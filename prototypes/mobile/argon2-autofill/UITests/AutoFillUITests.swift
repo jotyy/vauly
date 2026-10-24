@@ -97,4 +97,52 @@ final class AutoFillUITests: XCTestCase {
 		shot("\(prefix)7-after-link")
 		shell.activate()
 	}
+
+	/** The iPhone look (#82 step 2): the same screens through the tab bar, scrolled too. */
+	func testNativeScreens() throws {
+		let shell = XCUIApplication(bundleIdentifier: "app.vauly.proto.shell")
+		shell.activate()
+		let web = shell.webViews.firstMatch
+		let prefix = ProcessInfo.processInfo.environment["VAULY_PROTO_PREFIX"] ?? ""
+		func tap(_ label: String) {
+			let any = web.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label))
+			let element = any.allElementsBoundByIndex.first(where: { $0.isHittable }) ?? any.firstMatch
+			XCTAssertTrue(element.waitForExistence(timeout: 15), label)
+			element.tap()
+			sleep(2)
+		}
+		let signIn = web.buttons["Sign in"]
+		if signIn.waitForExistence(timeout: 20) {
+			sleep(1)
+			shot("\(prefix)1-sign-in")
+			signIn.tap()
+		}
+		XCTAssertTrue(web.links["Items"].waitForExistence(timeout: 60))
+		sleep(3)
+		shot("\(prefix)2-overview")
+		web.swipeUp(velocity: .slow)
+		sleep(2)
+		shot("\(prefix)3-overview-scrolled")
+		tap("Items")
+		web.swipeDown(velocity: .fast)
+		sleep(2)
+		shot("\(prefix)4-items")
+		web.swipeUp(velocity: .slow)
+		sleep(2)
+		shot("\(prefix)5-items-scrolled")
+		web.swipeDown(velocity: .fast)
+		sleep(1)
+		let item = web.links.matching(NSPredicate(format: "label CONTAINS 'AWS root'")).firstMatch
+		XCTAssertTrue(item.waitForExistence(timeout: 10))
+		item.tap()
+		sleep(3)
+		shot("\(prefix)6-item")
+		tap("Settings")
+		sleep(2)
+		shot("\(prefix)7-settings")
+		tap("Items")
+		tap("New item")
+		sleep(2)
+		shot("\(prefix)8-new-item-sheet")
+	}
 }
