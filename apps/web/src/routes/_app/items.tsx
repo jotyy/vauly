@@ -138,7 +138,10 @@ function Items() {
 			title={vault ? vault.name : "All items"}
 			description={description}
 		>
-			<div className="mb-3 flex flex-wrap-reverse items-center justify-between gap-3">
+			<div
+				data-slot="page-toolbar"
+				className="mb-3 flex flex-wrap-reverse items-center justify-between gap-3"
+			>
 				<Tabs
 					className="max-md:w-full max-md:overflow-x-auto"
 					value={search.kind ?? "all"}
@@ -213,8 +216,13 @@ function Items() {
 				/>
 			) : (
 				// On phones the list and the open item take turns: picking an item shows it alone.
-				<div className="grid grid-cols-1 items-start gap-3 md:grid-cols-5">
+				<div
+					data-slot="item-browser"
+					data-open={search.id ? "true" : undefined}
+					className="grid grid-cols-1 items-start gap-3 md:grid-cols-5"
+				>
 					<section
+						data-slot="item-list"
 						aria-label="Items"
 						className={cn(
 							"rounded-window bg-surface shadow-card flex flex-col gap-0.5 p-1.5 md:col-span-2",
@@ -256,6 +264,7 @@ function Items() {
 									to="/items"
 									search={(prev) => ({ ...prev, id: item.id })}
 									aria-current={active ? "true" : undefined}
+									data-slot="item-row"
 									className={cn(
 										"flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors",
 										active ? "bg-tint/6" : "hover:bg-tint/3",
@@ -263,7 +272,10 @@ function Items() {
 								>
 									<ItemTile kind={item.kind} logo={logoDomain(item)} />
 									<div className="flex min-w-0 flex-1 flex-col">
-										<span className="text-body-sm text-fg flex items-center gap-1 truncate">
+										<span
+											data-slot="item-name"
+											className="text-body-sm text-fg flex items-center gap-1 truncate"
+										>
 											{item.name}
 											{item.favorite && (
 												<StarIcon
@@ -272,7 +284,10 @@ function Items() {
 												/>
 											)}
 										</span>
-										<span className="text-caption text-fg-subtle truncate">
+										<span
+											data-slot="item-subtitle"
+											className="text-caption text-fg-subtle truncate"
+										>
 											{note(item)}
 										</span>
 									</div>
@@ -293,6 +308,7 @@ function Items() {
 						)}
 					>
 						<Button
+							data-slot="item-back"
 							variant="ghost"
 							size="sm"
 							className="w-fit md:hidden"

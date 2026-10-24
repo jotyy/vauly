@@ -17,10 +17,18 @@ const bridge = (globalThis as { Capacitor?: Bridge }).Capacitor;
 /** Whether this is the vauly app, rather than a browser. */
 export const isNativeApp = bridge?.isNativePlatform() ?? false;
 
-/** Marks the page for the app's own styling, as `html[data-native="ios"]`. */
+/**
+ * The app's type, while #82 compares two: the system font with Apple's text styles
+ * ("sf"), or vauly's Spline Sans retuned for a phone ("spline"). Chosen at build time.
+ */
+const nativeType =
+	import.meta.env.VITE_NATIVE_TYPE === "spline" ? "spline" : "sf";
+
+/** Marks the page for the app's own styling, as `html[data-native="ios"][data-type="sf"]`. */
 export function markNativeApp() {
 	if (isNativeApp && bridge) {
 		document.documentElement.dataset.native = bridge.getPlatform();
+		document.documentElement.dataset.type = nativeType;
 	}
 }
 

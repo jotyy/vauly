@@ -656,8 +656,14 @@ function Row({
 	return (
 		<div className="flex flex-col gap-3 px-4 py-3.5 md:flex-row md:items-center md:justify-between md:gap-6">
 			<div className="flex min-w-0 flex-col gap-0.5">
-				<span className="text-body-sm text-fg">{label}</span>
-				{hint && <span className="text-caption text-fg-muted">{hint}</span>}
+				<span data-slot="row-label" className="text-body-sm text-fg">
+					{label}
+				</span>
+				{hint && (
+					<span data-slot="row-hint" className="text-caption text-fg-muted">
+						{hint}
+					</span>
+				)}
 			</div>
 			<div className="flex shrink-0 items-center gap-2 max-md:w-full">
 				{children}
