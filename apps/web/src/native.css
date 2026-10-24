@@ -1,0 +1,645 @@
+/*
+ * The vauly app for iPhone (lib/native.ts sets html[data-native="ios"]). Everything here
+ * is scoped to it, so the website and the desktop app never see it. It sits outside the
+ * cascade layers, so it outranks the app's Tailwind utilities.
+ *
+ * Two type directions are compared for #82 (html[data-type]):
+ *   sf     the system font with Apple's text styles. WebKit draws -apple-system exactly
+ *          as UIKit draws the system font, size-specific tracking included (measured:
+ *          the same widths at every text-style size), so letter-spacing stays normal.
+ *   spline vauly's own face, Spline Sans, retuned for a phone, with tracking set per size.
+ * Each maps the app's semantic sizes (text-caption, text-body-sm, …) to one phone scale.
+ */
+
+/* ── Surfaces: an iPhone's grouped background, with white groups on it ───────────── */
+
+html[data-native][data-type] {
+	--frame: #f2f2f7;
+	--canvas: #f2f2f7;
+	--background: #f2f2f7;
+	--surface: #ffffff;
+	--surface-sunken: #f2f2f7;
+	--fg: #000000;
+	--fg-emphasis: #1c1c1e;
+	--fg-muted: #3a3a3c;
+	--fg-subtle: #6c6c70;
+	--fg-faint: #aeaeb2;
+	--line: rgb(60 60 67 / 0.17);
+	--line-subtle: rgb(60 60 67 / 0.12);
+	--line-strong: rgb(60 60 67 / 0.29);
+	--round-window: 22px;
+	--round-shell: 22px;
+	--round-panel: 22px;
+	--native-material: rgb(242 242 247 / 0.82);
+	--native-bar: rgb(255 255 255 / 0.72);
+	--native-press: rgb(0 0 0 / 0.06);
+	background-color: var(--frame);
+}
+
+html.dark[data-native][data-type] {
+	--frame: #000000;
+	--canvas: #000000;
+	--background: #000000;
+	--surface: #1c1c1e;
+	--surface-sunken: #2c2c2e;
+	--fg: #ffffff;
+	--fg-emphasis: #f2f2f7;
+	--fg-muted: #d1d1d6;
+	--fg-subtle: #98989f;
+	--fg-faint: #636366;
+	--line: rgb(84 84 88 / 0.62);
+	--line-subtle: rgb(84 84 88 / 0.42);
+	--line-strong: rgb(84 84 88 / 0.8);
+	--native-material: rgb(0 0 0 / 0.78);
+	--native-bar: rgb(37 37 40 / 0.72);
+	--native-press: rgb(255 255 255 / 0.08);
+}
+
+/* ── Type: (A) the system font, Apple's text styles ─────────────────────────────── */
+
+html[data-native][data-type="sf"] {
+	--font-text: -apple-system, system-ui, sans-serif;
+	--font-display: -apple-system, system-ui, sans-serif;
+	--font-code: ui-monospace, "SF Mono", Menlo, monospace;
+	/* Large Title, Title 1–3, Headline, Body, Subheadline, Footnote, Caption 1: size and
+	   line height from Apple's table at the default text size. */
+	--type-large: 700 34px / 1.206 var(--font-display);
+	--type-title1: 700 28px / 1.214 var(--font-display);
+	--type-title2: 700 22px / 1.273 var(--font-display);
+	--type-title3: 600 20px / 1.25 var(--font-display);
+	--type-headline: 600 17px / 1.294 var(--font-text);
+	--type-body: 400 17px / 1.294 var(--font-text);
+	--type-subheadline: 400 15px / 1.333 var(--font-text);
+	--type-footnote: 400 13px / 1.385 var(--font-text);
+	--type-caption: 400 12px / 1.333 var(--font-text);
+	--type-tab: 600 10px / 1.2 var(--font-text);
+	--fs-title1: 28px;
+	--lh-title1: 1.214;
+	--fs-title2: 22px;
+	--lh-title2: 1.273;
+	--fs-title3: 20px;
+	--lh-title3: 1.25;
+	--fs-body: 17px;
+	--lh-body: 1.294;
+	--fs-sub: 15px;
+	--lh-sub: 1.333;
+	--fs-foot: 13px;
+	--lh-foot: 1.385;
+	--fs-cap: 12px;
+	--lh-cap: 1.333;
+	--fw-title: 700;
+	--fw-title3: 600;
+	--fw-button: 500;
+	--track-large: normal;
+	--track-title: normal;
+	--track-body: normal;
+	--track-small: normal;
+	--track-label: 0.03em;
+	--type-code: 600 22px / 1.2 var(--font-text);
+	--track-code: 0.04em;
+	--type-secret: 400 17px / 1.294 var(--font-code);
+}
+
+/* ── Type: (B) Spline Sans, retuned for a phone ─────────────────────────────────── */
+
+html[data-native][data-type="spline"] {
+	--font-text: "Spline Sans Variable", system-ui, sans-serif;
+	--font-display: "Spline Sans Variable", system-ui, sans-serif;
+	--font-code: "Spline Sans Mono Variable", ui-monospace, monospace;
+	/* Spline runs wide with a tall x-height, so each step sits a little under Apple's,
+	   with tighter tracking as the size grows and a touch looser in the small sizes. */
+	--type-large: 650 32px / 1.125 var(--font-display);
+	--type-title1: 620 26px / 1.154 var(--font-display);
+	--type-title2: 620 22px / 1.182 var(--font-display);
+	--type-title3: 600 19px / 1.263 var(--font-display);
+	--type-headline: 560 16px / 1.375 var(--font-text);
+	--type-body: 400 16px / 1.4 var(--font-text);
+	--type-subheadline: 400 14.5px / 1.379 var(--font-text);
+	--type-footnote: 420 13px / 1.385 var(--font-text);
+	--type-caption: 480 12px / 1.333 var(--font-text);
+	--type-tab: 580 10.5px / 1.2 var(--font-text);
+	--fs-title1: 26px;
+	--lh-title1: 1.154;
+	--fs-title2: 22px;
+	--lh-title2: 1.182;
+	--fs-title3: 19px;
+	--lh-title3: 1.263;
+	--fs-body: 16px;
+	--lh-body: 1.4;
+	--fs-sub: 14.5px;
+	--lh-sub: 1.379;
+	--fs-foot: 13px;
+	--lh-foot: 1.385;
+	--fs-cap: 12px;
+	--lh-cap: 1.333;
+	--fw-title: 620;
+	--fw-title3: 600;
+	--fw-button: 470;
+	--track-large: -0.026em;
+	--track-title: -0.018em;
+	--track-body: -0.006em;
+	--track-small: 0.004em;
+	--track-label: 0.06em;
+	--type-code: 500 21px / 1.2 var(--font-code);
+	--track-code: 0.03em;
+	--type-secret: 400 15.5px / 1.4 var(--font-code);
+}
+
+/*
+ * The app's sizes, mapped onto the phone scale. Only size, line height and tracking: the
+ * weight, family and figures stay with each element's own classes. :where() keeps these
+ * below the component rules further down; unlayered, they still outrank the utilities.
+ */
+html[data-native][data-type] {
+	& body {
+		font-size: var(--fs-body);
+		line-height: var(--lh-body);
+		letter-spacing: var(--track-body);
+	}
+	& :where(.text-h3) {
+		font-size: var(--fs-title1);
+		line-height: var(--lh-title1);
+		font-weight: var(--fw-title);
+		letter-spacing: var(--track-title);
+	}
+	& :where(.text-h4, .text-stat) {
+		font-size: var(--fs-title2);
+		line-height: var(--lh-title2);
+		letter-spacing: var(--track-title);
+	}
+	& :where(.text-h5) {
+		font-size: var(--fs-title3);
+		line-height: var(--lh-title3);
+		font-weight: var(--fw-title3);
+		letter-spacing: var(--track-title);
+	}
+	/* Fields and the few places that ask for body text get Body; the app's running text,
+	   rows that read as sentences, gets Subheadline; small print gets Footnote. */
+	& :where(.text-body, .text-field) {
+		font-size: var(--fs-body);
+		line-height: var(--lh-body);
+		letter-spacing: var(--track-body);
+	}
+	& :where(.text-body-sm) {
+		font-size: var(--fs-sub);
+		line-height: var(--lh-sub);
+		letter-spacing: var(--track-small);
+	}
+	& :where(.text-caption) {
+		font-size: var(--fs-foot);
+		line-height: var(--lh-foot);
+		letter-spacing: var(--track-small);
+	}
+	& :where(.text-micro) {
+		font-size: var(--fs-cap);
+		line-height: var(--lh-cap);
+		letter-spacing: var(--track-small);
+	}
+	/* Fields read at body size, which they need anyway: no zoom, and no mismatch. */
+	&
+		:where(
+			input:not(
+				[type="checkbox"],
+				[type="radio"],
+				[type="range"],
+				[type="file"]
+			),
+			textarea,
+			select
+		) {
+		font-size: var(--fs-body);
+		line-height: var(--lh-body);
+		letter-spacing: var(--track-body);
+	}
+}
+
+/* ── The shell: no top bar or sidebar; a tab bar instead ────────────────────────── */
+
+html[data-native] {
+	& [data-slot="topbar"] {
+		display: none;
+	}
+	/* Room under the content for the floating tab bar. */
+	& [data-slot="app-main"] {
+		padding-bottom: calc(env(safe-area-inset-bottom) + 72px);
+	}
+}
+
+html[data-native] [data-slot="tab-bar-dock"] {
+	position: fixed;
+	right: 0;
+	bottom: max(calc(env(safe-area-inset-bottom) - 12px), 12px);
+	left: 0;
+	z-index: 40;
+	display: flex;
+	gap: 10px;
+	padding: 0 calc(16px + env(safe-area-inset-right)) 0
+		calc(16px + env(safe-area-inset-left));
+	pointer-events: none;
+
+	& > * {
+		pointer-events: auto;
+		background: var(--native-bar);
+		backdrop-filter: blur(24px) saturate(1.8);
+		box-shadow:
+			0 0 0 0.5px var(--line),
+			0 8px 28px rgb(0 0 0 / 0.12);
+	}
+}
+
+html[data-native] [data-slot="tab-bar"] {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	height: 62px;
+	padding: 4px;
+	border-radius: 31px;
+}
+
+html[data-native] [data-slot="tab"] {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	height: 54px;
+	border-radius: 27px;
+	font: var(--type-tab);
+	letter-spacing: var(--track-small);
+	color: var(--fg-muted);
+	transition:
+		scale 160ms ease-out,
+		background-color 160ms ease-out;
+
+	& svg {
+		width: 25px;
+		height: 25px;
+	}
+
+	&[aria-current="page"] {
+		color: var(--brand);
+		background: color-mix(in srgb, var(--brand) 12%, transparent);
+	}
+
+	&:active {
+		scale: 0.96;
+	}
+}
+
+html[data-native] [data-slot="tab-search"] {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 62px;
+	height: 62px;
+	border-radius: 31px;
+	color: var(--fg);
+	transition: scale 160ms ease-out;
+
+	& svg {
+		width: 23px;
+		height: 23px;
+	}
+
+	&:active {
+		scale: 0.96;
+	}
+}
+
+/* ── Pages: a large title under a nav bar that takes it over as it scrolls away ──── */
+
+html[data-native] [data-slot="page"] {
+	padding: 0 16px;
+}
+
+html[data-native] [data-slot="nav-bar"] {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 44px;
+	margin: 0 -16px;
+	padding: 0 56px;
+	transition:
+		background-color 200ms ease-out,
+		box-shadow 200ms ease-out;
+
+	& > span {
+		overflow: hidden;
+		font: var(--type-headline);
+		letter-spacing: var(--track-body);
+		color: var(--fg);
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		opacity: 0;
+		translate: 0 4px;
+		transition:
+			opacity 200ms ease-out,
+			translate 200ms ease-out;
+	}
+
+	&[data-collapsed] {
+		background: var(--native-material);
+		backdrop-filter: blur(20px) saturate(1.8);
+		box-shadow: 0 0.5px 0 var(--line);
+
+		& > span {
+			opacity: 1;
+			translate: 0 0;
+		}
+	}
+}
+
+html[data-native] [data-slot="page-header"] {
+	align-items: flex-start;
+	gap: 4px;
+	margin: 2px 0 20px;
+	padding: 0 4px;
+	text-align: start;
+
+	& h1 {
+		font: var(--type-large);
+		letter-spacing: var(--track-large);
+		text-wrap: balance;
+	}
+
+	& p {
+		font: var(--type-subheadline);
+		letter-spacing: var(--track-small);
+		color: var(--fg-subtle);
+		text-wrap: pretty;
+	}
+}
+
+/* Section titles over grouped lists: a small uppercase label, one tracking everywhere. */
+html[data-native] [data-slot="section-title"] {
+	margin-bottom: 6px;
+	padding: 0 16px;
+
+	& h2 {
+		font: var(--type-footnote);
+		letter-spacing: var(--track-label);
+		text-transform: uppercase;
+		color: var(--fg-subtle);
+	}
+}
+
+/* Settings rows: the label at body size, its hint as small print. */
+html[data-native] [data-slot="row-label"] {
+	font: var(--type-body);
+	letter-spacing: var(--track-body);
+}
+
+html[data-native] [data-slot="row-hint"] {
+	font: var(--type-footnote);
+	letter-spacing: var(--track-small);
+	color: var(--fg-subtle);
+	text-wrap: pretty;
+}
+
+/* Buttons a step under body, medium, so a row's label stays the loudest thing in it. */
+html[data-native] [data-slot="button"] {
+	font-size: var(--fs-sub);
+	font-weight: var(--fw-button);
+	letter-spacing: var(--track-small);
+}
+
+/* Short paragraphs end on more than one word. */
+html[data-native] :where(p) {
+	text-wrap: pretty;
+}
+
+/* The copy and reveal buttons in an item's fields: a finger's worth to hit. */
+html[data-native] [data-slot="field"] [data-slot="button"] {
+	min-width: 44px;
+	min-height: 44px;
+}
+
+html[data-native] [data-slot="dialog-title"] {
+	font: var(--type-title3);
+	letter-spacing: var(--track-title);
+	text-wrap: balance;
+}
+
+/* Cards become inset groups: flat on the grouped background, no shadow. */
+html[data-native] .rounded-window.shadow-card {
+	border-radius: 22px;
+	box-shadow: none;
+}
+
+/* ── Items: an inset-grouped list, and an item pushed on top of it ─────────────── */
+
+html[data-native] [data-slot="page-toolbar"] {
+	gap: 10px;
+	margin-bottom: 16px;
+
+	& [data-slot="input-group"] {
+		height: 40px;
+		border: 0;
+		border-radius: 12px;
+		background: rgb(118 118 128 / 0.12);
+		box-shadow: none;
+	}
+}
+
+html[data-native] [data-slot="item-list"] {
+	gap: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+html[data-native] [data-slot="item-row"] {
+	position: relative;
+	gap: 12px;
+	min-height: 62px;
+	padding: 10px 34px 10px 16px;
+	border-radius: 0;
+	background: none;
+	transition: background-color 120ms ease-out;
+
+	/* A separator from the text's edge to the right, as in iOS lists. */
+	& + &::before {
+		content: "";
+		position: absolute;
+		top: 0;
+		right: 0;
+		left: 64px;
+		height: 0.5px;
+		background: var(--line);
+	}
+
+	/* The disclosure chevron. */
+	&::after {
+		content: "";
+		position: absolute;
+		top: 50%;
+		right: 16px;
+		width: 8px;
+		height: 13px;
+		translate: 0 -50%;
+		background: var(--fg-faint);
+		mask:
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 13'%3E%3Cpath d='M1.5 1.5 6.5 6.5l-5 5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+			center / contain no-repeat;
+	}
+
+	&:active {
+		background: var(--native-press);
+	}
+}
+
+html[data-native] [data-slot="item-name"] {
+	font: var(--type-body);
+	font-weight: 500;
+	letter-spacing: var(--track-body);
+}
+
+html[data-native] [data-slot="item-subtitle"] {
+	font: var(--type-subheadline);
+	letter-spacing: var(--track-small);
+	color: var(--fg-subtle);
+}
+
+/* An open item replaces the list, the way a pushed screen does. */
+html[data-native]
+	[data-slot="page"]:has([data-slot="item-browser"][data-open])
+	:is(
+		[data-slot="nav-bar"],
+		[data-slot="page-header"],
+		[data-slot="page-toolbar"]
+	) {
+	display: none;
+}
+
+html[data-native] [data-slot="item-back"] {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	width: calc(100% + 32px);
+	height: 44px;
+	margin: 0 -16px;
+	padding: 0 12px 0 8px;
+	justify-content: flex-start;
+	border-radius: 0;
+	background: var(--native-material);
+	backdrop-filter: blur(20px) saturate(1.8);
+	font: var(--type-body);
+	letter-spacing: var(--track-body);
+	color: var(--brand);
+
+	& svg {
+		width: 22px;
+		height: 22px;
+	}
+}
+
+html[data-native] [data-slot="item-title"] {
+	font: var(--type-title1);
+	letter-spacing: var(--track-title);
+	white-space: normal;
+	text-wrap: balance;
+}
+
+/* Fields: a small label over its value, the way the Passwords app shows them. */
+html[data-native] [data-slot="field"] {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 2px;
+	min-height: 64px;
+	padding: 11px 0;
+
+	& > dt {
+		width: auto;
+		font: var(--type-footnote);
+		letter-spacing: var(--track-small);
+		color: var(--fg-subtle);
+	}
+
+	& > dd {
+		font: var(--type-body);
+		letter-spacing: var(--track-body);
+	}
+
+	/* Secrets in the face's mono; one-time codes keep their own style, below. */
+	& .font-mono:not([data-slot="one-time-code"]) {
+		font: var(--type-secret);
+	}
+}
+
+/* One-time codes: tabular, so the digits don't jump as the code changes. */
+html[data-native] [data-slot="one-time-code"] {
+	font: var(--type-code);
+	letter-spacing: var(--track-code);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Sheets: dialogs rise from the bottom ───────────────────────────────────────── */
+
+@keyframes native-sheet-in {
+	from {
+		translate: 0 100%;
+	}
+}
+
+@keyframes native-sheet-out {
+	to {
+		translate: 0 100%;
+	}
+}
+
+html[data-native] [data-slot="dialog-content"] {
+	top: auto;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+	max-width: none;
+	max-height: calc(100svh - env(safe-area-inset-top) - 12px);
+	padding: 28px 20px calc(20px + env(safe-area-inset-bottom));
+	border-radius: 28px 28px 0 0;
+	translate: none;
+	animation: native-sheet-in 360ms cubic-bezier(0.32, 0.72, 0, 1);
+
+	/* The grabber. */
+	&::before {
+		content: "";
+		position: absolute;
+		top: 7px;
+		left: 50%;
+		width: 36px;
+		height: 5px;
+		translate: -50% 0;
+		border-radius: 3px;
+		background: var(--line-strong);
+	}
+
+	&[data-closed] {
+		animation: native-sheet-out 200ms ease-out forwards;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html[data-native] [data-slot="dialog-content"] {
+		animation: none;
+
+		&[data-closed] {
+			animation: none;
+		}
+	}
+}
+
+/* ── Press feedback ─────────────────────────────────────────────────────────────── */
+
+html[data-native] [data-slot="button"] {
+	transition-property: scale, color, background-color, box-shadow;
+	transition-duration: 160ms;
+	transition-timing-function: ease-out;
+
+	&:active:not(:disabled) {
+		scale: 0.96;
+	}
+}

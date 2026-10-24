@@ -50,7 +50,10 @@ export function OneTimeCode({
 
 	return (
 		<div className="flex items-center gap-2">
-			<span className="text-body-sm text-fg font-mono tracking-wider tabular-nums">
+			<span
+				data-slot="one-time-code"
+				className="text-body-sm text-fg font-mono tracking-wider tabular-nums"
+			>
 				{code ? `${code.slice(0, 3)} ${code.slice(3)}` : "··· ···"}
 			</span>
 			<span className="text-caption text-fg-subtle flex items-center gap-1 tabular-nums">

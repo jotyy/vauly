@@ -53,7 +53,7 @@ import { useApplyAppStyle } from "@/lib/app-style";
 import { useOnline } from "@/lib/connection";
 import { ago, initials, toneDot } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
-import { setStatusBarText } from "@/lib/native";
+import { isNativeApp, setStatusBarText } from "@/lib/native";
 import { useOfflineCopy } from "@/lib/offline";
 import {
 	useDeletedItems,
@@ -63,6 +63,7 @@ import {
 } from "@/lib/vault-data";
 
 import { CommandPalette } from "./command-palette";
+import { NativeTabBar } from "./native-tab-bar";
 import { VaulyMark } from "./vauly-mark";
 
 /** What the status bar's text reads over at the top of the app: the demo banner, or the page. */
@@ -137,6 +138,7 @@ export function AppShell() {
 					<Outlet />
 				</main>
 			</div>
+			{isNativeApp && <NativeTabBar onSearch={() => setSearching(true)} />}
 			<CommandPalette open={searching} onOpenChange={setSearching} />
 		</div>
 	);

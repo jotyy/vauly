@@ -1,5 +1,6 @@
 @import "@vauly/ui/globals.css";
 @import "./themes.css";
+@import "./native.css";
 
 /*
  * Empty vault: two rows of example items drift past in opposite directions, fading out
