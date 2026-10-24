@@ -16,6 +16,36 @@ const MENU_WIDTH = { min: 300, max: 380 };
 const MENU_HEIGHT = 264;
 const BUTTON = 24;
 
+/**
+ * vauly's elements in the page take every rule as !important, so a page's style sheets
+ * can't fade, hide or move them, and a change the page makes to their style is undone.
+ */
+const HOST =
+	"all: initial !important; position: fixed !important; z-index: 2147483647 !important; display: block !important;";
+const pinned = new WeakMap<HTMLElement, string>();
+const guard = new MutationObserver((records) => {
+	for (const { target } of records) {
+		const host = target as HTMLElement;
+		const style = pinned.get(host);
+		if (style === undefined) continue;
+		if (host.getAttribute("style") !== style) host.setAttribute("style", style);
+		host.removeAttribute("inert");
+	}
+});
+
+function pin(host: HTMLElement, top: number, left: number) {
+	host.setAttribute(
+		"style",
+		`${HOST} top: ${top}px !important; left: ${left}px !important;`,
+	);
+	if (!pinned.has(host))
+		guard.observe(host, {
+			attributes: true,
+			attributeFilter: ["style", "inert"],
+		});
+	pinned.set(host, host.getAttribute("style") ?? "");
+}
+
 type Mounted = {
 	host: HTMLElement;
 	frame: HTMLIFrameElement;
@@ -43,18 +73,18 @@ export function mountFrames() {
 		// A field that keeps room on its right has something there, such as a show toggle.
 		const room = Number.parseFloat(getComputedStyle(field).paddingRight) || 0;
 		const right = room >= BUTTON + 4 ? room + 2 : 6;
-		Object.assign(host.style, {
-			top: `${rect.top + (rect.height - BUTTON) / 2}px`,
-			left: `${rect.right - right - BUTTON}px`,
-		});
+		pin(
+			host,
+			rect.top + (rect.height - BUTTON) / 2,
+			rect.right - right - BUTTON,
+		);
 	};
 
 	const showButton = (field: HTMLInputElement) => {
 		if (button?.field === field) return;
 		hideButton();
 		const host = document.createElement("vauly-button");
-		host.style.cssText =
-			"all: initial; position: fixed; z-index: 2147483647; display: block;";
+		pin(host, 0, 0);
 		const shadow = host.attachShadow({ mode: "closed" });
 		const style = document.createElement("style");
 		style.textContent = `
@@ -118,10 +148,7 @@ export function mountFrames() {
 			below < height && rect.top > below
 				? rect.top - 4 - height + PAD
 				: rect.bottom + 4 - PAD;
-		Object.assign(host.style, {
-			top: `${top}px`,
-			left: `${Math.max(0, rect.left - PAD)}px`,
-		});
+		pin(host, top, Math.max(0, rect.left - PAD));
 		frame.style.width = `${width + PAD * 2}px`;
 	};
 
@@ -131,8 +158,7 @@ export function mountFrames() {
 		if (current) close(view);
 
 		const host = document.createElement("vauly-frame");
-		host.style.cssText =
-			"all: initial; position: fixed; z-index: 2147483647; display: block;";
+		pin(host, 0, 0);
 		const shadow = host.attachShadow({ mode: "closed" });
 		const frame = document.createElement("iframe");
 		frame.title = "vauly: fill a login";
