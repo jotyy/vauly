@@ -55,24 +55,31 @@ html.dark[data-native][data-type] {
 	--native-press: rgb(255 255 255 / 0.08);
 }
 
-/* ── Type: (A) the system font, Apple's text styles ─────────────────────────────── */
+/* ── Type: (A) the system font, and the mix: SF text under Spline Sans titles ──────── */
 
-html[data-native][data-type="sf"] {
+/*
+ * Apple's text styles through WebKit's Dynamic Type keywords: they follow the person's
+ * text size (at the default, Body is 17px; at XXL, 21px). Large Title has no keyword, so
+ * it's sized from Title 1 (see the page header). The line heights are Apple's ratios.
+ */
+html[data-native]:is([data-type="sf"], [data-type="mix"]) {
 	--font-text: -apple-system, system-ui, sans-serif;
 	--font-display: -apple-system, system-ui, sans-serif;
 	--font-code: ui-monospace, "SF Mono", Menlo, monospace;
-	/* Large Title, Title 1–3, Headline, Body, Subheadline, Footnote, Caption 1: size and
-	   line height from Apple's table at the default text size. */
-	--type-large: 700 34px / 1.206 var(--font-display);
-	--type-title1: 700 28px / 1.214 var(--font-display);
-	--type-title2: 700 22px / 1.273 var(--font-display);
-	--type-title3: 600 20px / 1.25 var(--font-display);
-	--type-headline: 600 17px / 1.294 var(--font-text);
-	--type-body: 400 17px / 1.294 var(--font-text);
-	--type-subheadline: 400 15px / 1.333 var(--font-text);
-	--type-footnote: 400 13px / 1.385 var(--font-text);
-	--type-caption: 400 12px / 1.333 var(--font-text);
+	--type-title1: -apple-system-title1;
+	--type-title2: -apple-system-title2;
+	--type-title3: -apple-system-title3;
+	--type-headline: -apple-system-headline;
+	--type-body: -apple-system-body;
+	--type-subheadline: -apple-system-subheadline;
+	--type-footnote: -apple-system-footnote;
+	--type-caption: -apple-system-caption1;
 	--type-tab: 600 10px / 1.2 var(--font-text);
+	--large-em: 1.2143em;
+	--lh-large: 1.206;
+	--display-weight: 700;
+	--track-display: normal;
+	--code-weight: 600;
 	--fs-title1: 28px;
 	--lh-title1: 1.214;
 	--fs-title2: 22px;
@@ -95,9 +102,23 @@ html[data-native][data-type="sf"] {
 	--track-body: normal;
 	--track-small: normal;
 	--track-label: 0.03em;
-	--type-code: 600 22px / 1.2 var(--font-text);
+	--type-code: -apple-system-title2;
 	--track-code: 0.04em;
-	--type-secret: 400 17px / 1.294 var(--font-code);
+	--type-secret: -apple-system-body;
+}
+
+/*
+ * The mix: Spline Sans only where vauly speaks in its own voice, the large titles, the
+ * item's name over its fields and the sign-in title; SF for everything that's read. At
+ * 34px Spline runs wider and darker than SF Display, so it sits a weight lighter and
+ * tighter, to keep the same colour next to SF body text.
+ */
+html[data-native][data-type="mix"] {
+	--font-display: "Spline Sans Variable", -apple-system, system-ui, sans-serif;
+	--display-weight: 640;
+	--track-large: -0.032em;
+	--track-display: -0.022em;
+	--lh-large: 1.1;
 }
 
 /* ── Type: (B) Spline Sans, retuned for a phone ─────────────────────────────────── */
@@ -135,6 +156,11 @@ html[data-native][data-type="spline"] {
 	--fw-title: 620;
 	--fw-title3: 600;
 	--fw-button: 470;
+	--large-em: 1.2308em;
+	--lh-large: 1.125;
+	--display-weight: 650;
+	--track-display: -0.018em;
+	--code-weight: 500;
 	--track-large: -0.026em;
 	--track-title: -0.018em;
 	--track-body: -0.006em;
@@ -210,6 +236,71 @@ html[data-native][data-type] {
 		font-size: var(--fs-body);
 		line-height: var(--lh-body);
 		letter-spacing: var(--track-body);
+	}
+}
+
+/*
+ * SF text takes Apple's styles whole, so it follows Dynamic Type. The `font` keyword also
+ * resets weight, figures and face, so each element's own get their say again after it.
+ */
+html[data-native]:is([data-type="sf"], [data-type="mix"]) {
+	&
+		:where(
+			.text-body,
+			.text-field,
+			input:not(
+				[type="checkbox"],
+				[type="radio"],
+				[type="range"],
+				[type="file"]
+			),
+			textarea,
+			select
+		) {
+		font: -apple-system-body;
+		line-height: var(--lh-body);
+	}
+	& :where(.text-body-sm) {
+		font: -apple-system-subheadline;
+		line-height: var(--lh-sub);
+	}
+	& :where(.text-caption) {
+		font: -apple-system-footnote;
+		line-height: var(--lh-foot);
+	}
+	& :where(.text-micro) {
+		font: -apple-system-caption1;
+		line-height: var(--lh-cap);
+	}
+	& :where(.text-h5) {
+		font: -apple-system-title3;
+		font-weight: 600;
+		line-height: var(--lh-title3);
+	}
+	& :where(.text-h4, .text-stat) {
+		font: -apple-system-title2;
+		font-weight: 700;
+		line-height: var(--lh-title2);
+	}
+	& :where(.text-h3) {
+		font: -apple-system-title1;
+		font-weight: 700;
+		line-height: var(--lh-title1);
+	}
+	& :where(.font-medium) {
+		font-weight: 500;
+	}
+	& :where(.font-semibold, .font-bold) {
+		font-weight: 600;
+	}
+	& :where(.tabular-nums) {
+		font-variant-numeric: tabular-nums;
+	}
+	& :where(.font-mono) {
+		font-family: var(--font-code);
+	}
+	& :where(.italic) {
+		font-style: italic;
 	}
 }
 
@@ -354,21 +445,30 @@ html[data-native] [data-slot="nav-bar"] {
 	}
 }
 
+/*
+ * The header carries Title 1, and the large title is sized from it in em (34 over 28),
+ * so it grows with the person's text size though no keyword names it.
+ */
 html[data-native] [data-slot="page-header"] {
 	align-items: flex-start;
 	gap: 4px;
 	margin: 2px 0 20px;
 	padding: 0 4px;
+	font: var(--type-title1);
 	text-align: start;
 
 	& h1 {
-		font: var(--type-large);
+		font-family: var(--font-display);
+		font-size: var(--large-em);
+		font-weight: var(--display-weight);
+		line-height: var(--lh-large);
 		letter-spacing: var(--track-large);
 		text-wrap: balance;
 	}
 
 	& p {
 		font: var(--type-subheadline);
+		line-height: var(--lh-sub);
 		letter-spacing: var(--track-small);
 		color: var(--fg-subtle);
 		text-wrap: pretty;
@@ -537,10 +637,44 @@ html[data-native] [data-slot="item-back"] {
 	}
 }
 
+/* The item's header: tile and actions on top, the name across the full width under them,
+   so a long name wraps in whole lines instead of a column beside the buttons. */
+html[data-native] [data-slot="item-header"] {
+	flex-wrap: wrap;
+	align-items: center;
+	row-gap: 14px;
+	border-bottom: 0;
+
+	& > [data-slot="item-actions"] {
+		order: 1;
+		margin-left: auto;
+	}
+
+	& > [data-slot="item-heading"] {
+		order: 2;
+		flex-basis: 100%;
+	}
+}
+
 html[data-native] [data-slot="item-title"] {
+	overflow: visible;
+	text-overflow: clip;
 	font: var(--type-title1);
-	letter-spacing: var(--track-title);
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	line-height: 1.15;
+	letter-spacing: var(--track-display);
 	white-space: normal;
+	text-wrap: balance;
+}
+
+/* The sign-in pages' title, in the display face. */
+html[data-native] [data-slot="auth-title"] {
+	font: var(--type-title2);
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	line-height: 1.2;
+	letter-spacing: var(--track-display);
 	text-wrap: balance;
 }
 
@@ -567,12 +701,14 @@ html[data-native] [data-slot="field"] {
 	/* Secrets in the face's mono; one-time codes keep their own style, below. */
 	& .font-mono:not([data-slot="one-time-code"]) {
 		font: var(--type-secret);
+		font-family: var(--font-code);
 	}
 }
 
 /* One-time codes: tabular, so the digits don't jump as the code changes. */
 html[data-native] [data-slot="one-time-code"] {
 	font: var(--type-code);
+	font-weight: var(--code-weight);
 	letter-spacing: var(--track-code);
 	font-variant-numeric: tabular-nums;
 }
@@ -598,7 +734,8 @@ html[data-native] [data-slot="dialog-content"] {
 	left: 0;
 	width: 100%;
 	max-width: none;
-	max-height: calc(100svh - env(safe-area-inset-top) - 12px);
+	/* dvh follows the keyboard, so a sheet with a field open stays under the status bar. */
+	max-height: calc(100dvh - env(safe-area-inset-top) - 12px);
 	padding: 28px 20px calc(20px + env(safe-area-inset-bottom));
 	border-radius: 28px 28px 0 0;
 	translate: none;
@@ -630,6 +767,11 @@ html[data-native] [data-slot="dialog-content"] {
 			animation: none;
 		}
 	}
+}
+
+/* Toasts sit above the tab bar, not over it. */
+html[data-native] [data-sonner-toaster] {
+	--mobile-offset-bottom: calc(env(safe-area-inset-bottom) + 72px) !important;
 }
 
 /* ── Press feedback ─────────────────────────────────────────────────────────────── */

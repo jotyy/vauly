@@ -19,10 +19,14 @@ export const isNativeApp = bridge?.isNativePlatform() ?? false;
 
 /**
  * The app's type, while #82 compares two: the system font with Apple's text styles
- * ("sf"), or vauly's Spline Sans retuned for a phone ("spline"). Chosen at build time.
+ * ("sf"), vauly's Spline Sans retuned for a phone ("spline"), or SF text under Spline
+ * titles ("mix"). Chosen at build time.
  */
 const nativeType =
-	import.meta.env.VITE_NATIVE_TYPE === "spline" ? "spline" : "sf";
+	import.meta.env.VITE_NATIVE_TYPE === "spline" ||
+	import.meta.env.VITE_NATIVE_TYPE === "mix"
+		? import.meta.env.VITE_NATIVE_TYPE
+		: "sf";
 
 /** Marks the page for the app's own styling, as `html[data-native="ios"][data-type="sf"]`. */
 export function markNativeApp() {
