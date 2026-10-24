@@ -32,6 +32,8 @@
 			"!**/.source",
 			"!**/convex/_generated",
 			"!**/.wxt",
+			"!**/.build",
+			"!**/.swiftpm",
 			"!apps/site/public/docs",
 			"!apps/site/src/content/docs",
 			"!**/.astro",
