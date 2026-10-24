@@ -15,7 +15,9 @@ import {
 // the same size whatever it shows, and it closes through the background, never by
 // posting to the page, so the page learns nothing from it about what vauly holds.
 
-const close = () => void ask({ type: "vauly:menu-close" });
+/** The page script gives the menu a token in its address; the background answers no other frame. */
+const token = new URLSearchParams(location.hash.slice(1)).get("token") ?? "";
+const close = () => void ask({ type: "vauly:menu-close", token });
 
 export default function App() {
 	return <Menu />;
@@ -94,7 +96,7 @@ function Menu() {
 	const [state, setState] = useState<MenuState | null>(null);
 	const [note, setNote] = useState("");
 	const load = useCallback(
-		() => ask<MenuState>({ type: "vauly:menu" }).then(setState),
+		() => ask<MenuState>({ type: "vauly:menu", token }).then(setState),
 		[],
 	);
 	useEffect(() => void load(), [load]);
@@ -137,10 +139,14 @@ function Menu() {
 	}
 
 	const fill = async (login: MenuLogin) => {
-		const result = await ask<FillResult>({ type: "vauly:fill", id: login.id });
+		const result = await ask<FillResult>({
+			type: "vauly:fill",
+			id: login.id,
+			token,
+		});
 		if (!result?.ok) {
 			// vauly may have locked since the menu opened; then the menu says so instead.
-			const now = await ask<MenuState>({ type: "vauly:menu" });
+			const now = await ask<MenuState>({ type: "vauly:menu", token });
 			setState(now);
 			if (now?.status === "ready")
 				setNote("There's no password field to fill on this page.");

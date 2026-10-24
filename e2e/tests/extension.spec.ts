@@ -591,6 +591,39 @@ test("the page can't tell from vauly's button or menu what vauly holds", async (
 	expect(sizes[0]).toEqual(sizes[1]);
 });
 
+test("a frame of vauly's menu that the page script didn't make gets nothing", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	const menu = await openMenu(page, "Email");
+	const fill = `Fill ${login.name}, ${login.username}`;
+	await expect(menu.getByRole("button", { name: fill })).toBeVisible();
+	// Someone who knew the menu's address, its token too, frames it again in the page,
+	// and once more with a made-up token. Chrome doesn't load either: the menu's address
+	// changes every session. Firefox does, and the extension doesn't answer them, as
+	// e2e/firefox checks.
+	const address = menu.url();
+	await page.evaluate(
+		(urls) => {
+			for (const url of urls) {
+				const frame = document.createElement("iframe");
+				frame.src = url;
+				document.body.append(frame);
+			}
+		},
+		[address, address.replace(/token=[^&]+/, "token=made-up")],
+	);
+	await expect.poll(() => page.frames().length).toBe(4);
+	const copies = page.frames().slice(2);
+	for (const copy of copies) {
+		await copy.waitForLoadState();
+		expect(copy.url()).not.toContain("/inline.html");
+	}
+	// The menu the page script made still fills.
+	await menu.getByRole("button", { name: fill }).click();
+	await expect(page.getByLabel("Email")).toHaveValue(login.username);
+	await page.close();
+});
+
 test("a login that's saved already isn't offered again", async () => {
 	const url = "https://new.example.test";
 	const page = await signInOnSite(url, "sam@example.test", "brand-new-pass-77");

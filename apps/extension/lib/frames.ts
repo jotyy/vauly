@@ -5,6 +5,8 @@
 // The menu waits for the button rather than opening on focus: the browser draws its own
 // suggestions under the field, above anything a page can show.
 
+import { ask } from "./messages";
+
 export type View = "menu";
 
 /** Room around the card inside the frame, for its shadow. */
@@ -18,6 +20,8 @@ type Mounted = {
 	host: HTMLElement;
 	frame: HTMLIFrameElement;
 	anchor?: HTMLInputElement;
+	/** What the background gave this frame to show: it answers no other. */
+	token?: string;
 };
 
 export function mountFrames() {
@@ -131,21 +135,34 @@ export function mountFrames() {
 			"all: initial; position: fixed; z-index: 2147483647; display: block;";
 		const shadow = host.attachShadow({ mode: "closed" });
 		const frame = document.createElement("iframe");
-		frame.src = `${browser.runtime.getURL("/inline.html")}#${view}`;
 		frame.title = "vauly: fill a login";
 		// The frame copies a one-time code after filling.
 		frame.allow = "clipboard-write";
 		frame.style.cssText = `display: block; border: 0; background: transparent; color-scheme: normal; height: ${MENU_HEIGHT}px;`;
 		shadow.appendChild(frame);
 		document.documentElement.appendChild(host);
-		open.set(view, { host, frame, anchor });
+		const mounted: Mounted = { host, frame, anchor };
+		open.set(view, mounted);
 		if (view === "menu") button?.control.setAttribute("aria-expanded", "true");
 		place(view);
+		// The frame loads once the background has given it a token.
+		void ask<string>({ type: "vauly:menu-open" }).then((token) => {
+			if (!token) return;
+			if (open.get(view) !== mounted) {
+				void ask({ type: "vauly:menu-gone", token });
+				return;
+			}
+			mounted.token = token;
+			frame.src = `${browser.runtime.getURL("/inline.html")}#${new URLSearchParams({ view, token })}`;
+		});
 	};
 
 	const close = (view: View) => {
-		open.get(view)?.host.remove();
+		const mounted = open.get(view);
+		mounted?.host.remove();
 		open.delete(view);
+		if (mounted?.token)
+			void ask({ type: "vauly:menu-gone", token: mounted.token });
 		if (view !== "menu" || !button) return;
 		button.control.setAttribute("aria-expanded", "false");
 		if (document.activeElement !== button.field) hideButton();
