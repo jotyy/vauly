@@ -62,7 +62,8 @@ export function ItemFiles({
 	if (list.length === 0 && !canAttach) return null;
 
 	const attach = async (chosen: File[]) => {
-		const max = usage.data?.maxFile;
+		// A file chosen as the item opens can come before the limits do.
+		const max = (usage.data ?? (await usage.refetch()).data)?.maxFile;
 		for (const file of chosen) {
 			if (max !== undefined && file.size > max) {
 				notify.error(

@@ -92,11 +92,11 @@ Write commit messages as a short summary in the imperative ("Add Recently delete
 ## Cutting a release
 
 For maintainers. Versions follow semver. `next` carries the coming version with `-dev` (`0.2.0-dev`), and a release commit carries the plain one.
-1. **The release commit.** A pull request to `next` titled "Release 0.2.0" sets `"version": "0.2.0"` in the root `package.json` and turns **Unreleased** in CHANGELOG.md into `## 0.2.0 - <date>`.
+1. **The release commit.** A pull request to `next` titled "Release 0.2.0" sets `"version": "0.2.0"` in the root `package.json` and in `apps/extension/package.json`, and turns **Unreleased** in CHANGELOG.md into `## 0.2.0 - <date>`. A unit test fails if the two versions differ on a release commit.
 2. **The tag.** Tag the merged commit and push the tag: `git tag v0.2.0 <commit>` then `git push origin v0.2.0`. `cli.yml` builds the CLI and drafts a GitHub release.
 3. **Publish.** Paste that version's CHANGELOG section into the draft as its notes, attach the extension's zip, and publish it.
 4. **Move `main`.** Fast-forward `main` to the release: `git push origin v0.2.0^{commit}:main`.
-5. **Back to `-dev`.** Set `next` to the next version with `-dev` (`0.3.0-dev`), above an empty **Unreleased**.
+5. **Back to `-dev`.** Set `next` to the next version with `-dev` (`0.3.0-dev`), above an empty **Unreleased**. The extension keeps `0.2.0`, since Chrome takes only numbers in a version.
 
 A patch release fixes the latest release without what's new on `next`. Branch `release/0.2` from `v0.2.0`, cherry-pick the fixes, and commit "Release 0.2.1" with the version and its CHANGELOG section. Tag, publish and move `main` as above, then merge `release/0.2` back into `next`, so `main` can fast-forward to the next release from `next`.
 

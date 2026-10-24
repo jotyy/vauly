@@ -360,6 +360,15 @@ test("uploads started all at once stop at the total limit", async ({
 test("files over the limit are refused before they're sent", async ({
 	page,
 }) => {
+	// The limits arrive only after the file is chosen, as on a slow connection.
+	let release = () => {};
+	const limits = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	await page.route("**/rpc/files/usage", async (route) => {
+		await limits;
+		await route.continue().catch(() => {});
+	});
 	await signIn(page, owner);
 	await openItem(page);
 	await page.getByLabel("File to attach").setInputFiles({
@@ -367,7 +376,9 @@ test("files over the limit are refused before they're sent", async ({
 		mimeType: "application/octet-stream",
 		buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
 	});
+	release();
 	await expect(page.getByText("too-big.iso is too big")).toBeVisible();
+	await expect(page.getByText("Couldn't attach too-big.iso")).toHaveCount(0);
 	const { json: items } = JSON.parse(await apiFromPage(page, "items/list")) as {
 		json: { id: string }[];
 	};
