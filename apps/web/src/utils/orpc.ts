@@ -52,9 +52,19 @@ export const link = new RPCLink({
 			// A cancelled request isn't a missing network.
 			if (err instanceof DOMException && err.name === "AbortError") throw err;
 			setOnline(false);
-			throw new OfflineError();
+			throw new OfflineError(new URL(serverUrl()).host);
 		}
 		setOnline(true);
+		// The API answers in JSON, errors too. Anything else came from in front of it, such
+		// as a proxy's error page, so say that instead of a parsing error.
+		if (
+			response.status >= 500 &&
+			!response.headers.get("content-type")?.includes("json")
+		) {
+			throw new Error(
+				`${new URL(serverUrl()).host} answered with an error (${response.status}). Try again in a moment.`,
+			);
+		}
 		if (response.status === 401) window.dispatchEvent(new Event(SESSION_ENDED));
 		if (response.status === 403) {
 			response
