@@ -1,6 +1,13 @@
 import { GlobeIcon } from "@phosphor-icons/react";
 import { Button } from "@vauly/ui/components/button";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+	type MouseEvent,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 import { ItemLogo } from "@/components/item-logo";
 import {
@@ -96,6 +103,58 @@ function Note({ children }: { children: ReactNode }) {
 
 // ── The fill menu, under a login field ──────────────────────────────────────────────
 
+/** How long the logins show before a click on one counts. */
+const ARMED_MS = 500;
+
+/**
+ * Whether a click on a login is someone choosing it, rather than a click a page tricked
+ * out of them with the menu faded or covered: the logins have been showing for a moment,
+ * the pointer has moved over them since (the keyboard needs no pointer), and, where the
+ * browser can tell (Chrome), nothing covers, fades or distorts the menu.
+ */
+function useDeliberate(showing: boolean) {
+	const [armed, setArmed] = useState(false);
+	const ready = useRef(false);
+	const moved = useRef(false);
+	const visible = useRef(true);
+	useEffect(() => {
+		if (!showing) return;
+		const timer = setTimeout(() => {
+			ready.current = true;
+			setArmed(true);
+		}, ARMED_MS);
+		return () => clearTimeout(timer);
+	}, [showing]);
+	useEffect(() => {
+		const onMove = (event: PointerEvent) => {
+			if (event.isTrusted && ready.current) moved.current = true;
+		};
+		document.addEventListener("pointermove", onMove);
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (entry && "isVisible" in entry)
+					visible.current = Boolean(entry.isVisible);
+			},
+			{ trackVisibility: true, delay: 100 } as IntersectionObserverInit,
+		);
+		observer.observe(document.documentElement);
+		return () => {
+			document.removeEventListener("pointermove", onMove);
+			observer.disconnect();
+		};
+	}, []);
+	return {
+		armed,
+		/** "fill", "ignore" a click that doesn't count, or "hidden" when the menu isn't seen. */
+		check(event: MouseEvent<HTMLButtonElement>) {
+			const keyboard = event.detail === 0;
+			if (!event.nativeEvent.isTrusted || !ready.current) return "ignore";
+			if (!keyboard && !moved.current) return "ignore";
+			return visible.current ? "fill" : "hidden";
+		},
+	};
+}
+
 function Menu() {
 	const [state, setState] = useState<MenuState | null>(null);
 	const [note, setNote] = useState("");
@@ -109,6 +168,7 @@ function Menu() {
 	);
 	useEffect(() => void load(), [load]);
 	useSessionChange(load, state?.status === "ready");
+	const deliberate = useDeliberate(state?.status === "ready");
 
 	if (!state) return null;
 
@@ -146,7 +206,18 @@ function Menu() {
 		);
 	}
 
-	const fill = async (login: MenuLogin) => {
+	const fill = async (
+		login: MenuLogin,
+		event: MouseEvent<HTMLButtonElement>,
+	) => {
+		const choice = deliberate.check(event);
+		if (choice === "ignore") return;
+		if (choice === "hidden") {
+			setNote(
+				"vauly doesn't fill while this page hides or covers its menu. Use vauly in the toolbar.",
+			);
+			return;
+		}
 		const result = await ask<FillResult>({
 			type: "vauly:fill",
 			id: login.id,
@@ -187,7 +258,8 @@ function Menu() {
 							<button
 								type="button"
 								aria-label={`Fill ${login.name}${login.username ? `, ${login.username}` : ""}`}
-								onClick={() => fill(login)}
+								disabled={!deliberate.armed}
+								onClick={(event) => fill(login, event)}
 								className="group/row hover:bg-tint/4 focus-visible:bg-tint/4 flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left outline-none"
 							>
 								<ItemLogo logo={login.logo} icon={GlobeIcon} />

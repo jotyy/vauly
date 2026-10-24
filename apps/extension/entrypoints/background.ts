@@ -62,6 +62,7 @@ import {
 	hostOf,
 	loadVault,
 	matchesPage,
+	matchOf,
 	saveLogin,
 	savePasskeyLogin,
 	updatePassword,
@@ -302,8 +303,14 @@ async function siteStatus(url: string) {
 	return connection.server && connection.token ? "on" : "signed-out";
 }
 
+/**
+ * What the menu inside a page offers and fills: logins saved for that very host. Other
+ * hosts of the same site show only in the popup, which names them.
+ */
 const fillable = (entry: EditableEntry, url: string) =>
-	entry.kind === "login" && Boolean(entry.secret) && matchesPage(entry, url);
+	entry.kind === "login" &&
+	Boolean(entry.secret) &&
+	matchOf(entry, url)?.kind === "host";
 
 // ── The fill menu ───────────────────────────────────────────────────────────────────
 
@@ -338,7 +345,8 @@ async function fill(tab: Tab, id: string): Promise<FillResult> {
 	const [result] = await browser.scripting.executeScript({
 		target: { tabId: tab.id, frameIds: [0] },
 		func: fillLoginForm,
-		args: [entry.username ?? "", entry.secret ?? ""],
+		// The page checked above: if the tab has moved on since, nothing is filled.
+		args: [entry.username ?? "", entry.secret ?? "", new URL(tab.url).origin],
 	});
 	const filled = result?.result as { password: boolean } | undefined;
 	if (!filled?.password) return { ok: false };

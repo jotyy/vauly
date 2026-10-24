@@ -675,6 +675,46 @@ test("a frame of vauly's menu that the page script didn't make gets nothing", as
 	await page.close();
 });
 
+test("a page's styles can't fade, hide or move vauly's button and menu", async () => {
+	const page = await newTab(`${site}/`);
+	const menu = await openMenu(page, "#email");
+	await page.evaluate(() => {
+		const sheet = document.createElement("style");
+		sheet.textContent =
+			"vauly-frame, vauly-button { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; transform: translateX(-9999px) !important; }";
+		document.head.append(sheet);
+		for (const host of document.querySelectorAll<HTMLElement>(
+			"vauly-frame, vauly-button",
+		)) {
+			host.style.setProperty("opacity", "0", "important");
+			host.setAttribute("inert", "");
+		}
+	});
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				[
+					...document.querySelectorAll<HTMLElement>(
+						"vauly-frame, vauly-button",
+					),
+				].map((host) => {
+					const style = getComputedStyle(host);
+					return [
+						style.opacity,
+						style.visibility,
+						style.pointerEvents,
+						style.transform,
+						host.hasAttribute("inert"),
+					].join(" ");
+				}),
+			),
+		)
+		.toEqual(["1 visible auto none false", "1 visible auto none false"]);
+	await press(menu, `Fill ${login.name}, ${login.username}`);
+	await expect.poll(() => inputValue(page, "#email")).toBe(login.username);
+	await page.close();
+});
+
 test("a card fills a checkout form, and an identity an address form", async () => {
 	await web.goto("/items");
 	await web.getByLabel("Master password").fill(owner.password);

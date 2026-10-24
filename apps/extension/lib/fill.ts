@@ -2,8 +2,15 @@
  * Runs inside the page when someone chooses Fill: finds the visible password field and
  * the username field before it, and types into them the way a person would, so the
  * page's own scripts notice. It must not use anything from outside its own body.
+ * `origin` is the page the login was checked against: if the tab has gone to another
+ * since, it fills nothing.
  */
-export function fillLoginForm(username: string, password: string) {
+export function fillLoginForm(
+	username: string,
+	password: string,
+	origin: string,
+) {
+	if (location.origin !== origin) return { username: false, password: false };
 	const visible = (element: HTMLElement) => {
 		const style = getComputedStyle(element);
 		return (
@@ -46,13 +53,18 @@ export function fillLoginForm(username: string, password: string) {
  * their names and labels, and types the card into them. Like fillLoginForm, it uses
  * nothing from outside its own body. Returns how many fields it filled.
  */
-export function fillCardForm(card: {
-	cardholder?: string;
-	number?: string;
-	/** "MM/YYYY". */
-	expiry?: string;
-	code?: string;
-}) {
+export function fillCardForm(
+	card: {
+		cardholder?: string;
+		number?: string;
+		/** "MM/YYYY". */
+		expiry?: string;
+		code?: string;
+	},
+	origin: string,
+) {
+	// The page the person chose to fill, still: not one the tab went to since.
+	if (location.origin !== origin) return { filled: 0 };
 	const fields = (
 		[...document.querySelectorAll("input, select")] as HTMLElement[]
 	).filter((element) => {
@@ -157,17 +169,21 @@ export function fillCardForm(card: {
  * postal-code…), or else by their names and labels. Self-contained, like the others.
  * Returns how many fields it filled.
  */
-export function fillAddressForm(identity: {
-	name?: string;
-	company?: string;
-	email?: string;
-	phone?: string;
-	address?: string;
-	city?: string;
-	region?: string;
-	postalCode?: string;
-	country?: string;
-}) {
+export function fillAddressForm(
+	identity: {
+		name?: string;
+		company?: string;
+		email?: string;
+		phone?: string;
+		address?: string;
+		city?: string;
+		region?: string;
+		postalCode?: string;
+		country?: string;
+	},
+	origin: string,
+) {
+	if (location.origin !== origin) return { filled: 0 };
 	const fields = (
 		[...document.querySelectorAll("input, select, textarea")] as HTMLElement[]
 	).filter((element) => {
