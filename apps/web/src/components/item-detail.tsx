@@ -147,9 +147,15 @@ export function ItemDetail({ item }: { item: Item }) {
 
 	return (
 		<section className="rounded-window bg-surface shadow-card flex flex-col">
-			<header className="border-line-subtle flex items-start gap-3 border-b p-4">
+			<header
+				data-slot="item-header"
+				className="border-line-subtle flex items-start gap-3 border-b p-4"
+			>
 				<ItemTile kind={item.kind} size="lg" logo={logoDomain(item)} />
-				<div className="flex min-w-0 flex-1 flex-col gap-1.5">
+				<div
+					data-slot="item-heading"
+					className="flex min-w-0 flex-1 flex-col gap-1.5"
+				>
 					<h2 data-slot="item-title" className="text-fg text-h5 truncate">
 						{item.name}
 					</h2>
@@ -177,7 +183,7 @@ export function ItemDetail({ item }: { item: Item }) {
 						)}
 					</div>
 				</div>
-				<div className="flex items-center gap-1">
+				<div data-slot="item-actions" className="flex items-center gap-1">
 					<Tooltip>
 						<TooltipTrigger
 							render={
