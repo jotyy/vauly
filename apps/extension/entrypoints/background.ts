@@ -116,10 +116,7 @@ export default defineBackground(() => {
 	});
 
 	// A tab's badge clears when it loads a new page; put it back while the login waits.
-	// Leaving a page takes its fill menus with it.
 	browser.tabs.onUpdated.addListener((tabId, change) => {
-		if (change.status === "loading")
-			void withMenuFrames((all) => drop(all, tabId));
 		if (change.status !== "complete") return;
 		void getCapture(tabId).then((capture) => {
 			if (capture) void saveCapture(tabId, capture);
@@ -139,8 +136,8 @@ export default defineBackground(() => {
 /**
  * Which of vauly's own pages sent a message, or null for a content script, which sends
  * from the site's address. Only this extension's pages and scripts reach this listener.
- * The fill menu's address has an ID that changes every session, so it's the path that
- * counts.
+ * The fill menu's address can change from session to session (lib/menu-frames.ts says
+ * how its frame proves itself), so it's the path that counts.
  */
 function ownPage(url: string | undefined) {
 	try {

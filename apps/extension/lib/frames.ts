@@ -174,6 +174,8 @@ export function mountFrames() {
 	};
 	window.addEventListener("scroll", follow, { capture: true, passive: true });
 	window.addEventListener("resize", follow, { passive: true });
+	// Leaving the page, or putting it in the back-forward cache, ends its menu.
+	window.addEventListener("pagehide", () => close("menu"));
 
 	// Clicks inside a frame don't reach the page, so any click the page sees is outside.
 	document.addEventListener(

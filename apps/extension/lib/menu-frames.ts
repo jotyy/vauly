@@ -2,9 +2,10 @@
 // learned its address could frame it too. So the page script asks the background for a
 // token before it opens a menu, and gives it to the frame it makes, in the address's hash.
 // The first frame of vauly's menu page to show the token holds it from then on, in its tab
-// and its document; another frame with the same token, or with none, gets no answer. The
-// token goes when the menu closes, or its page does. In session storage, so it outlives
-// the background going to sleep.
+// and its document; another frame with the same token, or with none, gets no answer. A tab
+// has one menu at a time, so a new token replaces the tab's others; the token goes when
+// the menu closes, when its page is hidden, or when the tab does. In session storage, so
+// it outlives the background going to sleep.
 
 export type MenuFrame = {
 	tabId: number;
@@ -18,11 +19,11 @@ export type MenuFrames = Record<string, MenuFrame>;
 /** Long enough for the menu's page to load and ask for the first time. */
 export const UNCLAIMED_MS = 15_000;
 
-/** A new token for a menu the page script in this tab is about to open. */
+/** A new token for the menu the page script in this tab is about to open, its only one. */
 export function issue(all: MenuFrames, tabId: number, now: number) {
 	for (const [token, menu] of Object.entries(all)) {
-		if (menu.documentId === undefined && now - menu.at > UNCLAIMED_MS)
-			delete all[token];
+		const stale = menu.documentId === undefined && now - menu.at > UNCLAIMED_MS;
+		if (menu.tabId === tabId || stale) delete all[token];
 	}
 	const bytes = crypto.getRandomValues(new Uint8Array(16));
 	const token = btoa(String.fromCharCode(...bytes))
@@ -75,11 +76,18 @@ let loaded: Promise<MenuFrames> | null = null;
  * together, between awaits.
  */
 export async function withMenuFrames<T>(change: (all: MenuFrames) => T) {
-	loaded ??= browser.storage.session
-		.get(KEY)
-		.then((stored) => (stored[KEY] ?? {}) as MenuFrames);
+	loaded ??= browser.storage.session.get(KEY).then(
+		(stored) => (stored[KEY] ?? {}) as MenuFrames,
+		(error: unknown) => {
+			loaded = null;
+			throw error;
+		},
+	);
 	const all = await loaded;
+	const before = JSON.stringify(all);
 	const result = change(all);
-	await browser.storage.session.set({ [KEY]: all });
+	// Most requests change nothing: only a claim, a new token or a closed menu is saved.
+	if (JSON.stringify(all) !== before)
+		await browser.storage.session.set({ [KEY]: all });
 	return result;
 }

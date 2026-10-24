@@ -28,7 +28,10 @@ export default function App() {
  * session storage, nor word of its changes, so there it asks again every second until
  * there's something to fill.
  */
-function useSessionChange(load: () => Promise<void>, ready: boolean) {
+function useSessionChange(
+	load: () => Promise<MenuState | null>,
+	ready: boolean,
+) {
 	useEffect(() => {
 		if (!browser.storage.session) {
 			if (ready) return;
@@ -37,7 +40,8 @@ function useSessionChange(load: () => Promise<void>, ready: boolean) {
 			let stopped = false;
 			const next = () => {
 				timer = setTimeout(
-					() => void load().then(() => stopped || next()),
+					// Nothing means this frame isn't the menu any more: stop asking.
+					() => void load().then((answer) => stopped || !answer || next()),
 					1000,
 				);
 			};
@@ -96,7 +100,11 @@ function Menu() {
 	const [state, setState] = useState<MenuState | null>(null);
 	const [note, setNote] = useState("");
 	const load = useCallback(
-		() => ask<MenuState>({ type: "vauly:menu", token }).then(setState),
+		() =>
+			ask<MenuState>({ type: "vauly:menu", token }).then((answer) => {
+				setState(answer);
+				return answer;
+			}),
 		[],
 	);
 	useEffect(() => void load(), [load]);

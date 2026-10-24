@@ -42,36 +42,45 @@ describe("which frame is vauly's fill menu", () => {
 		const late = issue(all, TAB, NOW);
 		expect(claim(all, late, TAB, "menu", NOW + UNCLAIMED_MS + 1)).toBe(false);
 		expect(all[late]).toBeUndefined();
-		// Issuing another sweeps out the old ones nobody claimed.
-		const stale = issue(all, TAB, NOW);
-		const held = issue(all, TAB, NOW);
-		claim(all, held, TAB, "menu", NOW);
+		// Issuing sweeps out other tabs' tokens that nobody claimed, not ones in use.
+		const stale = issue(all, TAB + 1, NOW);
+		const held = issue(all, TAB + 2, NOW);
+		claim(all, held, TAB + 2, "menu", NOW);
 		issue(all, TAB, NOW + UNCLAIMED_MS + 1);
 		expect(all[stale]).toBeUndefined();
 		expect(all[held]).toBeDefined();
 	});
 
-	test("a closed menu, or a tab that left its page, gives its tokens up", () => {
+	test("a tab has one menu: a new one takes the place of the last", () => {
 		const all: MenuFrames = {};
 		const first = issue(all, TAB, NOW);
-		const second = issue(all, TAB, NOW);
-		const elsewhere = issue(all, TAB + 1, NOW);
 		claim(all, first, TAB, "menu", NOW);
-		drop(all, TAB, first);
-		expect(claim(all, first, TAB, "menu", NOW)).toBe(false);
-		expect(all[second]).toBeDefined();
-		// Another tab can't drop this tab's menus.
-		drop(all, TAB + 1, second);
-		expect(all[second]).toBeDefined();
-		drop(all, TAB);
-		expect(all[second]).toBeUndefined();
+		const elsewhere = issue(all, TAB + 1, NOW);
+		const second = issue(all, TAB, NOW + 1000);
+		expect(claim(all, first, TAB, "menu", NOW + 1000)).toBe(false);
+		expect(claim(all, second, TAB, "next", NOW + 1000)).toBe(true);
 		expect(all[elsewhere]).toBeDefined();
+	});
+
+	test("a closed menu, or a closed tab, gives its token up", () => {
+		const all: MenuFrames = {};
+		const here = issue(all, TAB, NOW);
+		const there = issue(all, TAB + 1, NOW);
+		claim(all, here, TAB, "menu", NOW);
+		// Another tab can't drop this tab's menu.
+		drop(all, TAB + 1, here);
+		expect(all[here]).toBeDefined();
+		drop(all, TAB, here);
+		expect(claim(all, here, TAB, "menu", NOW)).toBe(false);
+		expect(all[there]).toBeDefined();
+		drop(all, TAB + 1);
+		expect(all[there]).toBeUndefined();
 	});
 
 	test("tokens are random and can't be guessed from each other", () => {
 		const all: MenuFrames = {};
 		const tokens = new Set(
-			Array.from({ length: 50 }, () => issue(all, TAB, NOW)),
+			Array.from({ length: 50 }, (_, tab) => issue(all, tab, NOW)),
 		);
 		expect(tokens.size).toBe(50);
 		for (const token of tokens) expect(token).toMatch(/^[\w-]{22}$/);

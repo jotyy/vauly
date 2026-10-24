@@ -600,7 +600,7 @@ test("a frame of vauly's menu that the page script didn't make gets nothing", as
 	// Someone who knew the menu's address, its token too, frames it again in the page,
 	// and once more with a made-up token. Chrome doesn't load either: the menu's address
 	// changes every session. Firefox does, and the extension doesn't answer them, as
-	// e2e/firefox checks.
+	// e2e/firefox/extension.spec.ts checks.
 	const address = menu.url();
 	await page.evaluate(
 		(urls) => {
@@ -621,6 +621,38 @@ test("a frame of vauly's menu that the page script didn't make gets nothing", as
 	// The menu the page script made still fills.
 	await menu.getByRole("button", { name: fill }).click();
 	await expect(page.getByLabel("Email")).toHaveValue(login.username);
+	await page.close();
+});
+
+test("a page that changes its address while the menu is open still fills from it", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	const menu = await openMenu(page, "Password");
+	const fill = `Fill ${login.name}, ${login.username}`;
+	await expect(menu.getByRole("button", { name: fill })).toBeVisible();
+	// A single-page app moves on without loading a page: the tab's address changes.
+	await page.evaluate(() => {
+		history.pushState({}, "", "/sign-in/password");
+		history.replaceState({}, "", "/sign-in/password?step=2");
+		location.hash = "#password";
+	});
+	const tabId = await tabIdOf(site);
+	type Tabs = { get(id: number): Promise<{ url?: string }> };
+	await expect
+		.poll(() =>
+			worker?.evaluate(
+				async (id) =>
+					(
+						await (
+							globalThis as unknown as { chrome: { tabs: Tabs } }
+						).chrome.tabs.get(id)
+					).url,
+				tabId as number,
+			),
+		)
+		.toContain("#password");
+	await menu.getByRole("button", { name: fill }).click();
+	await expect(page.getByLabel("Password")).toHaveValue(login.password);
 	await page.close();
 });
 
