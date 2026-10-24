@@ -50,6 +50,11 @@ export type Delivery = {
 	userId: string;
 	notice: Notice;
 	exceptSession?: string;
+	/**
+	 * Their devices as read before the request signed them out, for a notice about that.
+	 * Without them, it goes to the devices signed in when it's sent.
+	 */
+	devices?: Device[];
 };
 
 /**
@@ -126,7 +131,7 @@ export function pushServiceAllowed(
 	);
 }
 
-type Device = {
+export type Device = {
 	id: string;
 	userId: string;
 	sessionId: string;
@@ -146,8 +151,8 @@ export function pickSends(
 	devices: Device[],
 	{ localhost = false } = {},
 ) {
-	const queues = deliveries.map(({ userId, notice, exceptSession }) =>
-		devices
+	const queues = deliveries.map(({ userId, notice, exceptSession, ...given }) =>
+		(given.devices ?? devices)
 			.filter(
 				(device) =>
 					device.userId === userId &&
@@ -178,27 +183,12 @@ export async function notify(
 ) {
 	try {
 		const wanted = await deliveries;
-		const userIds = [...new Set(wanted.map((entry) => entry.userId))];
-		if (userIds.length === 0) return;
-		const devices = await db
-			.select({
-				id: pushSubscription.id,
-				userId: pushSubscription.userId,
-				sessionId: pushSubscription.sessionId,
-				endpoint: pushSubscription.endpoint,
-				p256dh: pushSubscription.p256dh,
-				auth: pushSubscription.auth,
-				failures: pushSubscription.failures,
-			})
-			.from(pushSubscription)
-			.innerJoin(session, eq(session.id, pushSubscription.sessionId))
-			.where(
-				and(
-					inArray(pushSubscription.userId, userIds),
-					gt(session.expiresAt, new Date()),
-				),
-			)
-			.orderBy(desc(pushSubscription.createdAt));
+		if (wanted.length === 0) return;
+		const devices = await liveDevices(db, [
+			...new Set(
+				wanted.filter((entry) => !entry.devices).map((entry) => entry.userId),
+			),
+		]);
 		const sends = pickSends(wanted, devices, { localhost });
 		if (sends.length === 0) return;
 		const keys = await vapidKeys(db);
@@ -230,6 +220,33 @@ export async function notify(
 	} catch (error) {
 		console.error(error);
 	}
+}
+
+/** The devices of these people that are signed in now, newest first. */
+export async function liveDevices(
+	db: Database,
+	userIds: string[],
+): Promise<Device[]> {
+	if (userIds.length === 0) return [];
+	return db
+		.select({
+			id: pushSubscription.id,
+			userId: pushSubscription.userId,
+			sessionId: pushSubscription.sessionId,
+			endpoint: pushSubscription.endpoint,
+			p256dh: pushSubscription.p256dh,
+			auth: pushSubscription.auth,
+			failures: pushSubscription.failures,
+		})
+		.from(pushSubscription)
+		.innerJoin(session, eq(session.id, pushSubscription.sessionId))
+		.where(
+			and(
+				inArray(pushSubscription.userId, userIds),
+				gt(session.expiresAt, new Date()),
+			),
+		)
+		.orderBy(desc(pushSubscription.createdAt));
 }
 
 async function send(
@@ -383,6 +400,20 @@ export function twoStepNotice(who: { id: string; name: string }): Notice {
 		body: "If it wasn't them, reset it on the Members page.",
 		url: "/members",
 		tag: `two-step:${who.id}`,
+		ttl: 24 * 60 * 60,
+	};
+}
+
+/**
+ * What setting up two-step login, on `device`, tells the person's other devices, which it
+ * signed out: the quickest to notice if it wasn't them.
+ */
+export function ownTwoStepNotice(device: string, userId: string): Notice {
+	return {
+		title: "Two-step login is on for your vauly",
+		body: `${device} turned it on and signed this device out. If that wasn't you, sign in again and check Settings.`,
+		url: "/settings",
+		tag: `two-step-on:${userId}`,
 		ttl: 24 * 60 * 60,
 	};
 }

@@ -7,6 +7,7 @@ import { member } from "@vauly/db/schema/vault";
 import { eq } from "drizzle-orm";
 
 import type { Context } from "./context";
+import { type Delivery, pickSends } from "./push/notify";
 import { appRouter } from "./routers/index";
 import { testDb } from "./test-db";
 
@@ -46,6 +47,13 @@ function workspace() {
 			`INSERT INTO session (id, token, expires_at, updated_at, user_id) VALUES ('${id}', 'token-${id}', ${SESSION_ENDS}, 0, '${userId}')`,
 		);
 	}
+	// Each of Mei's sessions has notifications on.
+	for (const id of ["ses_mei_here", "ses_mei_there"]) {
+		sqlite.run(
+			`INSERT INTO push_subscription (id, user_id, session_id, endpoint, p256dh, auth) VALUES ('psb_${id}', 'usr_mei', '${id}', 'https://fcm.googleapis.com/fcm/send/${id}', 'p256dh', 'auth')`,
+		);
+	}
+	const notified: (Delivery[] | Promise<Delivery[]>)[] = [];
 	const as = (userId: string, sessionId: string) =>
 		({
 			session: {
@@ -57,7 +65,8 @@ function workspace() {
 			headers: new Headers(),
 			secret: "test-secret-that-is-long-enough",
 			files: { maxFileBytes: 1024, maxTotalBytes: 4096 },
-			notify: () => {},
+			notify: (deliveries: Delivery[] | Promise<Delivery[]>) =>
+				notified.push(deliveries),
 		}) as unknown as Context;
 	const sessions = () =>
 		(
@@ -73,7 +82,7 @@ function workspace() {
 		).n;
 	const mei = async () =>
 		(await db.select().from(member).where(eq(member.userId, "usr_mei")))[0];
-	return { as, sessions, setups, mei };
+	return { as, sessions, setups, mei, notified, sqlite };
 }
 
 async function codeFor(secret: string) {
@@ -124,6 +133,29 @@ describe("two-step login and sessions", () => {
 		await turnOn(as("usr_mei", "ses_mei_here"));
 		expect(sessions()).toEqual(["ses_alex", "ses_mei_here"]);
 		expect(setups()).toBe(1);
+	});
+
+	test("the sessions it signs out hear about it on their devices, and the admins too", async () => {
+		const { as, notified, sqlite } = workspace();
+		await turnOn(as("usr_mei", "ses_mei_here"));
+		// Their subscriptions went with their sessions.
+		expect(sqlite.query("SELECT id FROM push_subscription").all()).toEqual([
+			{ id: "psb_ses_mei_here" },
+		]);
+		const deliveries = await Promise.all(notified).then((all) => all.flat());
+		expect(deliveries.map((delivery) => delivery.userId).sort()).toEqual([
+			"usr_alex",
+			"usr_mei",
+		]);
+		const own = deliveries.find((delivery) => delivery.userId === "usr_mei");
+		expect(own?.notice.title).toBe("Two-step login is on for your vauly");
+		// Read before they were signed out, and never the device that set it up.
+		const sends = pickSends(deliveries, []);
+		expect(
+			sends
+				.filter(({ device }) => device.userId === "usr_mei")
+				.map(({ device }) => device.sessionId),
+		).toEqual(["ses_mei_there"]);
 	});
 
 	test("a reset signs them out everywhere", async () => {

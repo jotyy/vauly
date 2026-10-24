@@ -491,6 +491,58 @@ test("signing out stops the browser listening", async () => {
 	).toBeNull();
 });
 
+test("turning on two-step login tells the devices it signs out", async () => {
+	// The phone signs in with the password alone, and turns notifications on.
+	await signIn(phone.page, owner);
+	await turnOn(phone);
+	const before = pushesTo(phone).length;
+
+	await laptop.page
+		.getByRole("navigation")
+		.getByRole("link", { name: "Overview" })
+		.click();
+	await openSettings(laptop.page);
+	await laptop.page
+		.getByRole("button", { name: "Turn on", exact: true })
+		.click();
+	const dialog = laptop.page.getByRole("dialog");
+	await expect(dialog.getByTestId("setup-key")).toHaveText(/^[A-Z2-7]{32}$/);
+	const config = parseTotp(
+		(await dialog.getByTestId("setup-key").textContent()) ?? "",
+	);
+	if (!config) throw new Error("No setup key");
+	await dialog.getByLabel("Code from the app").fill(await totpCode(config));
+	await dialog.getByRole("button", { name: "Turn on" }).click();
+	const recovery =
+		(await dialog.getByRole("listitem").first().textContent()) ?? "";
+	await dialog.getByRole("button", { name: "I saved them" }).click();
+
+	// It signed the phone out, and the phone still heard which device did it.
+	await expect.poll(() => pushesTo(phone).length).toBe(before + 1);
+	const { notice } = await read(
+		phone,
+		pushesTo(phone).at(-1) as Received,
+		await serverKey(laptop.page),
+	);
+	expect(notice.title).toBe("Two-step login is on for your vauly");
+	expect(notice.body).toMatch(
+		/^Chrome on \w+ turned it on and signed this device out\. If that wasn't you, sign in again and check Settings\.$/,
+	);
+	expect(notice.url).toBe("/settings");
+
+	// Off again, with a recovery code, for the test after.
+	await laptop.page
+		.getByRole("button", { name: "Turn off", exact: true })
+		.click();
+	const off = laptop.page.getByRole("dialog");
+	await off.getByLabel("Code").fill(recovery);
+	await off.getByRole("button", { name: "Turn off" }).click();
+	await expect(off).toBeHidden();
+	await expect(
+		laptop.page.getByRole("button", { name: "Turn on", exact: true }),
+	).toBeVisible();
+});
+
 test("a sign-in that fails its two-step check tells nobody", async () => {
 	answers.delete(laptop.path);
 	await turnOn(laptop);
