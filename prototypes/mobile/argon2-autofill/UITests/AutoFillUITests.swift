@@ -144,5 +144,46 @@ final class AutoFillUITests: XCTestCase {
 		tap("New item")
 		sleep(2)
 		shot("\(prefix)8-new-item-sheet")
+		web.buttons["Cancel"].firstMatch.tap()
+		sleep(1)
+
+		// Long titles: an item renamed for the shot and back, and a vault with a long name.
+		func rename(to name: String) {
+			tap("Edit")
+			let field = shell.webViews.textFields["Name"].firstMatch
+			XCTAssertTrue(field.waitForExistence(timeout: 10))
+			// The caret goes where the tap lands: at the end, then delete back to empty.
+			field.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+			let old = (field.value as? String) ?? ""
+			field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count + 2))
+			// Return submits the form; Save sits under the keyboard.
+			field.typeText(name + "\n")
+			sleep(3)
+		}
+		let aws = web.links.matching(NSPredicate(format: "label CONTAINS 'AWS root'")).firstMatch
+		XCTAssertTrue(aws.waitForExistence(timeout: 10))
+		aws.tap()
+		sleep(2)
+		rename(to: "AWS root account for production billing")
+		shot("\(prefix)9-item-long-name")
+		rename(to: "AWS root")
+
+		tap("Vaults")
+		web.swipeUp(velocity: .fast)
+		sleep(1)
+		let vaultName = "Customer support escalations"
+		let existing = web.descendants(matching: .any)
+			.matching(NSPredicate(format: "label == %@", "Open \(vaultName)")).firstMatch
+		if existing.waitForExistence(timeout: 3) {
+			existing.tap()
+		} else {
+			tap("New vault")
+			let field = shell.webViews.textFields["Name"].firstMatch
+			XCTAssertTrue(field.waitForExistence(timeout: 10))
+			field.tap()
+			field.typeText(vaultName + "\n")
+		}
+		sleep(3)
+		shot("\(prefix)10-vault-long-name")
 	}
 }
