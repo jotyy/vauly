@@ -17,6 +17,7 @@ import {
 import { and, count, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Context } from "../context";
+import { describeDevice } from "../device";
 import {
 	adminProcedure,
 	memberProcedure,
@@ -26,7 +27,11 @@ import {
 } from "../index";
 import { signOutOthersAfter, swapKeys } from "../key-swap";
 import { hashToken, logEvent, newId } from "../lib";
-import { twoStepDeliveries } from "../push/notify";
+import {
+	liveDevices,
+	ownTwoStepNotice,
+	twoStepDeliveries,
+} from "../push/notify";
 import { deleteWorkspace, removeFromWorkspace } from "../workspace";
 
 const keyFields = z.object({
@@ -552,6 +557,9 @@ export const accountRouter = {
 				});
 			}
 			const recoveryCodes = newRecoveryCodes();
+			// The person's other devices hear about it, and the batch signs them out, which
+			// deletes their subscriptions: so they're read first.
+			const devices = await liveDevices(db, [me.userId]);
 			const [turnedOn] = await db.batch([
 				db
 					.update(member)
@@ -593,11 +601,23 @@ export const accountRouter = {
 				action: "updated",
 				detail: "two-step login on",
 			});
+			const here = context.session.session;
 			context.notify(
 				twoStepDeliveries(db, {
 					id: me.userId,
 					name: context.session.user.name,
-				}),
+				}).then((admins) => [
+					...admins,
+					{
+						userId: me.userId,
+						notice: ownTwoStepNotice(
+							describeDevice(here.userAgent).label,
+							me.userId,
+						),
+						exceptSession: here.id,
+						devices,
+					},
+				]),
 			);
 			return { recoveryCodes };
 		}),

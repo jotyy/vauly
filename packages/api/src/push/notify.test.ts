@@ -16,9 +16,11 @@ import {
 	approvalDeliveries,
 	approvalNotice,
 	type Delivery,
+	liveDevices,
 	MAX_FAILURES,
 	MAX_SENDS,
 	notify,
+	ownTwoStepNotice,
 	PAD_TO,
 	pickSends,
 	pushServiceAllowed,
@@ -81,6 +83,15 @@ describe("notices", () => {
 			body: "Chrome on macOS. If this wasn't you, sign it out in Settings.",
 			url: "/settings",
 			tag: "sign-in:ses_1",
+		});
+	});
+
+	test("setting up two-step login tells the person's own devices which device did it", () => {
+		expect(ownTwoStepNotice("Firefox on Windows", "usr_mei")).toMatchObject({
+			title: "Two-step login is on for your vauly",
+			body: "Firefox on Windows turned it on and signed this device out. If that wasn't you, ask your workspace's owner or an admin to reset your two-step login, then change your master password.",
+			url: "/settings",
+			tag: "two-step-on:usr_mei",
 		});
 	});
 });
@@ -270,6 +281,23 @@ describe("notify", () => {
 		}) as unknown as typeof fetch;
 		await send([{ userId: "usr_alex", notice }]);
 		expect(most).toBe(6);
+	});
+
+	test("devices read before their sessions ended still get a notice about it", async () => {
+		const devices = await liveDevices(db, ["usr_alex"]);
+		// The request signs them out, which takes their subscriptions with them.
+		sqlite.run("DELETE FROM session WHERE user_id = 'usr_alex'");
+		expect(await liveDevices(db, ["usr_alex"])).toHaveLength(0);
+		await send([
+			{ userId: "usr_alex", notice, exceptSession: "ses_laptop", devices },
+			// Anyone else's devices are looked up as usual.
+			{ userId: "usr_sam", notice },
+		]);
+		expect(sent.map((push) => push.url).sort()).toEqual([
+			"https://fcm.googleapis.com/fcm/send/phone",
+			"https://updates.push.services.mozilla.com/wpush/v2/ff",
+			"https://web.push.apple.com/sam",
+		]);
 	});
 
 	test("working out who gets it can fail without failing anything else", async () => {
