@@ -29,13 +29,20 @@ export type PageRequest =
 			request: unknown;
 	  }
 	/** The site gave up waiting for the passkey. */
-	| { type: "vauly:passkey-abort"; id: string };
+	| { type: "vauly:passkey-abort"; id: string }
+	/** The page script is about to open the fill menu: the token for its frame. */
+	| { type: "vauly:menu-open" }
+	/** The fill menu with this token closed. */
+	| { type: "vauly:menu-gone"; token: string };
 
-/** Asked by vauly's fill menu, about the tab it sits in. */
+/**
+ * Asked by vauly's fill menu, about the tab it sits in, with the token the page script
+ * gave it (lib/menu-frames.ts).
+ */
 export type FrameRequest =
-	| { type: "vauly:menu" }
-	| { type: "vauly:fill"; id: string }
-	| { type: "vauly:menu-close" };
+	| { type: "vauly:menu"; token: string }
+	| { type: "vauly:fill"; id: string; token: string }
+	| { type: "vauly:menu-close"; token: string };
 
 /** Asked by vauly's save window, about the tab whose login waits. */
 export type SaveWindowRequest =
