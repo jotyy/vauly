@@ -34,7 +34,7 @@ The extension fills and saves logins and passkeys from your team's vauly.
 
 **What it sends, and where:**
 - **To your vauly server only:** signing in, your encrypted items, items you save or update (encrypted on your computer first), and activity log entries such as "filled the login" with the item's ID.
-- **To Brandfetch:** to show a brand's logo next to a login, the extension loads the logo from Brandfetch's image service by the website's domain, such as `github.com`. Brandfetch then learns which brands' logos your extension shows, and your IP address, the way any image host does. It's never sent a password, a username or a full web address. Turn logos off with **Show website logos** in the extension's settings; they're also off when your team's vauly turns them off for everyone.
+- **To Brandfetch:** to show a brand's logo next to a login, the extension loads the logo from Brandfetch's image service by the website's domain, such as `github.com`. Brandfetch then learns which brands' logos your extension shows, and your IP address, the way any image host does. It's never sent a password, a username or a full web address. Turn logos off with **Show website logos** in the extension's settings; they're also off when your team's vauly turns them off for everyone. In Firefox they're off until you turn them on there, and Firefox asks you first.
 
 The extension sends nothing to us, and has no analytics.
 

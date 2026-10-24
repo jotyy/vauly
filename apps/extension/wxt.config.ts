@@ -3,10 +3,16 @@ import { defineConfig } from "wxt";
 
 export default defineConfig({
 	modules: ["@wxt-dev/module-react"],
+	// Firefox too, so its build has the same permissions, frames and passkey script.
+	manifestVersion: 3,
+	// The release attaches vauly-extension-<version>-chrome.zip. The source that
+	// addons.mozilla.org asks for is the whole repository at the release's tag, so no
+	// zip of this folder alone.
+	zip: { name: "vauly-extension", zipSources: false },
 	vite: () => ({
 		plugins: [tailwindcss()],
 	}),
-	manifest: {
+	manifest: ({ browser }) => ({
 		name: "vauly: Password Manager for Teams",
 		description:
 			"Fill and save your team's logins and passkeys from vauly, the open-source, end-to-end encrypted password manager you host yourself.",
@@ -33,5 +39,21 @@ export default defineConfig({
 				use_dynamic_url: true,
 			},
 		],
-	},
+		// 153 is the first Firefox that tells the extension which document asked for a
+		// passkey, so the answer goes back to that one alone. Firefox shows what leaves
+		// the browser: signing in and the encrypted items, to the team's own server, and,
+		// only if the person allows it, saved logins' domains to Brandfetch for logos.
+		...(browser === "firefox" && {
+			browser_specific_settings: {
+				gecko: {
+					id: "extension@vauly.app",
+					strict_min_version: "153.0",
+					data_collection_permissions: {
+						required: ["authenticationInfo", "personallyIdentifyingInfo"],
+						optional: ["browsingActivity"],
+					},
+				},
+			},
+		}),
+	}),
 });

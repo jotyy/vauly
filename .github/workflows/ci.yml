@@ -30,6 +30,7 @@ jobs:
     outputs:
       app: ${{ steps.filter.outputs.app }}
       site: ${{ steps.filter.outputs.site }}
+      firefox: ${{ steps.filter.outputs.firefox }}
     steps:
       - uses: actions/checkout@v7
       - id: filter
@@ -56,6 +57,12 @@ jobs:
               - "package.json"
               - "bun.lock"
               - ".github/workflows/ci.yml"
+            firefox:
+              - "apps/extension/**"
+              - "packages/crypto/**"
+              - "packages/ui/**"
+              - "e2e/firefox/**"
+              - "e2e/firefox.config.ts"
 
   check:
     name: Types, lint and unit tests
@@ -78,7 +85,7 @@ jobs:
   # Two builds of one commit, in different directories, must give byte-identical files:
   # that's what lets anyone check an instance with `vauly verify` (docs/security.md).
   reproducible:
-    name: Reproducible web build
+    name: Reproducible builds
     needs: changes
     if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-24.04
@@ -90,15 +97,18 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: first/package.json
+      # The extension's Firefox build too: addons.mozilla.org rebuilds it from the source
+      # and wants the same files.
       - name: Build twice
         run: |
           cp -R first "$RUNNER_TEMP/second-copy"
           for dir in "$GITHUB_WORKSPACE/first" "$RUNNER_TEMP/second-copy"; do
-            (cd "$dir" && bun install --frozen-lockfile && bun run build)
+            (cd "$dir" && bun install --frozen-lockfile && bun run build && bun run --cwd apps/extension build:firefox)
           done
       - name: Compare
         run: |
           diff -r first/apps/web/dist "$RUNNER_TEMP/second-copy/apps/web/dist"
+          diff -r first/apps/extension/.output/firefox-mv3 "$RUNNER_TEMP/second-copy/apps/extension/.output/firefox-mv3"
           echo "Both builds are byte-identical."
       # Production and the demo are built by `alchemy deploy`, with Alchemy's own build
       # function and the stage's settings, a separate API among them, so that build has to
@@ -118,11 +128,15 @@ jobs:
           name: web-dist
           path: first/apps/web/dist
           include-hidden-files: true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: extension-firefox
+          path: first/apps/extension/.output/firefox-mv3
 
   # A release's manifest is built on Linux, and an instance may be built anywhere: on
   # another machine and another system, the build has to come out the same.
   reproducible-macos:
-    name: Reproducible web build, on macOS
+    name: Reproducible builds, on macOS
     needs: reproducible
     runs-on: macos-15
     timeout-minutes: 20
@@ -134,13 +148,20 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
         working-directory: apps/web
+      - run: bun run build:firefox
+        working-directory: apps/extension
       - uses: actions/download-artifact@v7
         with:
           name: web-dist
           path: ${{ runner.temp }}/linux-dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: extension-firefox
+          path: ${{ runner.temp }}/linux-firefox
       - name: Compare with the Linux build
         run: |
           diff -r "$RUNNER_TEMP/linux-dist" apps/web/dist
+          diff -r "$RUNNER_TEMP/linux-firefox" apps/extension/.output/firefox-mv3
           echo "The macOS build and the Linux build are byte-identical."
 
   site:
@@ -258,13 +279,58 @@ jobs:
             e2e/results
           retention-days: 7
 
+  # The extension's Firefox build, in Firefox. Playwright can't load extensions there, so
+  # Puppeteer drives it (e2e/firefox), against vauly as one Worker.
+  firefox:
+    name: Extension in Firefox
+    needs: changes
+    if: needs.changes.outputs.firefox == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bunx playwright install chromium
+        working-directory: e2e
+      # The spec downloads Firefox's current release into e2e/.cache; keep it a month.
+      - id: month
+        run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: e2e/.cache/firefox
+          key: firefox-${{ runner.os }}-${{ steps.month.outputs.month }}
+      - run: bun run test:firefox
+        working-directory: e2e
+        env:
+          VAULY_E2E_ONE_WORKER: "1"
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report-firefox
+          path: |
+            e2e/report
+            e2e/results
+          retention-days: 7
+
   # The one check branch protection asks for: it passes when every job above passed or
   # was skipped as not needed, and fails when any of them failed or was cancelled.
   passed:
     name: CI passed
     if: always()
     needs:
-      [changes, check, reproducible, reproducible-macos, site, e2e, one-worker]
+      [
+        changes,
+        check,
+        reproducible,
+        reproducible-macos,
+        site,
+        e2e,
+        one-worker,
+        firefox,
+      ]
     runs-on: ubuntu-24.04
     steps:
       - name: Every job passed or was skipped
