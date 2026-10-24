@@ -115,10 +115,15 @@ html[data-native]:is([data-type="sf"], [data-type="mix"]) {
  */
 html[data-native][data-type="mix"] {
 	--font-display: "Spline Sans Variable", -apple-system, system-ui, sans-serif;
-	--display-weight: 640;
-	--track-large: -0.032em;
-	--track-display: -0.022em;
-	--lh-large: 1.1;
+	/* Titles a step under Apple's: page titles at Title 1 (28), the item's name at Title 2
+	   (22). At these sizes Spline wants a lighter weight than at 34 to stay crisp. */
+	--large-em: 1em;
+	--lh-large: 1.15;
+	--display-weight: 610;
+	--track-large: -0.024em;
+	--track-display: -0.016em;
+	--type-item-title: -apple-system-title2;
+	--header-margin: 0 0 16px;
 }
 
 /* ── Type: (B) Spline Sans, retuned for a phone ─────────────────────────────────── */
@@ -452,7 +457,7 @@ html[data-native] [data-slot="nav-bar"] {
 html[data-native] [data-slot="page-header"] {
 	align-items: flex-start;
 	gap: 4px;
-	margin: 2px 0 20px;
+	margin: var(--header-margin, 2px 0 20px);
 	padding: 0 4px;
 	font: var(--type-title1);
 	text-align: start;
@@ -659,10 +664,10 @@ html[data-native] [data-slot="item-header"] {
 html[data-native] [data-slot="item-title"] {
 	overflow: visible;
 	text-overflow: clip;
-	font: var(--type-title1);
+	font: var(--type-item-title, var(--type-title1));
 	font-family: var(--font-display);
 	font-weight: var(--display-weight);
-	line-height: 1.15;
+	line-height: 1.2;
 	letter-spacing: var(--track-display);
 	white-space: normal;
 	text-wrap: balance;
