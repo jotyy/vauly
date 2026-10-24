@@ -89,7 +89,7 @@ describe("notices", () => {
 	test("setting up two-step login tells the person's own devices which device did it", () => {
 		expect(ownTwoStepNotice("Firefox on Windows", "usr_mei")).toMatchObject({
 			title: "Two-step login is on for your vauly",
-			body: "Firefox on Windows turned it on and signed this device out. If that wasn't you, sign in again and check Settings.",
+			body: "Firefox on Windows turned it on and signed this device out. If that wasn't you, ask your workspace's owner or an admin to reset your two-step login, then change your master password.",
 			url: "/settings",
 			tag: "two-step-on:usr_mei",
 		});

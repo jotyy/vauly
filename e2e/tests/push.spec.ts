@@ -526,7 +526,7 @@ test("turning on two-step login tells the devices it signs out", async () => {
 	);
 	expect(notice.title).toBe("Two-step login is on for your vauly");
 	expect(notice.body).toMatch(
-		/^Chrome on \w+ turned it on and signed this device out\. If that wasn't you, sign in again and check Settings\.$/,
+		/^Chrome on \w+ turned it on and signed this device out\. If that wasn't you, ask your workspace's owner or an admin to reset your two-step login, then change your master password\.$/,
 	);
 	expect(notice.url).toBe("/settings");
 

@@ -411,7 +411,7 @@ export function twoStepNotice(who: { id: string; name: string }): Notice {
 export function ownTwoStepNotice(device: string, userId: string): Notice {
 	return {
 		title: "Two-step login is on for your vauly",
-		body: `${device} turned it on and signed this device out. If that wasn't you, sign in again and check Settings.`,
+		body: `${device} turned it on and signed this device out. If that wasn't you, ask your workspace's owner or an admin to reset your two-step login, then change your master password.`,
 		url: "/settings",
 		tag: `two-step-on:${userId}`,
 		ttl: 24 * 60 * 60,
