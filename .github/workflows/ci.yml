@@ -59,10 +59,18 @@ jobs:
               - ".github/workflows/ci.yml"
             firefox:
               - "apps/extension/**"
+              - "apps/web/**"
+              - "packages/api/**"
               - "packages/crypto/**"
               - "packages/ui/**"
               - "e2e/firefox/**"
               - "e2e/firefox.config.ts"
+              - "e2e/playwright.config.ts"
+              - "e2e/tests/helpers.ts"
+              - "e2e/package.json"
+              - "package.json"
+              - "bun.lock"
+              - ".github/workflows/ci.yml"
 
   check:
     name: Types, lint and unit tests
@@ -281,12 +289,17 @@ jobs:
 
   # The extension's Firefox build, in Firefox. Playwright can't load extensions there, so
   # Puppeteer drives it (e2e/firefox), against vauly as one Worker.
+  # Firefox 153, the first the extension's design relies on, and the current release.
   firefox:
-    name: Extension in Firefox
+    name: Extension in Firefox (${{ matrix.firefox }})
     needs: changes
     if: needs.changes.outputs.firefox == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        firefox: [stable_153.0, stable]
     steps:
       - uses: actions/checkout@v7
       - uses: oven-sh/setup-bun@v2
@@ -295,21 +308,22 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx playwright install chromium
         working-directory: e2e
-      # The spec downloads Firefox's current release into e2e/.cache; keep it a month.
+      # The spec downloads Firefox into e2e/.cache; keep it a month.
       - id: month
         run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
       - uses: actions/cache@v6
         with:
           path: e2e/.cache/firefox
-          key: firefox-${{ runner.os }}-${{ steps.month.outputs.month }}
+          key: firefox-${{ runner.os }}-${{ matrix.firefox }}-${{ steps.month.outputs.month }}
       - run: bun run test:firefox
         working-directory: e2e
         env:
           VAULY_E2E_ONE_WORKER: "1"
+          VAULY_FIREFOX_BUILD: ${{ matrix.firefox }}
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report-firefox
+          name: playwright-report-firefox-${{ matrix.firefox }}
           path: |
             e2e/report
             e2e/results

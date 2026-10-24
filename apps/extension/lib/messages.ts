@@ -79,6 +79,9 @@ export type PageMessage =
 	/** The person chose in vauly's passkey prompt; hand the outcome to the site. */
 	| { type: "vauly:passkey-done"; id: string; outcome: PasskeyOutcome };
 
+/** Sent by the background over an open fill menu's port: the extension locked or unlocked. */
+export type LockMessage = { type: "vauly:lock-changed" };
+
 /**
  * What becomes of a site's passkey request: the browser's own passkeys take it, vauly
  * answers with a credential or an error, or (only to the content script) vauly's window
