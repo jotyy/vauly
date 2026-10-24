@@ -43,15 +43,20 @@ export default defineConfig({
 		],
 		// 153 is the first Firefox that tells the extension which document asked for a
 		// passkey, so the answer goes back to that one alone. Firefox shows what leaves
-		// the browser: signing in and the encrypted items, to the team's own server, and,
-		// only if the person allows it, saved logins' domains to Brandfetch for logos.
+		// the browser: signing in, the encrypted items and the activity log's fills and
+		// copies, to the team's own server, and, only if the person allows it, saved
+		// logins' domains to Brandfetch for logos.
 		...(browser === "firefox" && {
 			browser_specific_settings: {
 				gecko: {
 					id: "extension@vauly.app",
 					strict_min_version: "153.0",
 					data_collection_permissions: {
-						required: ["authenticationInfo", "personallyIdentifyingInfo"],
+						required: [
+							"authenticationInfo",
+							"personallyIdentifyingInfo",
+							"websiteActivity",
+						],
 						optional: ["browsingActivity"],
 					},
 				},
