@@ -254,11 +254,12 @@ test("a login's one-time code can be copied from the popup", async () => {
 });
 
 test("search finds items, and other sites get nothing to fill", async () => {
-	const page = await context.newPage();
-	await page.goto("https://elsewhere.example.test/");
-	const popup: Page = await openPopup(
-		await tabIdOf("https://elsewhere.example.test"),
+	await context.route("https://elsewhere.test/**", (route) =>
+		route.fulfill({ contentType: "text/html", body: loginPage }),
 	);
+	const page = await context.newPage();
+	await page.goto("https://elsewhere.test/");
+	const popup: Page = await openPopup(await tabIdOf("https://elsewhere.test"));
 	await expect(popup.getByText("Nothing saved for this site.")).toBeVisible();
 	await popup.getByLabel("Search items").fill("example");
 	const results = popup.getByRole("list", { name: "Results" });
@@ -267,6 +268,109 @@ test("search finds items, and other sites get nothing to fill", async () => {
 		results.getByRole("button", { name: `Fill ${login.name}` }),
 	).toHaveCount(0);
 	await popup.close();
+	await page.close();
+});
+
+test("a login fills in the page only on its own host; the popup names the rest of its site", async () => {
+	const other = "https://account.example.test";
+	const page = await context.newPage();
+	await page.goto(`${other}/`);
+	const menu = await openMenu(page, "Email");
+	await expect(
+		menu.getByText("Nothing saved for account.example.test yet"),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+
+	// The popup offers it, and says which host it was saved for.
+	const popup = await openPopup(await tabIdOf(other));
+	const here = popup.getByRole("list", { name: "On account.example.test" });
+	await expect(here.getByText("for login.example.test")).toBeVisible();
+	await here.getByRole("button", { name: `Fill ${login.name}` }).click();
+	await expect(page.getByLabel("Email")).toHaveValue(login.username);
+	await page.close();
+});
+
+test("a login saved with https isn't offered on an http page", async () => {
+	await context.route("http://login.example.test/**", (route) =>
+		route.fulfill({ contentType: "text/html", body: loginPage }),
+	);
+	const page = await context.newPage();
+	await page.goto("http://login.example.test/");
+	const menu = await openMenu(page, "Email");
+	await expect(
+		menu.getByText("Nothing saved for login.example.test yet"),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	const popup = await openPopup(await tabIdOf("http://login.example.test"));
+	await expect(popup.getByText("Nothing saved for this site.")).toBeVisible();
+	await popup.close();
+	await page.close();
+});
+
+test("a page's styles can't fade, hide or move vauly's button and menu", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	const menu = await openMenu(page, "Email");
+	await page.evaluate(() => {
+		const sheet = document.createElement("style");
+		sheet.textContent =
+			"vauly-frame, vauly-button { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; transform: translateX(-9999px) !important; }";
+		document.head.append(sheet);
+		for (const host of document.querySelectorAll<HTMLElement>(
+			"vauly-frame, vauly-button",
+		)) {
+			host.style.setProperty("opacity", "0", "important");
+			host.setAttribute("inert", "");
+		}
+	});
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				[
+					...document.querySelectorAll<HTMLElement>(
+						"vauly-frame, vauly-button",
+					),
+				].map((host) => {
+					const style = getComputedStyle(host);
+					return [
+						style.opacity,
+						style.visibility,
+						style.pointerEvents,
+						style.transform,
+						host.hasAttribute("inert"),
+					].join(" ");
+				}),
+			),
+		)
+		.toEqual(["1 visible auto none false", "1 visible auto none false"]);
+	await menu
+		.getByRole("button", { name: `Fill ${login.name}, ${login.username}` })
+		.click();
+	await expect(page.getByLabel("Email")).toHaveValue(login.username);
+	await page.close();
+});
+
+test("a menu the page has faded out doesn't fill", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	const menu = await openMenu(page, "Email");
+	const fill = menu.getByRole("button", {
+		name: `Fill ${login.name}, ${login.username}`,
+	});
+	await expect(fill).toBeEnabled();
+	// The whole page, vauly's menu with it, nearly invisible over a decoy.
+	await page.evaluate(() => {
+		document.documentElement.style.opacity = "0.05";
+	});
+	// Chrome reports what's visible at most every tenth of a second.
+	await page.waitForTimeout(500);
+	await fill.click();
+	await expect(
+		menu.getByText(
+			"vauly doesn't fill while this page hides or covers its menu.",
+		),
+	).toBeVisible();
+	await expect(page.getByLabel("Password")).toHaveValue("");
 	await page.close();
 });
 
