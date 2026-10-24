@@ -147,6 +147,11 @@ test("starting up offline unlocks from the copy", async ({ page, context }) => {
 		"The app's files are cached by the service worker only in a production build.",
 	);
 	await signedInWithCopy(page);
+	// The service worker serves the app offline once it's active, which is after it has
+	// cached the app's files: on a slow first load it can still be installing.
+	await page.evaluate(async () => {
+		await navigator.serviceWorker.ready;
+	});
 	await context.setOffline(true);
 	await page.reload();
 	await expect(
