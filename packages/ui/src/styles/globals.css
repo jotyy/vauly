@@ -348,4 +348,48 @@
 	::selection {
 		background-color: var(--brand-soft-strong);
 	}
+	/* Inside the vauly app (apps/web/src/lib/native.ts), the chrome behaves like an app's:
+	   nothing to select or long-press outside fields and values, and no bounce behind it. */
+	html[data-native] {
+		overscroll-behavior: none;
+		-webkit-user-select: none;
+		user-select: none;
+		-webkit-touch-callout: none;
+	}
+	html[data-native] body {
+		overscroll-behavior: none;
+	}
+	html[data-native] :is(input, textarea, [contenteditable], dd, pre, code) {
+		-webkit-user-select: text;
+		user-select: text;
+		-webkit-touch-callout: default;
+	}
+}
+
+/* The notch, the status bar and the home indicator, on a phone with viewport-fit=cover;
+   zero everywhere else. */
+@utility pt-safe {
+	padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+	padding-bottom: env(safe-area-inset-bottom);
+}
+@utility px-safe {
+	padding-left: env(safe-area-inset-left);
+	padding-right: env(safe-area-inset-right);
+}
+@utility h-safe-top {
+	height: env(safe-area-inset-top);
+}
+
+/* iOS zooms in on a field whose text is under 16px as it's focused, and stays zoomed. On a
+   touch screen fields use 16px; this sits outside the layers so it outranks text sizes. */
+@media (pointer: coarse) {
+	:is(
+		input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+		textarea,
+		select
+	) {
+		font-size: 16px;
+	}
 }

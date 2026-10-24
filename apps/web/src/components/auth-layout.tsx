@@ -2,8 +2,14 @@ import { EyeIcon, EyeSlashIcon } from "@phosphor-icons/react";
 import { Button } from "@vauly/ui/components/button";
 import { Input } from "@vauly/ui/components/input";
 import { cn } from "@vauly/ui/lib/utils";
-import { type ComponentProps, type ReactNode, useState } from "react";
+import {
+	type ComponentProps,
+	type ReactNode,
+	useEffect,
+	useState,
+} from "react";
 
+import { setStatusBarText } from "@/lib/native";
 import { passwordStrength } from "@/lib/secrets";
 
 import { CipherField } from "./cipher-field";
@@ -30,10 +36,13 @@ export function AuthLayout({
 	/** Fine print under the card. */
 	note?: ReactNode;
 }) {
+	// White text over the sky, in the app's status bar.
+	useEffect(() => setStatusBarText("light"), []);
+
 	return (
 		<div
 			data-slot="auth-sky"
-			className="relative isolate flex min-h-svh flex-col"
+			className="px-safe pt-safe pb-safe relative isolate flex min-h-svh flex-col"
 		>
 			<CipherField />
 			<header className="px-5 pt-5 sm:px-8 sm:pt-7">

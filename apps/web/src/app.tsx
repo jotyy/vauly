@@ -3,9 +3,12 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 
 import Loader from "./components/loader";
+import { markNativeApp } from "./lib/native";
 import { OPEN_PAGE } from "./lib/notifications";
 import { routeTree } from "./routeTree.gen";
 import { orpc, queryClient } from "./utils/orpc";
+
+markNativeApp();
 
 const router = createRouter({
 	routeTree,

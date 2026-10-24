@@ -63,6 +63,8 @@ function RootComponent() {
 				<Toaster
 					position="bottom-center"
 					offset={24}
+					// Clear of a phone's home indicator.
+					mobileOffset={{ bottom: "calc(16px + env(safe-area-inset-bottom))" }}
 					gap={8}
 					style={{ "--width": "36rem" } as CSSProperties}
 				/>

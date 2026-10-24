@@ -4,10 +4,17 @@ import { useSyncExternalStore } from "react";
 // next one that does says it's back; the browser's own online and offline events only
 // nudge it, since a device can be on a network that goes nowhere.
 
-/** A request that couldn't reach the server at all. */
+/**
+ * A request that couldn't reach the server at all. With the device online, the server is
+ * down or the address is wrong, so the message names it rather than blame the network.
+ */
 export class OfflineError extends Error {
-	constructor() {
-		super("You're offline. This needs a connection.");
+	constructor(server?: string) {
+		super(
+			navigator.onLine && server
+				? `Couldn't reach ${server}. Check your connection, or try again in a moment.`
+				: "You're offline. This needs a connection.",
+		);
 	}
 }
 

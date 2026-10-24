@@ -53,6 +53,7 @@ import { useApplyAppStyle } from "@/lib/app-style";
 import { useOnline } from "@/lib/connection";
 import { ago, initials, toneDot } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
+import { setStatusBarText } from "@/lib/native";
 import { useOfflineCopy } from "@/lib/offline";
 import {
 	useDeletedItems,
@@ -64,11 +65,19 @@ import {
 import { CommandPalette } from "./command-palette";
 import { VaulyMark } from "./vauly-mark";
 
+/** What the status bar's text reads over at the top of the app: the demo banner, or the page. */
+const topText = (theme: string | undefined) =>
+	demoAccount || theme === "dark" ? "light" : "dark";
+
 export function AppShell() {
 	const [searching, setSearching] = useState(false);
 	const online = useOnline();
 	useApplyAppStyle();
 	const main = useRef<HTMLElement>(null);
+	const { resolvedTheme } = useTheme();
+
+	// In the app, the status bar's text has to read over whatever is at the top.
+	useEffect(() => setStatusBarText(topText(resolvedTheme)), [resolvedTheme]);
 
 	// Notifications sit centered over the content column (minus its scrollbar), not over
 	// the whole window: measure the column and shift the toast layer to match.
@@ -106,7 +115,15 @@ export function AppShell() {
 	}, []);
 
 	return (
-		<div data-slot="app-shell" className="bg-frame flex h-svh flex-col">
+		<div data-slot="app-shell" className="bg-frame px-safe flex h-svh flex-col">
+			{/* Under a phone's status bar, in the color of what's just below it. */}
+			<div
+				aria-hidden
+				className={cn(
+					"h-safe-top shrink-0",
+					demoAccount ? "bg-brand" : !online && "bg-warning-soft",
+				)}
+			/>
 			{demoAccount && <DemoBanner />}
 			{!online && <OfflineBanner />}
 			<TopBar onSearch={() => setSearching(true)} />
@@ -134,9 +151,9 @@ function OfflineBanner() {
 			className="bg-warning-soft text-warning border-warning-line text-caption flex shrink-0 flex-wrap items-center justify-center gap-x-2 border-b px-4 py-1.5 text-center"
 		>
 			<WifiSlashIcon className="size-3.5 shrink-0" />
-			{syncedAt
-				? `You're offline. Showing the copy this device saved ${ago(new Date(syncedAt))}.`
-				: "You're offline."}{" "}
+			{navigator.onLine ? "Can't reach vauly's server." : "You're offline."}{" "}
+			{syncedAt &&
+				`Showing the copy this device saved ${ago(new Date(syncedAt))}. `}
 			Changes, sharing and the activity log wait for a connection.
 		</p>
 	);
@@ -212,6 +229,14 @@ function MobileNav() {
 	const href = useRouterState({ select: (state) => state.location.href });
 	// biome-ignore lint/correctness/useExhaustiveDependencies: close whenever the page changes
 	useEffect(() => setOpen(false), [href]);
+	const { resolvedTheme } = useTheme();
+
+	// The open menu covers the status bar in the page's own color.
+	useEffect(() => {
+		if (!open) return;
+		setStatusBarText(resolvedTheme === "dark" ? "light" : "dark");
+		return () => setStatusBarText(topText(resolvedTheme));
+	}, [open, resolvedTheme]);
 
 	return (
 		<Sheet open={open} onOpenChange={setOpen}>

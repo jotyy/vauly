@@ -6,6 +6,8 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ### Fixed
 
+- On an iPhone, tapping a field no longer zooms the page in and leaves it zoomed: fields use 16px text on touch screens. The app fills the screen around the notch and the home indicator when it's installed.
+- When the device is online but vauly's server doesn't answer, messages name the server instead of saying you're offline, and an error page from in front of the server says so.
 - A file over the size limit, chosen just as its item opens, is turned away with "is too big" before it's sent, as at any other time. It used to start the upload and end with "Couldn't attach" and the server's reason.
 
 ## 0.2.0 - 2026-10-24
