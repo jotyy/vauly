@@ -94,7 +94,7 @@ Write commit messages as a short summary in the imperative ("Add Recently delete
 For maintainers. Versions follow semver. `next` carries the coming version with `-dev` (`0.2.0-dev`), and a release commit carries the plain one.
 1. **The release commit.** A pull request to `next` titled "Release 0.2.0" sets `"version": "0.2.0"` in the root `package.json` and in `apps/extension/package.json`, and turns **Unreleased** in CHANGELOG.md into `## 0.2.0 - <date>`. A unit test fails if the two versions differ on a release commit.
 2. **The tag.** Tag the merged commit and push the tag: `git tag v0.2.0 <commit>` then `git push origin v0.2.0`. `cli.yml` builds the CLI and drafts a GitHub release.
-3. **Publish.** Paste that version's CHANGELOG section into the draft as its notes, attach the extension's zip, and publish it.
+3. **Publish.** Paste that version's CHANGELOG section into the draft as its notes, attach the extension's zip from `bun run --cwd apps/extension zip` (`vauly-extension-0.2.0-chrome.zip`), and publish it. Then upload the Firefox zip from `zip:firefox` to addons.mozilla.org, with `git archive --format=zip v0.2.0` as its source and the steps in [apps/extension/README.md](apps/extension/README.md#rebuilding-the-firefox-package-from-its-source) as the notes for reviewers.
 4. **Move `main`.** Fast-forward `main` to the release: `git push origin v0.2.0^{commit}:main`.
 5. **Back to `-dev`.** Set `next` to the next version with `-dev` (`0.3.0-dev`), above an empty **Unreleased**. The extension keeps `0.2.0`, since Chrome takes only numbers in a version.
 

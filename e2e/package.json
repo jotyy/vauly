@@ -5,6 +5,7 @@
 	"scripts": {
 		"test": "playwright test",
 		"test:one-worker": "VAULY_E2E_ONE_WORKER=1 playwright test",
+		"test:firefox": "playwright test --config firefox.config.ts",
 		"report": "playwright show-report",
 		"screenshots": "playwright test --config screenshots.config.ts",
 		"demo:seed": "playwright test --config demo.config.ts",
@@ -15,11 +16,13 @@
 	"devDependencies": {
 		"@axe-core/playwright": "^4.14.0",
 		"@playwright/test": "1.64.1",
+		"@puppeteer/browsers": "3.2.6",
 		"@simplewebauthn/server": "14.0.3",
 		"@types/node": "^26.4.1",
 		"@vauly/api": "workspace:*",
 		"@vauly/crypto": "workspace:*",
 		"fflate": "0.8.3",
+		"puppeteer-core": "25.16.0",
 		"typescript": "catalog:"
 	}
 }

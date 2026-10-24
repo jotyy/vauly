@@ -4,6 +4,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ## Unreleased
 
+### Added
+
+- **The browser extension works in Firefox**, 153 or later, on a computer. It fills logins, cards and identities, offers to save logins, and saves and signs in with passkeys, as it does in Chrome. For now, build it with `bun run --cwd apps/extension build:firefox` and load it from `about:debugging`; [Browser extension](docs/browser-extension.md#firefox) has the steps. In Firefox, website logos are off until you turn them on in the extension's settings, which asks you first, and the window offering to save a login takes the focus when it opens. Firefox for Android isn't supported yet.
+
 ### Fixed
 
 - On an iPhone, tapping a field no longer zooms the page in and leaves it zoomed: fields use 16px text on touch screens. The app fills the screen around the notch and the home indicator when it's installed.
