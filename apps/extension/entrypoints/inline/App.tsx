@@ -21,20 +21,41 @@ export default function App() {
 	return <Menu />;
 }
 
-/** Runs again when the extension locks or unlocks. */
-function useSessionChange(load: () => void) {
+/**
+ * Runs again when the extension locks or unlocks. Firefox gives a frame inside a page no
+ * session storage, nor word of its changes, so there it asks again every second until
+ * there's something to fill.
+ */
+function useSessionChange(load: () => Promise<void>, ready: boolean) {
 	useEffect(() => {
+		if (!browser.storage.session) {
+			if (ready) return;
+			// One question at a time: the first after unlocking decrypts the vault.
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			let stopped = false;
+			const next = () => {
+				timer = setTimeout(
+					() => void load().then(() => stopped || next()),
+					1000,
+				);
+			};
+			next();
+			return () => {
+				stopped = true;
+				clearTimeout(timer);
+			};
+		}
 		const changed = (
 			changes: Record<string, { oldValue?: unknown; newValue?: unknown }>,
 			area: string,
 		) => {
 			if (area !== "session") return;
 			const unlocked = changes.unlocked;
-			if (unlocked && !unlocked.oldValue !== !unlocked.newValue) load();
+			if (unlocked && !unlocked.oldValue !== !unlocked.newValue) void load();
 		};
 		browser.storage.onChanged.addListener(changed);
 		return () => browser.storage.onChanged.removeListener(changed);
-	}, [load]);
+	}, [load, ready]);
 }
 
 /** The popup is where people sign in and unlock; open it from the page if we can. */
@@ -72,11 +93,12 @@ function Note({ children }: { children: ReactNode }) {
 function Menu() {
 	const [state, setState] = useState<MenuState | null>(null);
 	const [note, setNote] = useState("");
-	const load = useCallback(() => {
-		void ask<MenuState>({ type: "vauly:menu" }).then(setState);
-	}, []);
-	useEffect(load, [load]);
-	useSessionChange(load);
+	const load = useCallback(
+		() => ask<MenuState>({ type: "vauly:menu" }).then(setState),
+		[],
+	);
+	useEffect(() => void load(), [load]);
+	useSessionChange(load, state?.status === "ready");
 
 	if (!state) return null;
 
@@ -117,7 +139,11 @@ function Menu() {
 	const fill = async (login: MenuLogin) => {
 		const result = await ask<FillResult>({ type: "vauly:fill", id: login.id });
 		if (!result?.ok) {
-			setNote("There's no password field to fill on this page.");
+			// vauly may have locked since the menu opened; then the menu says so instead.
+			const now = await ask<MenuState>({ type: "vauly:menu" });
+			setState(now);
+			if (now?.status === "ready")
+				setNote("There's no password field to fill on this page.");
 			return;
 		}
 		if (result.code) {

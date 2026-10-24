@@ -7,10 +7,10 @@
 	"scripts": {
 		"dev": "wxt --port 5555",
 		"dev:firefox": "wxt -b firefox",
-		"build": "wxt build",
-		"build:firefox": "wxt build -b firefox",
-		"zip": "wxt zip",
-		"zip:firefox": "wxt zip -b firefox",
+		"build": "bun --bun wxt build",
+		"build:firefox": "bun --bun wxt build -b firefox",
+		"zip": "bun --bun wxt zip",
+		"zip:firefox": "bun --bun wxt zip -b firefox",
 		"check-types": "tsc --noEmit",
 		"postinstall": "wxt prepare"
 	},
