@@ -15,9 +15,11 @@ import {
 } from "@/lib/capture";
 import { fillLoginForm } from "@/lib/fill";
 import { getLogoSettings, logoFor } from "@/lib/logos";
+import { claim, drop, issue, withMenuFrames } from "@/lib/menu-frames";
 import type {
 	Done,
 	FillResult,
+	FrameRequest,
 	LoginMessage,
 	MenuState,
 	OfferState,
@@ -122,6 +124,7 @@ export default defineBackground(() => {
 	});
 	browser.tabs.onRemoved.addListener(async (tabId) => {
 		void dropCapture(tabId);
+		void withMenuFrames((all) => drop(all, tabId));
 		const pending = await getPending();
 		if (pending?.tabId === tabId) await finish(pending, toBrowser);
 		const saving = await getSaveWindow();
@@ -133,8 +136,8 @@ export default defineBackground(() => {
 /**
  * Which of vauly's own pages sent a message, or null for a content script, which sends
  * from the site's address. Only this extension's pages and scripts reach this listener.
- * The fill menu's address has an ID that changes every session, so it's the path that
- * counts.
+ * The fill menu's address can change from session to session (lib/menu-frames.ts says
+ * how its frame proves itself), so it's the path that counts.
  */
 function ownPage(url: string | undefined) {
 	try {
@@ -182,6 +185,14 @@ async function answer(
 		case "vauly:offer-show":
 			if (sender.topFrame && !sender.fromFrame) await showSaveWindow(tab);
 			return null;
+		case "vauly:menu-open":
+			// The page script, which makes the menu's frame; never a frame of vauly's.
+			if (!sender.topFrame || sender.fromFrame) return null;
+			return withMenuFrames((all) => issue(all, tab.id, Date.now()));
+		case "vauly:menu-gone":
+			if (sender.topFrame && !sender.fromFrame)
+				await withMenuFrames((all) => drop(all, tab.id, request.token));
+			return null;
 		case "vauly:passkey":
 			return passkeyAsked(tab, request, sender);
 		case "vauly:passkey-abort": {
@@ -208,7 +219,13 @@ async function answer(
 			// Only from vauly's save window, about the tab it was opened for.
 			return sender.saveWindow ? answerSaveWindow(request, sender) : null;
 	}
+	// Only the frame the page script made for this menu: the first to show its token.
 	if (!sender.menuFrame) return null;
+	const { token } = request as FrameRequest;
+	const known = await withMenuFrames((all) =>
+		claim(all, token, tab.id, sender.documentId, Date.now()),
+	);
+	if (!known) return null;
 	switch (request.type) {
 		case "vauly:menu":
 			return menuState(tab.url);

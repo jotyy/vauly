@@ -30,8 +30,10 @@ export default defineConfig({
 				"script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
 		},
 		// The fill menu is this page, framed inside the site's page; the button in a login
-		// field shows the mark. Their addresses change every session, so a site can't
-		// frame the menu itself. vauly's other windows aren't reachable from sites at all.
+		// field shows the mark. In Chrome their addresses change every session; Firefox
+		// doesn't do that, and either way the menu answers only the frame vauly's page
+		// script made (lib/menu-frames.ts). vauly's other windows aren't reachable from
+		// sites at all.
 		web_accessible_resources: [
 			{
 				resources: ["inline.html", "icon/32.png"],

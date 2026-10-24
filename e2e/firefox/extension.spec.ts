@@ -613,6 +613,68 @@ test("the menu under a login field fills the site's form", async () => {
 	await page.close();
 });
 
+test("a frame of vauly's menu that the page script didn't make gets nothing", async () => {
+	const page = await newTab(`${site}/`);
+	const menu = await openMenu(page, "#email");
+	const fill = `Fill ${login.name}, ${login.username}`;
+	await see(menu, login.username);
+	// Someone who knew the menu's address, its token too, frames it again in the page,
+	// and with a made-up token, and with none. Firefox loads them all.
+	const address = await menu.evaluate(() => location.href);
+	await page.evaluate(
+		(urls) => {
+			for (const url of urls) {
+				const frame = document.createElement("iframe");
+				frame.src = url;
+				document.body.append(frame);
+			}
+		},
+		[
+			address,
+			address.replace(/token=[^&]+/, "token=made-up"),
+			address.replace(/&token=[^&]+/, ""),
+		],
+	);
+	let copies: Frame[] = [];
+	await expect
+		.poll(async () => {
+			copies = [];
+			for (const frame of page.frames()) {
+				if (frame === menu) continue;
+				const href = await frame.evaluate(() => location.href).catch(() => "");
+				if (href.includes("/inline.html")) copies.push(frame);
+			}
+			return copies.length;
+		})
+		.toBe(3);
+	type Runtime = {
+		browser: { runtime: { sendMessage(message: unknown): Promise<unknown> } };
+	};
+	for (const copy of copies) {
+		const token = await copy.evaluate(() =>
+			new URLSearchParams(location.hash.slice(1)).get("token"),
+		);
+		// Asked the way the menu asks, the background doesn't answer.
+		expect(
+			await copy.evaluate(
+				(token) =>
+					(globalThis as unknown as Runtime).browser.runtime.sendMessage({
+						type: "vauly:menu",
+						token,
+					}),
+				token,
+			),
+		).toBeNull();
+		expect(
+			await copy.evaluate(() => document.querySelectorAll("button").length),
+		).toBe(0);
+	}
+	// The menu the page script made still fills.
+	await press(menu, fill);
+	await expect.poll(() => inputValue(page, "#email")).toBe(login.username);
+	await page.close();
+});
+
 test("a card fills a checkout form, and an identity an address form", async () => {
 	await web.goto("/items");
 	await web.getByLabel("Master password").fill(owner.password);

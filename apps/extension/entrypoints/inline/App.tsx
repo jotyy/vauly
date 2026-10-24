@@ -15,7 +15,9 @@ import {
 // the same size whatever it shows, and it closes through the background, never by
 // posting to the page, so the page learns nothing from it about what vauly holds.
 
-const close = () => void ask({ type: "vauly:menu-close" });
+/** The page script gives the menu a token in its address; the background answers no other frame. */
+const token = new URLSearchParams(location.hash.slice(1)).get("token") ?? "";
+const close = () => void ask({ type: "vauly:menu-close", token });
 
 export default function App() {
 	return <Menu />;
@@ -26,7 +28,10 @@ export default function App() {
  * session storage, nor word of its changes, so there it asks again every second until
  * there's something to fill.
  */
-function useSessionChange(load: () => Promise<void>, ready: boolean) {
+function useSessionChange(
+	load: () => Promise<MenuState | null>,
+	ready: boolean,
+) {
 	useEffect(() => {
 		if (!browser.storage.session) {
 			if (ready) return;
@@ -35,7 +40,8 @@ function useSessionChange(load: () => Promise<void>, ready: boolean) {
 			let stopped = false;
 			const next = () => {
 				timer = setTimeout(
-					() => void load().then(() => stopped || next()),
+					// Nothing means this frame isn't the menu any more: stop asking.
+					() => void load().then((answer) => stopped || !answer || next()),
 					1000,
 				);
 			};
@@ -94,7 +100,11 @@ function Menu() {
 	const [state, setState] = useState<MenuState | null>(null);
 	const [note, setNote] = useState("");
 	const load = useCallback(
-		() => ask<MenuState>({ type: "vauly:menu" }).then(setState),
+		() =>
+			ask<MenuState>({ type: "vauly:menu", token }).then((answer) => {
+				setState(answer);
+				return answer;
+			}),
 		[],
 	);
 	useEffect(() => void load(), [load]);
@@ -137,10 +147,14 @@ function Menu() {
 	}
 
 	const fill = async (login: MenuLogin) => {
-		const result = await ask<FillResult>({ type: "vauly:fill", id: login.id });
+		const result = await ask<FillResult>({
+			type: "vauly:fill",
+			id: login.id,
+			token,
+		});
 		if (!result?.ok) {
 			// vauly may have locked since the menu opened; then the menu says so instead.
-			const now = await ask<MenuState>({ type: "vauly:menu" });
+			const now = await ask<MenuState>({ type: "vauly:menu", token });
 			setState(now);
 			if (now?.status === "ready")
 				setNote("There's no password field to fill on this page.");
