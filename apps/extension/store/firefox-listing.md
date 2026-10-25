@@ -31,7 +31,7 @@ What it does:
 • Copies usernames, passwords and one-time codes, and searches every item you can open.
 
 How your data is kept:
-• Everything is decrypted on your computer. Your master password never leaves it, and the server only ever holds ciphertext.
+• Everything is decrypted on your computer. Your master password never leaves it, and your items reach the server only as ciphertext. The server also keeps your team's activity log: when you fill or copy an item, it notes which item and when, as the web app does.
 • The extension talks to the vauly server you connect it to, your team's own. It sends nothing to us and has no analytics.
 • Brand logos next to logins come from Brandfetch, looked up by the website's domain. Turn them off in the extension's settings.
 
@@ -64,7 +64,9 @@ vauly is open source under AGPL-3.0: https://github.com/jotyy/vauly
 ## Data collection
 
 Firefox shows these when the extension is installed. They're in the manifest, under `browser_specific_settings.gecko.data_collection_permissions`; the listing repeats them in words:
-- **Required: authentication information and personally identifying information.** Signing in sends the user's email address and a key derived from their master password, and saving sends their logins, encrypted on the computer first. All of it goes only to the vauly server the user connects the extension to, which their team runs.
+- **Required: authentication information and personally identifying information.** Signing in sends the user's email address and a key derived from their master password, and saving sends their logins, encrypted on the computer first.
+- **Required: website activity.** Filling or copying an item adds an entry to the team's activity log, with the item's ID and the time, as the web app does. The server can't tell the item's website, but teammates who can open the item can.
+- All of it goes only to the vauly server the user connects the extension to, which their team runs.
 - **Optional: browsing activity.** Brand logos are loaded from Brandfetch by the website's domain of each saved login. They're off until the user turns on **Show website logos** in the extension's settings, which asks for this permission.
 
 ## Notes for reviewers
@@ -87,4 +89,6 @@ Source: the uploaded zip is the repository at the release's tag (https://github.
 4. apps/extension/.output/firefox-mv3 has the same files as the package. CI checks that builds on Linux and macOS match.
 
 Permissions: "Access your data for all websites" lets it fill and offer to save logins on whatever site the user signs in to, handle sites' passkey requests, and reach the team's own vauly server, whose address is different for every team. "storage" keeps the server address, the session and settings; the unlocked key is kept in session storage only. "scripting" fills the form when the user chooses a login. "alarms" locks vauly after 15 idle minutes.
+
+Data: everything goes only to the vauly server the user connects, which their team runs. Items reach it only as ciphertext, encrypted in the extension. Signing in sends the email address and a key derived from the master password (authentication and personally identifying information). Filling or copying an item adds an entry to the team's activity log with the item's ID and the time (website activity), as the web app does. Brand logos load from Brandfetch by website domain only if the user turns them on, which asks for the optional browsing-activity permission.
 ```

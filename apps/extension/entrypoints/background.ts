@@ -20,6 +20,7 @@ import type {
 	Done,
 	FillResult,
 	FrameRequest,
+	LockMessage,
 	LoginMessage,
 	MenuState,
 	OfferState,
@@ -71,6 +72,9 @@ import {
 
 type Tab = { id: number; url: string };
 
+/** The fill menus open in pages, by their ports. */
+const openMenus = new Set<ReturnType<typeof browser.runtime.connect>>();
+
 export default defineBackground(() => {
 	// Checks every minute whether the extension has been idle long enough to lock, so the
 	// unlocked key leaves memory even if the popup is never opened again.
@@ -80,6 +84,38 @@ export default defineBackground(() => {
 		void getUnlocked();
 		void expirePasskeyRequest();
 		void expireSaveWindow();
+	});
+
+	// Open fill menus hear when the extension locks or unlocks, over a port each opens and
+	// proves is the menu's own frame with its token, as its requests do.
+	browser.runtime.onConnect.addListener((port) => {
+		const sender = port.sender;
+		const tabId = sender?.tab?.id;
+		if (
+			port.name !== "vauly:menu" ||
+			ownPage(sender?.url) !== "/inline.html" ||
+			tabId === undefined
+		) {
+			port.disconnect();
+			return;
+		}
+		port.onMessage.addListener(async (message: { token?: unknown } | null) => {
+			// If the menus can't be read, the port closes: the frame asks again, and connects
+			// again only if it gets an answer.
+			const known = await withMenuFrames((all) =>
+				claim(all, message?.token, tabId, sender?.documentId, Date.now()),
+			).catch(() => false);
+			if (known) openMenus.add(port);
+			else port.disconnect();
+		});
+		port.onDisconnect.addListener(() => openMenus.delete(port));
+	});
+	browser.storage.onChanged.addListener((changes, area) => {
+		const unlocked = changes.unlocked;
+		if (area !== "session" || !unlocked) return;
+		if (!unlocked.oldValue === !unlocked.newValue) return;
+		for (const port of openMenus)
+			port.postMessage({ type: "vauly:lock-changed" } satisfies LockMessage);
 	});
 
 	browser.runtime.onMessage.addListener((message: unknown, sender, reply) => {

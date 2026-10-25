@@ -287,14 +287,20 @@ function serve(request: HTTPRequest) {
 
 // ── Firefox, the extension and vauly ────────────────────────────────────────────────
 
-/** Firefox's current release, downloaded once into e2e/.cache, or VAULY_FIREFOX. */
+/**
+ * Firefox, downloaded once into e2e/.cache: its current release, or the build
+ * VAULY_FIREFOX_BUILD names, such as stable_153.0. VAULY_FIREFOX names one to use instead.
+ */
 async function firefoxPath() {
 	if (process.env.VAULY_FIREFOX) return process.env.VAULY_FIREFOX;
 	const platform = detectBrowserPlatform();
 	if (!platform) throw new Error("No Firefox build for this platform");
+	const wanted = process.env.VAULY_FIREFOX_BUILD ?? "stable";
 	const installed = await install({
 		browser: BrowserName.FIREFOX,
-		buildId: await resolveBuildId(BrowserName.FIREFOX, platform, "stable"),
+		buildId: wanted.includes("_")
+			? wanted
+			: await resolveBuildId(BrowserName.FIREFOX, platform, wanted),
 		cacheDir: path.resolve(import.meta.dirname, "../.cache/firefox"),
 	});
 	return installed.executablePath;
@@ -829,9 +835,8 @@ test("Lock forgets the key until the master password is entered again", async ()
 	await see(popup, login.name);
 	// The open menu follows.
 	await see(menu, login.username);
-	// Locked again while it's open, choosing a login finds vauly locked.
+	// Locked again while it's open, the menu says so straight away.
 	await press(popup, "Lock");
-	await press(menu, `Fill ${login.name}, ${login.username}`);
 	await see(menu, "vauly is locked");
 	expect(await inputValue(page, "#password")).toBe("");
 	await fillIn(popup, "Master password", owner.password);

@@ -13,6 +13,7 @@ import { ItemLogo } from "@/components/item-logo";
 import {
 	ask,
 	type FillResult,
+	type LockMessage,
 	type MenuLogin,
 	type MenuState,
 } from "@/lib/messages";
@@ -34,44 +35,34 @@ export default function App() {
 }
 
 /**
- * Runs again when the extension locks or unlocks. Firefox gives a frame inside a page no
- * session storage, nor word of its changes, so there it asks again every second until
- * there's something to fill.
+ * Runs again when the extension locks or unlocks: the background says so over a port, as
+ * a frame inside a page hears nothing of the session storage that holds the key in
+ * Firefox. A background that goes to sleep closes the port, so the menu asks afresh and
+ * connects again; one that doesn't know this frame closes it too, and then gets no answer.
  */
-function useSessionChange(
-	load: () => Promise<MenuState | null>,
-	ready: boolean,
-) {
+function useLockChange(load: () => Promise<MenuState | null>) {
 	useEffect(() => {
-		if (!browser.storage.session) {
-			if (ready) return;
-			// One question at a time: the first after unlocking decrypts the vault.
-			let timer: ReturnType<typeof setTimeout> | undefined;
-			let stopped = false;
-			const next = () => {
-				timer = setTimeout(
-					// Nothing means this frame isn't the menu any more: stop asking.
-					() => void load().then((answer) => stopped || !answer || next()),
-					1000,
-				);
-			};
-			next();
-			return () => {
-				stopped = true;
-				clearTimeout(timer);
-			};
-		}
-		const changed = (
-			changes: Record<string, { oldValue?: unknown; newValue?: unknown }>,
-			area: string,
-		) => {
-			if (area !== "session") return;
-			const unlocked = changes.unlocked;
-			if (unlocked && !unlocked.oldValue !== !unlocked.newValue) void load();
+		let port: ReturnType<typeof browser.runtime.connect> | undefined;
+		let stopped = false;
+		const connect = () => {
+			port = browser.runtime.connect({ name: "vauly:menu" });
+			port.onMessage.addListener((message: LockMessage | null) => {
+				if (message?.type === "vauly:lock-changed") void load();
+			});
+			port.onDisconnect.addListener(() => {
+				if (stopped) return;
+				void load().then((answer) => {
+					if (answer && !stopped) connect();
+				});
+			});
+			port.postMessage({ token });
 		};
-		browser.storage.onChanged.addListener(changed);
-		return () => browser.storage.onChanged.removeListener(changed);
-	}, [load, ready]);
+		connect();
+		return () => {
+			stopped = true;
+			port?.disconnect();
+		};
+	}, [load]);
 }
 
 /** The popup is where people sign in and unlock; open it from the page if we can. */
@@ -197,7 +188,7 @@ function Menu() {
 		[],
 	);
 	useEffect(() => void load(), [load]);
-	useSessionChange(load, state?.status === "ready");
+	useLockChange(load);
 	const deliberate = useDeliberate(state?.status === "ready");
 
 	if (!state) return null;
