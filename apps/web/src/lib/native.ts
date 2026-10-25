@@ -15,6 +15,12 @@ type Bridge = {
 				type: "SUCCESS" | "WARNING" | "ERROR";
 			}): Promise<void>;
 		};
+		/** The app's own plugin (apps/mobile): its session, kept in the Keychain. */
+		VaulySession?: {
+			get(): Promise<{ address?: string; token?: string }>;
+			set(session: { address: string; token?: string }): Promise<void>;
+			clear(): Promise<void>;
+		};
 	};
 };
 
@@ -22,6 +28,9 @@ const bridge = (globalThis as { Capacitor?: Bridge }).Capacitor;
 
 /** Whether this is the vauly app, rather than a browser. */
 export const isNativeApp = bridge?.isNativePlatform() ?? false;
+
+/** Where the app keeps which vauly it's connected to, and its session there. */
+export const sessionStore = bridge?.Plugins.VaulySession;
 
 /** Marks the page for the app's own styling (native.css), as `html[data-native="ios"]`. */
 export function markNativeApp() {

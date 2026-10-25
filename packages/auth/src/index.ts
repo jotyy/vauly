@@ -13,6 +13,14 @@ export type AuthConfig = {
 	CORS_ORIGIN: string;
 };
 
+/**
+ * Where the vauly apps run the web app from. The iPhone app holds its session as a bearer
+ * token, never a cookie, so the API lets it in on every deploy, without credentials.
+ * Android's WebView would be https://localhost, an origin a page on someone's own computer
+ * can have too, so it isn't here: the Android app needs an origin of its own first.
+ */
+export const APP_ORIGINS = ["capacitor://localhost"];
+
 export type AuthOptions = {
 	desktopOrigins?: readonly string[];
 	/** Called once a sign-in has passed every check, with the session it made. */
@@ -38,6 +46,7 @@ export function createAuth(
 			env.CORS_ORIGIN,
 			"chrome-extension://",
 			"moz-extension://",
+			...APP_ORIGINS,
 			...desktopOrigins,
 		],
 		// The "password" is the auth key derived from the master password on the device;

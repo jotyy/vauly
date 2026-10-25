@@ -1,0 +1,13 @@
+{
+	"appId": "app.vauly",
+	"appName": "vauly",
+	"webDir": "www",
+	"plugins": {
+		"CapacitorHttp": {
+			"enabled": false
+		},
+		"Keyboard": {
+			"resize": "native"
+		}
+	}
+}

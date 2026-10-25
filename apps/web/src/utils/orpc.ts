@@ -6,12 +6,14 @@ import type { AppRouterClient } from "@vauly/api/routers/index";
 
 import { notify } from "../components/notify";
 import { serverUrl } from "../env.public";
+import { appToken } from "../lib/app-session";
 import {
 	isOfflineError,
 	isOnline,
 	OfflineError,
 	setOnline,
 } from "../lib/connection";
+import { isNativeApp } from "../lib/native";
 
 export function createQueryClient() {
 	return new QueryClient({
@@ -44,10 +46,16 @@ export const TWO_STEP_NEEDED = "vauly:two-step-needed";
 
 export const link = new RPCLink({
 	url: () => `${serverUrl()}/rpc`,
-	async fetch(url, options) {
+	async fetch(request, init) {
+		// Inside the vauly app the session is a bearer token, never a cookie (app-session.ts).
+		const token = isNativeApp && appToken();
+		if (token) request.headers.set("Authorization", `Bearer ${token}`);
 		let response: Response;
 		try {
-			response = await fetch(url, { ...options, credentials: "include" });
+			response = await fetch(request, {
+				...init,
+				credentials: isNativeApp ? "omit" : "include",
+			});
 		} catch (err) {
 			// A cancelled request isn't a missing network.
 			if (err instanceof DOMException && err.name === "AbortError") throw err;

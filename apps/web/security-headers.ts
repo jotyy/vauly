@@ -16,12 +16,11 @@ export type HeaderOptions = {
 	breaches: boolean;
 };
 
-export function contentSecurityPolicy({
-	server,
-	logos,
-	breaches,
-}: HeaderOptions) {
-	const directives: [string, ...string[]][] = [
+type Directive = [string, ...string[]];
+
+/** The directives the website and the app share; `connect` says where it may connect. */
+function directives(connect: string[], logos: boolean): Directive[] {
+	return [
 		["default-src", "'self'"],
 		// Only the app's own script files run: nothing inline, nothing from a string.
 		["script-src", "'self'"],
@@ -29,21 +28,75 @@ export function contentSecurityPolicy({
 		["style-src", "'self'", "'unsafe-inline'"],
 		// The data: images are the backgrounds and masks in the app's CSS.
 		["img-src", "'self'", "data:", "blob:", ...(logos ? [LOGO_ORIGIN] : [])],
-		[
-			"connect-src",
-			"'self'",
-			...(server ? [new URL(server).origin] : []),
-			...(breaches ? [PWNED_PASSWORDS_ORIGIN] : []),
-		],
+		["connect-src", "'self'", ...connect],
 		["worker-src", "'self'"],
 		["manifest-src", "'self'"],
 		["object-src", "'none'"],
 		["base-uri", "'none'"],
 		["form-action", "'self'"],
+	];
+}
+
+const join = (list: Directive[]) =>
+	list.map((directive) => directive.join(" ")).join("; ");
+
+export function contentSecurityPolicy({
+	server,
+	logos,
+	breaches,
+}: HeaderOptions) {
+	return join([
+		...directives(
+			[
+				...(server ? [new URL(server).origin] : []),
+				...(breaches ? [PWNED_PASSWORDS_ORIGIN] : []),
+			],
+			logos,
+		),
 		// No other site can show vauly in a frame and trick someone into a click.
 		["frame-ancestors", "'none'"],
-	];
-	return directives.map((directive) => directive.join(" ")).join("; ");
+	]);
+}
+
+/**
+ * The policy inside the vauly app for iPhone. Its WebView loads the app's files from the
+ * app itself, with no headers, so the mobile build writes this into index.html as a
+ * <meta> tag (apps/mobile/scripts/copy-web.ts). The person names their vauly once the app
+ * is running, so this lets it connect to any https address, and to the computer it runs
+ * on for development; once the app knows the address, it narrows that to the one vauly
+ * (appConnectPolicy). A <meta> policy can't name frame ancestors, and nothing can frame
+ * the app anyway. It doesn't reach the key worker either, which runs only the app's own
+ * file there.
+ */
+export function appContentSecurityPolicy() {
+	return join(
+		directives(["https:", "http://localhost:*", "http://127.0.0.1:*"], true),
+	);
+}
+
+/**
+ * The second policy the app adds once it knows which vauly it's connected to: `address`,
+ * where the person opens it, and `server`, its API. With two policies, a request has to
+ * pass both, so this narrows appContentSecurityPolicy's connect-src.
+ */
+export function appConnectPolicy({
+	address,
+	server,
+	breaches,
+}: {
+	address: string;
+	server: string;
+	breaches: boolean;
+}) {
+	const origins = new Set([new URL(address).origin, new URL(server).origin]);
+	return join([
+		[
+			"connect-src",
+			"'self'",
+			...origins,
+			...(breaches ? [PWNED_PASSWORDS_ORIGIN] : []),
+		],
+	]);
 }
 
 /** Where the build puts the key worker and what it loads (vite.config.ts). */
@@ -87,5 +140,8 @@ export function headersFile(options: HeaderOptions) {
 		"  ! Content-Security-Policy",
 		`  Content-Security-Policy: ${keyWorkerPolicy()}`,
 	];
-	return `# Written by the build, from apps/web/security-headers.ts.\n/*\n${lines.join("\n")}\n\n/${KEY_WORKER_DIR}/*\n${keyWorker.join("\n")}\n`;
+	// The instance's public settings, which the vauly app reads from its own origin when
+	// someone connects it here. One Worker answers this itself, with the API's CORS.
+	const settings = ["  Access-Control-Allow-Origin: *"];
+	return `# Written by the build, from apps/web/security-headers.ts.\n/*\n${lines.join("\n")}\n\n/${KEY_WORKER_DIR}/*\n${keyWorker.join("\n")}\n\n/vauly.json\n${settings.join("\n")}\n`;
 }

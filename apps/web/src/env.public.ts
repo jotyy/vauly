@@ -1,4 +1,5 @@
 import { instance } from "./config";
+import { appAddress } from "./lib/app-session";
 
 // The instance's settings the app's modules use, read once /vauly.json has loaded
 // (see config.ts): the app's own modules load only after that.
@@ -15,3 +16,9 @@ export const demoAccount = instance().demo ?? null;
  */
 export const serverUrl = () =>
 	(instance().server || window.location.origin).replace(/\/$/, "");
+
+/**
+ * Where people open this vauly, for links and the Emergency Kit: this page's own address,
+ * or inside the vauly app, the address it's connected to.
+ */
+export const webAddress = () => appAddress() ?? window.location.origin;

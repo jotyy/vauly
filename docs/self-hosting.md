@@ -111,7 +111,7 @@ DELETE FROM setting WHERE key = 'require_two_step';
 
 ## Deploying with Alchemy
 
-The repository's development stack uses [Alchemy](https://alchemy.run) (`packages/infra/alchemy.run.ts`), which can also deploy, as two Workers: one for the web app and one for the API. `bun run deploy:stack -- --stage production` does that. It needs `BETTER_AUTH_SECRET`, and `CORS_ORIGIN` set to the web app's address; the one-Worker deploy above needs neither and is the simpler choice.
+The repository's development stack uses [Alchemy](https://alchemy.run) (`packages/infra/alchemy.run.ts`), which can also deploy, as two Workers: one for the web app and one for the API. `bun run deploy:stack -- --stage production` does that. It needs `BETTER_AUTH_SECRET`, and `CORS_ORIGIN` set to the web app's address; the one-Worker deploy above needs neither and is the simpler choice. Either way, the API also lets in the vauly app for iPhone, from `capacitor://localhost`, without cookies ([Security](security.md#the-app-for-iphone)).
 
 ## Checking what your instance serves
 

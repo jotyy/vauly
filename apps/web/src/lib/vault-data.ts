@@ -22,6 +22,7 @@ import { type Card, cardBrand, lastFour } from "@vauly/ui/lib/cards";
 import type { Identity } from "@vauly/ui/lib/identity";
 import { useMemo } from "react";
 
+import { webAddress } from "@/env.public";
 import { client } from "@/utils/orpc";
 
 import { useKeyring } from "./keyring";
@@ -698,7 +699,7 @@ export function useActions() {
 						once: options.once,
 					}),
 				);
-				const url = `${window.location.origin}/s/${id}#${await keyToText(key)}`;
+				const url = `${webAddress()}/s/${id}#${await keyToText(key)}`;
 				return { url, expiresAt };
 			},
 

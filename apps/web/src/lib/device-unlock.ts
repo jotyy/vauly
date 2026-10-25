@@ -11,6 +11,7 @@ import {
 import { client } from "@/utils/orpc";
 
 import { objectStore } from "./idb";
+import { isNativeApp } from "./native";
 
 // Unlocking with a passkey on this device: Face ID, Touch ID, Windows Hello or the
 // device's PIN instead of the master password. Turning it on creates a passkey with the
@@ -48,6 +49,8 @@ export const expiresAt = (record: DeviceUnlock) =>
 
 /** Whether to offer it: a platform authenticator that verifies the person, and PRF. */
 export async function deviceUnlockSupported() {
+	// The app's WebView can't use passkeys: they belong to a website's domain.
+	if (isNativeApp) return false;
 	if (!window.isSecureContext || !("PublicKeyCredential" in window)) {
 		return false;
 	}

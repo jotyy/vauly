@@ -38,7 +38,9 @@
 			"!apps/site/src/content/docs",
 			"!**/.astro",
 			"!apps/*/src/env.ts",
-			"!packages/*/src/env.ts"
+			"!packages/*/src/env.ts",
+			"!apps/mobile/www",
+			"!apps/mobile/ios"
 		]
 	},
 	"formatter": {

@@ -1,0 +1,9 @@
+{
+	"extends": "@vauly/config/tsconfig.base.json",
+	"compilerOptions": {
+		"lib": ["ESNext"],
+		"types": ["bun"],
+		"noEmit": true
+	},
+	"include": ["scripts/**/*.ts"]
+}

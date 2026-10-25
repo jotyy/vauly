@@ -30,6 +30,7 @@ import {
 } from "react";
 import { notify } from "@/components/notify";
 import { instance } from "@/config";
+import { forgetAppToken } from "@/lib/app-session";
 import { argon2InWorker, prepareArgon2 } from "@/lib/argon2";
 import { argon2idSeen, rememberArgon2id } from "@/lib/argon2id-seen";
 import { authClient } from "@/lib/auth-client";
@@ -231,7 +232,11 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			forgetSnapshots((snapshot) => snapshot.sessionId !== current),
 		]);
 		if (current) pushEnabled().catch(() => false);
-		else forgetPush();
+		else {
+			forgetPush();
+			// In the app: a token the server no longer knows.
+			void forgetAppToken();
+		}
 		return session;
 	}, []);
 
@@ -527,6 +532,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			forgetDevice();
 			forgetSnapshots();
 			forgetPush();
+			forgetAppToken();
 			lock();
 			setMe(null);
 			setStatus("signed-out");
@@ -556,7 +562,8 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			forgetDevice(),
 			forgetSnapshots(),
 			forgetPush(),
-			authClient.signOut(),
+			// The app's token goes once the server has ended the session it names.
+			authClient.signOut().finally(forgetAppToken),
 		]);
 		setMe(null);
 		setStatus("signed-out");
@@ -626,7 +633,10 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 				forgetDevice().catch(() => {}),
 				forgetSnapshots().catch(() => {}),
 				forgetPush(),
-				authClient.signOut().catch(() => {}),
+				authClient
+					.signOut()
+					.catch(() => {})
+					.then(forgetAppToken),
 			]);
 			setMe(null);
 			setStatus("signed-out");
