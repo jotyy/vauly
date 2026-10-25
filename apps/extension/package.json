@@ -1,6 +1,6 @@
 {
 	"name": "extension",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"private": true,
 	"description": "Fill and copy your vauly items in the browser.",
 	"type": "module",

@@ -6,20 +6,34 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ### Added
 
-- **The browser extension works in Firefox**, 153 or later, on a computer. It fills logins, cards and identities, offers to save logins, and saves and signs in with passkeys, as it does in Chrome. For now, build it with `bun run --cwd apps/extension build:firefox` and load it from `about:debugging`; [Browser extension](docs/browser-extension.md#firefox) has the steps. In Firefox, website logos are off until you turn them on in the extension's settings, which asks you first, and the window offering to save a login takes the focus when it opens. Firefox for Android isn't supported yet.
 - Turning on two-step login now tells the account's other devices, the ones it signs out, if they have notifications on. The notification names the device that turned it on, and says, if it wasn't you, to ask the workspace's owner or an admin to reset your two-step login and then change your master password.
+- A release now sends the extension to the Chrome Web Store by itself: its tag uploads the new version and submits it for review, and the store publishes it once the review passes.
 
 ### Changed
 
-- **The extension fills only on the site a login was saved for.** The menu inside a page offers a login on the address it was saved for: the same name and port, with or without `www.`. The extension's popup also offers it on other addresses of the same site and names the address. Sites are told apart as the Public Suffix List draws them, and a login saved with `https://` isn't offered on an `http://` page. A password typed on another address of the site is offered as a new login, not as an update. A login in the menu can be chosen a moment after the menu opens, and the menu closes if the page fades, covers or moves it.
-
-- **Sign-in is harder to guess at.** One address gets a run of ten sign-ins, then waits a minute, counted across the whole server. After three wrong two-step codes in a row, an account's next sign-in waits five seconds, then twice as long after each wrong one, up to five minutes, and a right one starts the count again; the master password and the codes checked inside a session are counted apart, so guessing codes at sign-in never holds up a session that's already open, and nothing locks the account. The browser extension's session token now counts only with its signature, like the web app's cookie. A migration adds the counts; see [Updating from 0.2](docs/updating.md#updating-from-02).
+- **Sign-in is harder to guess at.** One address gets a run of ten sign-ins, then waits a minute, counted across the whole server. After three wrong two-step codes in a row, an account's next sign-in waits five seconds, then twice as long after each wrong one, up to five minutes, and a right one starts the count again; the master password and the codes checked inside a session are counted apart, so guessing codes at sign-in never holds up a session that's already open, and nothing locks the account. The browser extension's session token now counts only with its signature, like the web app's cookie. A migration adds the counts; see [Updating from 0.2.1](docs/updating.md#updating-from-021).
 
 ### Fixed
 
 - On an iPhone, tapping a field no longer zooms the page in and leaves it zoomed: fields use 16px text on touch screens. The app fills the screen around the notch and the home indicator when it's installed.
 - When the device is online but vauly's server doesn't answer, messages name the server instead of saying you're offline, and an error page from in front of the server says so.
 - On a narrow screen, a notification about a long name keeps its first word whole, as in "Saved", and shortens the name instead. It used to cut both.
+
+## 0.2.1 - 2026-10-25
+
+Changes to the browser extension, mostly to where and when it fills. The server has no migrations in this release. Update the extension along with the server; [Updating vauly](docs/updating.md#updating-from-020) says what people may notice.
+
+### Added
+
+- **The browser extension works in Firefox**, 153 or later, on a computer. It fills logins, cards and identities, offers to save logins, and saves and signs in with passkeys, as it does in Chrome. For now, build it with `bun run --cwd apps/extension build:firefox` and load it from `about:debugging`; [Browser extension](docs/browser-extension.md#firefox) has the steps. In Firefox, website logos are off until you turn them on in the extension's settings, which asks you first, and the window offering to save a login takes the focus when it opens. Firefox for Android isn't supported yet.
+
+### Changed
+
+- **The extension fills only on the site a login was saved for.** The menu inside a page offers a login on the address it was saved for: the same name and port, with or without `www.`. The extension's popup also offers it on other addresses of the same site and names the address. Sites are told apart as the Public Suffix List draws them, and a login saved with `https://` isn't offered on an `http://` page. A password typed on another address of the site is offered as a new login, not as an update. A login in the menu can be chosen a moment after the menu opens, and the menu closes if the page fades, covers or moves it.
+- **An open fill menu hears when vauly locks.** It stops listing logins at once, rather than when a fill fails. In Firefox it no longer asks every second until vauly unlocks.
+
+### Fixed
+
 - A file over the size limit, chosen just as its item opens, is turned away with "is too big" before it's sent, as at any other time. It used to start the upload and end with "Couldn't attach" and the server's reason.
 
 ## 0.2.0 - 2026-10-24
