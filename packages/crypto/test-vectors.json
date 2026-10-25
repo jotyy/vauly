@@ -246,6 +246,66 @@
 			"sealed": "QEFCQ0RFRkdISUpL.WqLEHyo/VaF4gKibl2J2oDn4e3IOENFocROR2sm4L8/tPpW68Ya9ROXC+1go1/gDccduttn06kNmYBhI9AGkQvGc056VT8VFwpwIctP9F0769TvcetmJr4eSj+y2KwY/x0QMND9U07CPrRoU9WaRWLWzmyJ4V4foZSCsAv0qroRbY2ntjWnEdmEyk+OW/yrL+H9hloT/TlvuaA=="
 		}
 	],
+	"snapshot": [
+		{
+			"privateKey": "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg39xIWH6p27YIMw3m4kGCDMC3dOnRc2F6c1sPBxfPy/uhRANCAATYf8lz1wcc3Jf7vbCOPXrpBfh01PqCxIgYnnnXuos/ZtVBtxucWy4s1QrORnTJ9TBQWA+c9fCF9EZ2ptfy85EA",
+			"cacheKey": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+			"vaultKey": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8=",
+			"itemKey": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8=",
+			"snapshot": {
+				"accountId": "user_0123456789",
+				"sessionId": "ses_0123456789",
+				"syncedAt": 1793000000000,
+				"keys": {
+					"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+					"kdf": "argon2id",
+					"kdfIterations": 600000,
+					"kdfPasses": 3,
+					"kdfMemory": 65536,
+					"publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2H/Jc9cHHNyX+72wjj166QX4dNT6gsSIGJ5517qLP2bVQbcbnFsuLNUKzkZ0yfUwUFgPnPXwhfRGdqbX8vORAA==",
+					"encryptedPrivateKey": "4OHi4+Tl5ufo6err.tyc2AWMAYQXDkaJcgJ61gqr8fMsv+SjwuPuLY5zl0VEKWpjaBw0zw3GNLRZZpkgFrz7AXsfBAlAzg1EuKXwL9lJKLZ3f2Sp5EbViIbgmhjvgL9LzB5mM267Z3HRwml1GmkIVUaEqRn1bQwsBNzJa3zdbpTAoBGJ7c8SzBMcNTJDkFQ0slLm+zlHH3mpeTl1LtKXTVoVIrwXRKQ=="
+				},
+				"cacheKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEg3DmlZkZXn3XR1WL4X30adQJXTn9eo27mqmr3Kx2QlSpIoWg20ylwBN7fttuE7IwoKkWqWfM48q5mwBYGHDklA==:wMHCw8TFxsfIycrL.U+qLhK9nezekCG99GfwoLozuwQyWb8bxm0gZm1+yzrmDbtsMxpDB2AiZFNlVTxDF",
+				"sealed": "0NHS09TV1tfY2drb.h0usHL+V8uh5WPwGbg7KpULRLrdXXIbFxhOWV1b/vpBwD5TF2nEGtW/v7TtXcb4ZE/SEhydAgc2aXxb9Jsl6dFvl4POMlkLJ9bPUqu0kRBoFV1FdgS+tMcRamxFoXCP+IDWjrq5EENkSzl3x4cc+4rhMPPWnGOX4/sNm7P/Q7ec5MUwDIJe6Ce3VZwB/+qhjixKTX04eaEBU3eaZieyfr/yx2okE8GbzOULilK+R3Vw0pQN4LThtaGu6WNM+aMEGO0YwsUM9xTD/WqapdtBjd2fGMEYkudMclxSOuF0vWpgpEYKf9IV1otkQ+z8sRwWFPlTSwli3bUnqu1FDgfhopdVLLGs0xbWn59ceRsU7WH1Puy98xBPj+3Ao98q5abeBh4uv0ka5gOwJO9zJxl2xE5hgtK6fdRMo9u7SrwcGOnR6oOb2zzBLq54fm72o2sVMU5fadtVkvassxbGwIC/oe8B8EU2es6CGeK4h7EzefcPvPUzi34m8GKfFvGNYROwzT0JOQlIUGIpdESyT6BOj5/IUWhsMT79IGT35ZqwG4QtVTo1RURpcQYG54ELa5qLz7trDzfVf1Al9V510Ax+EqXhIQRRPASyYg6fkC2BIDKXCmGPLvimrW90HCoHpIntjk7v+UaKz0hFsurzm5B5e2zOKjIY+5JkK3dda7ZkyjArYzyW0tK/RtM1IaXyDdcssLoA70weHaKd8enygHSC2BBXgJqBDzsKLJWD7elDAdBsvhSarPhXSkKpKdaF/iRmvmWvkpnoEC3BluijOf0OdAJq6oM5jXcfRHDcp0TgPqaPJMe3FpZzBu3VQkBrCIkqW1na7/TFh5NnbiLXDZfpC2R5ejMKvHSMZXaRTe/PiBPQu9K49fn1ZdhW+WHuUf11pSEarRTIE8eUxzF99AVYEpv2UpkT8vIsWf527hS+LPlIWTemImqVGh0tmgKXfT1nyWjXZxJCL1N7QGhDcAZTft23XfzjWb22W8R23j/OPlYe/V9UjxYxj9YK8fPZEy6qDGGy2KlxCDyZfGLB4q6S1MePcWvZ/9BBmkioPF1sBQIOKvneUJUF9ArEPrPq+8FSkaXgt8fkbsowdQwvnq2Jcz0/A0Q7aNqLs5qCUGpmWrCAJ1edloH18xIXoTuhMMIhnDUIzDRPp3DkT"
+			},
+			"contents": {
+				"profile": {
+					"id": "user_0123456789",
+					"name": "Alex Kim",
+					"email": "alex@example.test",
+					"role": "owner",
+					"twoStep": false,
+					"recoveryCodesLeft": 0
+				},
+				"vaults": [
+					{
+						"id": "vlt_0123456789",
+						"role": "owner",
+						"encryptedMeta": "gIGCg4SFhoeIiYqL.WR2zeBLmdtuyPPeKhK4vq0w6yGoK/ACbn4liQyAshU6mpG0Ro5MrhitzblSt9SmnsRx7frKe0oZhFr6BNWhp8QiF9a0UM2AnKmrA/NcFrc8=",
+						"wrappedKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEg3DmlZkZXn3XR1WL4X30adQJXTn9eo27mqmr3Kx2QlSpIoWg20ylwBN7fttuE7IwoKkWqWfM48q5mwBYGHDklA==:kJGSk5SVlpeYmZqb.lAvE8B0jWvJcUVYJqr0+4TnVdFQYNAxviowRRNBoAFWMnqm4zRVUW0qlBg0olmSP"
+					}
+				],
+				"items": [
+					{
+						"id": "itm_0123456789",
+						"vaultId": "vlt_0123456789",
+						"revision": 1,
+						"data": "oKGio6Slpqeoqaqr.rK1tVoyPvhdbAy6Z4NIS2s15lKqJTb8Pp6SP95muG9p2tQcwpSJKwIU/iqR8jUusmgxiHoqUYny/XumAAqr37Vx5Ldr+1rq/6wUaiVb+NNI=",
+						"wrappedKey": "sLGys7S1tre4ubq7.pnSj1k3UdDuZE2L8llnHkDSWUfdEyejVliD6+Ys+XnbhIJZ+51jUpWylYnldq8TZ"
+					}
+				]
+			},
+			"vaultMeta": {
+				"name": "Private",
+				"description": "Only you can open this vault."
+			},
+			"item": {
+				"kind": "login",
+				"name": "Example",
+				"username": "alex@example.test"
+			}
+		}
+	],
 	"passkeyKey": [
 		{
 			"vaultKey": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8=",

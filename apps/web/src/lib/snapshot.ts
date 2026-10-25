@@ -70,6 +70,9 @@ export async function openSnapshot(
 	return openJson<Contents>(key, snapshot.sealed);
 }
 
-export const isFresh = (snapshot: Snapshot, now = Date.now()) =>
+export const isFresh = (
+	snapshot: Pick<Snapshot, "syncedAt">,
+	now = Date.now(),
+) =>
 	now - snapshot.syncedAt < OFFLINE_DAYS * 24 * 60 * 60_000 &&
 	snapshot.syncedAt <= now + 60_000;

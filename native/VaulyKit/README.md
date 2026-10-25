@@ -15,6 +15,7 @@ Everything unlocking and filling needs, each checked against `packages/crypto/te
 | `unlockAccount`, `openPrivateKey`               | the same, checking the opened key against the account's public key    | `createAccount`, `changeMasterPassword`    |
 | `deviceKey`, `sealDeviceCopy`, `openDeviceCopy` | the same, with the device's secret in place of the PRF output (#80)   | `deviceKey`                                |
 | `sealPasskeyKey`, `openPasskeyKey`              | the same (#27)                                                        | `passkeyKey`                               |
+| `openSnapshot`, `isFresh` (in `apps/web`)       | the same, with `vaultKey` and `openItem` to open one item (#81)       | `snapshot`                                 |
 | `totpCode`, `parseTotp`                         | the same                                                              | `totp`, `parseTotp`                        |
 - **Argon2id** comes from libsodium through [swift-sodium](https://github.com/jedisct1/swift-sodium), pinned to one version, as the web app's comes from libsodium.js. Inside an AutoFill extension it peaks at about 88 MiB (#8).
 - **Not here:** files, share-link keys and agent tokens, which neither the AutoFill extension nor the app's native side handles.

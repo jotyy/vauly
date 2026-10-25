@@ -113,7 +113,23 @@ private struct Vectors: Decodable {
 	let createAccount: [CreateAccount]
 	let changeMasterPassword: [ChangeMasterPassword]
 	let upgradeKdf: [UpgradeKdf]
+	struct SnapshotVector: Decodable {
+		struct Meta: Decodable, Equatable {
+			let name: String
+			let description: String
+		}
+		struct Fields: Decodable, Equatable {
+			let kind: String
+			let name: String
+			let username: String
+		}
+		let privateKey: String
+		let snapshot: Snapshot
+		let vaultMeta: Meta
+		let item: Fields
+	}
 	let deviceKey: [DeviceKey]
+	let snapshot: [SnapshotVector]
 	let passkeyKey: [PasskeyKey]
 	let totp: [Totp]
 	let parseTotp: [ParseTotp]
@@ -326,6 +342,41 @@ final class VectorTests: XCTestCase {
 				continue
 			}
 			XCTAssertEqual(kdfAllowed(settings), allowed, why)
+		}
+	}
+
+	/// The offline copy the app keeps for its AutoFill extension opens as the web app sealed it,
+	/// down to an item, and for nobody else.
+	func testSnapshot() throws {
+		XCTAssertFalse(vectors.snapshot.isEmpty)
+		let other = try importPrivateKey(pkcs8: Data(
+			base64Encoded: ((vectorsJson["wrapKeyFor"] as! [[String: Any]])[0]["recipientPrivateKey"] as! String))!)
+		for vector in vectors.snapshot {
+			let privateKey = try importPrivateKey(pkcs8: Data(base64Encoded: vector.privateKey)!)
+			let contents = try openSnapshot(vector.snapshot, privateKey: privateKey)
+			let expected = (vectorsJson["snapshot"] as! [[String: Any]])[0]["contents"] as! [String: Any]
+			XCTAssertEqual(contents.profile.id, (expected["profile"] as! [String: Any])["id"] as? String)
+			XCTAssertEqual(contents.vaults.map(\.id), (expected["vaults"] as! [[String: Any]]).map { $0["id"] as! String })
+			XCTAssertEqual(contents.items.map(\.id), (expected["items"] as! [[String: Any]]).map { $0["id"] as! String })
+
+			let vault = try XCTUnwrap(contents.vaults.first)
+			let key = try vaultKey(vault, privateKey: privateKey)
+			XCTAssertEqual(try openJson(Vectors.SnapshotVector.Meta.self, key, vault.encryptedMeta), vector.vaultMeta)
+			let item = try XCTUnwrap(contents.items.first { $0.vaultId == vault.id })
+			XCTAssertEqual(try openItem(Vectors.SnapshotVector.Fields.self, item, vaultKey: key), vector.item)
+
+			// As stored: it reads back the same, and another account's key doesn't open it.
+			XCTAssertEqual(try decodeSnapshot(JSONEncoder().encode(vector.snapshot)), vector.snapshot)
+			XCTAssertThrowsError(try openSnapshot(vector.snapshot, privateKey: other))
+			var changed = vector.snapshot
+			changed.sealed = String(changed.sealed.dropLast(4)) + "AAA="
+			XCTAssertThrowsError(try openSnapshot(changed, privateKey: privateKey))
+
+			// Used for 30 days after its sync, and not when it says it's from the future.
+			let synced = Date(timeIntervalSince1970: vector.snapshot.syncedAt / 1000)
+			XCTAssertTrue(isFresh(vector.snapshot, now: synced.addingTimeInterval(29 * 86_400)))
+			XCTAssertFalse(isFresh(vector.snapshot, now: synced.addingTimeInterval(30 * 86_400)))
+			XCTAssertFalse(isFresh(vector.snapshot, now: synced.addingTimeInterval(-120)))
 		}
 	}
 }

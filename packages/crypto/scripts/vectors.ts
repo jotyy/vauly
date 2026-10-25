@@ -418,6 +418,52 @@ const deviceCopy = {
 };
 const deviceData = `vauly/device\n${deviceCopy.accountId}\n${deviceCopy.credentialId}\n${deviceCopy.publicKey}`;
 
+// The offline copy (apps/web/src/lib/snapshot.ts): what the API returned for the account,
+// sealed with a key wrapped to the account's own public key. The vault's key is wrapped to
+// the account too, its item's key to the vault's.
+const accountShareKey = await hkdf(
+	await ecdh(keyPairs.ephemeral, account.publicKey),
+	`vauly/share:${account.publicKey}`,
+);
+const wrapForAccount = async (key: Uint8Array, ivBytes: Uint8Array) =>
+	`${ephemeralPublicKey}:${await seal(accountShareKey, ivBytes, key)}`;
+const cacheKey = run(0x20, 32);
+const vaultMeta = {
+	name: "Private",
+	description: "Only you can open this vault.",
+};
+const snapshotContents = {
+	profile: {
+		id: "user_0123456789",
+		name: "Alex Kim",
+		email: "alex@example.test",
+		role: "owner",
+		twoStep: false,
+		recoveryCodesLeft: 0,
+	},
+	vaults: [
+		{
+			id: "vlt_0123456789",
+			role: "owner",
+			encryptedMeta: await seal(
+				vaultKey,
+				iv(14),
+				encoder.encode(JSON.stringify(vaultMeta)),
+			),
+			wrappedKey: await wrapForAccount(vaultKey, iv(15)),
+		},
+	],
+	items: [
+		{
+			id: "itm_0123456789",
+			vaultId: "vlt_0123456789",
+			revision: 1,
+			data: await seal(itemKey, iv(16), encoder.encode(JSON.stringify(item))),
+			wrappedKey: await seal(vaultKey, iv(17), itemKey),
+		},
+	],
+};
+
 /** A passkey's credential ID: 16 bytes, base64url, as the browser extension makes them. */
 const passkeyCredentialId = base64Url(run(0xc0, 16)).replace(/=+$/, "");
 
@@ -763,6 +809,29 @@ const vectors = {
 				fromB64(keyPairs.account),
 				encoder.encode(deviceData),
 			),
+		},
+	],
+	snapshot: [
+		{
+			privateKey: keyPairs.account,
+			cacheKey: b64(cacheKey),
+			vaultKey: b64(vaultKey),
+			itemKey: b64(itemKey),
+			snapshot: {
+				accountId: "user_0123456789",
+				sessionId: "ses_0123456789",
+				syncedAt: 1_793_000_000_000,
+				keys: account.keys,
+				cacheKey: await wrapForAccount(cacheKey, iv(18)),
+				sealed: await seal(
+					cacheKey,
+					iv(19),
+					encoder.encode(JSON.stringify(snapshotContents)),
+				),
+			},
+			contents: snapshotContents,
+			vaultMeta,
+			item,
 		},
 	],
 	passkeyKey: [
