@@ -15,7 +15,7 @@ import {
 	vault,
 	vaultAccess,
 } from "@vauly/db/schema/vault";
-import { and, count, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, count, eq, gt, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Context } from "../context";
 import { describeDevice } from "../device";
@@ -649,21 +649,16 @@ export const accountRouter = {
 				});
 			}
 			const secret = me.totpSecret;
-			const result = await paced(
-				db,
-				me.userId,
-				async () =>
-					(await matchCode(secret, input.code, me.totpStep ?? -1)) !== null ||
-					(me.recoveryCodes ?? []).includes(await hashRecoveryCode(input.code)),
-			);
-			if (typeof result === "object") throw tooSoon(result);
-			if (result === "wrong") {
-				throw new ORPCError("BAD_REQUEST", {
-					message: "That code didn't work",
-				});
-			}
-			await db.batch([
-				db
+			const result = await paced(db, me.userId, async () => {
+				const step = await matchCode(secret, input.code, me.totpStep ?? -1);
+				const recovery = me.recoveryCodes ?? [];
+				if (
+					step === null &&
+					!recovery.includes(await hashRecoveryCode(input.code))
+				)
+					return false;
+				// Only if the code is still unused: a sign-in at the same moment may have used it.
+				const off = await db
 					.update(member)
 					.set({
 						totpSecret: null,
@@ -671,14 +666,30 @@ export const accountRouter = {
 						totpStep: null,
 						recoveryCodes: null,
 					})
-					.where(eq(member.userId, me.userId)),
-				logEvent(db, {
-					actorType: "member",
-					actorId: me.userId,
-					action: "updated",
-					detail: "two-step login off",
-				}),
-			]);
+					.where(
+						and(
+							eq(member.userId, me.userId),
+							eq(member.totpSecret, secret),
+							step === null
+								? eq(member.recoveryCodes, recovery)
+								: or(isNull(member.totpStep), lt(member.totpStep, step)),
+						),
+					)
+					.returning({ userId: member.userId });
+				return off.length > 0;
+			});
+			if (typeof result === "object") throw tooSoon(result);
+			if (result === "wrong") {
+				throw new ORPCError("BAD_REQUEST", {
+					message: "That code didn't work",
+				});
+			}
+			await logEvent(db, {
+				actorType: "member",
+				actorId: me.userId,
+				action: "updated",
+				detail: "two-step login off",
+			});
 			return { ok: true };
 		}),
 

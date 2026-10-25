@@ -4,6 +4,9 @@ import { describe, expect, test } from "bun:test";
 import { call } from "@orpc/server";
 import { paced, tryAgainIn, waitAfter } from "@vauly/auth/pace";
 import { checkSecondStep, hashRecoveryCode } from "@vauly/auth/two-step";
+import { parseTotp, totpCode } from "@vauly/crypto";
+import { member } from "@vauly/db/schema/vault";
+import { eq } from "drizzle-orm";
 
 import type { Context } from "./context";
 import { appRouter } from "./routers/index";
@@ -36,6 +39,28 @@ function workspace() {
 		).n;
 	return { sqlite, db, waitOver, tries };
 }
+
+/** Mei, signed in, calling the API. */
+const as = (db: ReturnType<typeof workspace>["db"]) =>
+	({
+		session: {
+			user: { id: "usr_mei", name: "Mei", email: "usr_mei@acme.test" },
+			session: { id: "ses_mei" },
+		},
+		db,
+		auth: {
+			$context: Promise.resolve({
+				password: {
+					verify: async ({ password }: { password: string }) =>
+						password === "r".repeat(64),
+				},
+			}),
+		},
+		headers: new Headers(),
+		secret: "test-secret-that-is-long-enough",
+		files: { maxFileBytes: 1024, maxTotalBytes: 4096 },
+		notify: () => {},
+	}) as unknown as Context;
 
 /** Counts the checks that actually ran. */
 function checker(right = false) {
@@ -134,27 +159,6 @@ describe("checking at a pace", () => {
 });
 
 describe("the checks that are paced", () => {
-	const as = (db: ReturnType<typeof workspace>["db"]) =>
-		({
-			session: {
-				user: { id: "usr_mei", name: "Mei", email: "usr_mei@acme.test" },
-				session: { id: "ses_mei" },
-			},
-			db,
-			auth: {
-				$context: Promise.resolve({
-					password: {
-						verify: async ({ password }: { password: string }) =>
-							password === "r".repeat(64),
-					},
-				}),
-			},
-			headers: new Headers(),
-			secret: "test-secret-that-is-long-enough",
-			files: { maxFileBytes: 1024, maxTotalBytes: 4096 },
-			notify: () => {},
-		}) as unknown as Context;
-
 	test("the second step at sign-in", async () => {
 		const { sqlite, db, waitOver } = workspace();
 		sqlite.run(
@@ -218,5 +222,75 @@ describe("the checks that are paced", () => {
 		await expect(
 			call(appRouter.account.confirmTwoStep, { code: "000000" }, { context }),
 		).rejects.toMatchObject({ code: "TOO_MANY_REQUESTS" });
+	});
+});
+
+describe("a code is used once, even by tries at once", () => {
+	const SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+	const RECOVERY = "k7m2p-9xq4r";
+
+	async function withTwoStep() {
+		const ws = workspace();
+		ws.sqlite.run(
+			`UPDATE member SET totp_secret = '${SECRET}', recovery_codes = '["${await hashRecoveryCode(RECOVERY)}"]' WHERE user_id = 'usr_mei'`,
+		);
+		return ws;
+	}
+	const appCode = async () => {
+		const config = parseTotp(SECRET);
+		if (!config) throw new Error("bad setup key");
+		return totpCode(config);
+	};
+	const sorted = (results: unknown[]) => results.map(String).sort();
+
+	test("two sign-ins with the same code from the app: one gets in", async () => {
+		const { db } = await withTwoStep();
+		const code = await appCode();
+		const results = await Promise.all([
+			checkSecondStep(db, "usr_mei", code),
+			checkSecondStep(db, "usr_mei", code),
+		]);
+		expect(sorted(results)).toEqual(["ok", "wrong"]);
+	});
+
+	test("two sign-ins with the same recovery code: one gets in", async () => {
+		const { db } = await withTwoStep();
+		const results = await Promise.all([
+			checkSecondStep(db, "usr_mei", RECOVERY),
+			checkSecondStep(db, "usr_mei", RECOVERY),
+		]);
+		expect(sorted(results)).toEqual(["ok", "wrong"]);
+	});
+
+	test("a code a sign-in just used doesn't also turn two-step login off", async () => {
+		for (const code of [RECOVERY, await appCode()]) {
+			const { sqlite, db } = await withTwoStep();
+			// What turning it off read of Mei's account, before the sign-in used the code.
+			const [read] = await db
+				.select()
+				.from(member)
+				.where(eq(member.userId, "usr_mei"));
+			expect(await checkSecondStep(db, "usr_mei", code)).toBe("ok");
+			const procedure = appRouter.account.disableTwoStep;
+			await expect(
+				procedure["~orpc"].handler({
+					context: {
+						...as(db),
+						member: read,
+						userId: "usr_mei",
+						twoStepRequired: false,
+					},
+					input: { code },
+					path: [],
+					procedure,
+					signal: undefined,
+					lastEventId: undefined,
+					errors: {},
+				} as never),
+			).rejects.toMatchObject({ code: "BAD_REQUEST" });
+			expect(
+				sqlite.query("SELECT totp_secret AS secret FROM member").get(),
+			).toEqual({ secret: SECRET });
+		}
 	});
 });
