@@ -31,4 +31,5 @@ Your master password never leaves your device, and nobody can reset it, not even
 - [Browser extension](browser-extension.md): install it, then fill and save logins.
 - [Agents and scripts](agents.md): let a coding agent, script or CI job use secrets without seeing them.
 - [Security](security.md): how vauly keeps the server from reading your items.
+- [Threat model](threat-model.md): what vauly protects, from whom, and what it doesn't defend against.
 - [vauly, 1Password and Bitwarden](compare.md): how they differ, and when to choose one of the others.
