@@ -100,9 +100,11 @@ export default defineBackground(() => {
 			return;
 		}
 		port.onMessage.addListener(async (message: { token?: unknown } | null) => {
+			// If the menus can't be read, the port closes: the frame asks again, and connects
+			// again only if it gets an answer.
 			const known = await withMenuFrames((all) =>
 				claim(all, message?.token, tabId, sender?.documentId, Date.now()),
-			);
+			).catch(() => false);
 			if (known) openMenus.add(port);
 			else port.disconnect();
 		});
