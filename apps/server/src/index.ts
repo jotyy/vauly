@@ -4,6 +4,7 @@ import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@vauly/api/routers/index";
+import { APP_ORIGINS } from "@vauly/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -17,19 +18,41 @@ import { createAuth, getDb, prepare } from "./services";
 const app = new Hono();
 
 app.use(logger());
-// Only when the app is served from another address. A deploy from the Deploy to
+const allowHeaders = ["Content-Type", "Authorization", "X-Vauly-Code"];
+// The vauly app for iPhone, on every deploy. It sends its session as a bearer token and
+// keeps no cookie, so it's let in without credentials. Better Auth hands it a new
+// session's token in a header, and says in another how long to wait after too many
+// sign-ins. (This list takes the place of the one Better Auth sends.)
+const appCors = cors({
+	origin: APP_ORIGINS,
+	allowMethods: ["GET", "POST", "OPTIONS"],
+	allowHeaders,
+	exposeHeaders: ["set-auth-token", "X-Retry-After"],
+});
+// The web app, only when it's served from another address. A deploy from the Deploy to
 // Cloudflare button is one Worker for both, so the browser never asks.
-if (ENV.CORS_ORIGIN) {
-	app.use(
-		"/*",
-		cors({
-			origin: ENV.CORS_ORIGIN,
-			allowMethods: ["GET", "POST", "OPTIONS"],
-			allowHeaders: ["Content-Type", "Authorization", "X-Vauly-Code"],
-			credentials: true,
-		}),
-	);
-}
+const webCors =
+	ENV.CORS_ORIGIN &&
+	cors({
+		origin: ENV.CORS_ORIGIN,
+		allowMethods: ["GET", "POST", "OPTIONS"],
+		allowHeaders,
+		credentials: true,
+	});
+app.use("/*", async (c, next) => {
+	// Origins compare case-insensitively, as Better Auth compares them.
+	const origin = c.req.header("origin")?.toLowerCase() ?? "";
+	if (!APP_ORIGINS.includes(origin)) {
+		return webCors ? webCors(c, next) : next();
+	}
+	// Every Capacitor app on a phone has this origin, and vauly's never sends a cookie.
+	// One that does is another app, using a session someone opened inside it: refused
+	// here, for the API, and not trusted by Better Auth either.
+	if (c.req.header("cookie")) {
+		return c.json({ message: "The vauly app sends no cookies" }, 403);
+	}
+	return appCors(c, next);
+});
 
 // Ahead of Better Auth, since the demo answers some of its routes itself.
 if (isDemo()) mountDemo(app);

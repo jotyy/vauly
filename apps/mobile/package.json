@@ -1,0 +1,25 @@
+{
+	"name": "@vauly/mobile",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"web": "bun run --cwd ../web build && bun scripts/copy-web.ts",
+		"sync": "bun run web && cap sync ios",
+		"open": "cap open ios",
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@capacitor/core": "8.5.3",
+		"@capacitor/haptics": "8.0.2",
+		"@capacitor/ios": "8.5.3",
+		"@capacitor/keyboard": "8.0.6",
+		"@capacitor/status-bar": "8.0.4"
+	},
+	"devDependencies": {
+		"@capacitor/cli": "8.5.3",
+		"@types/bun": "^1.3.14",
+		"@vauly/config": "workspace:*",
+		"typescript": "catalog:"
+	}
+}

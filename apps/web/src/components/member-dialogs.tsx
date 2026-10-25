@@ -10,6 +10,7 @@ import {
 } from "@vauly/ui/components/dialog";
 import { useEffect, useState } from "react";
 
+import { webAddress } from "@/env.public";
 import { toneDot } from "@/lib/format";
 import {
 	canManage,
@@ -23,7 +24,7 @@ import { CopyButton } from "./copy-button";
 import { notify } from "./notify";
 
 export function inviteLink(token: string) {
-	return `${window.location.origin}/join?token=${encodeURIComponent(token)}`;
+	return `${webAddress()}/join?token=${encodeURIComponent(token)}`;
 }
 
 /** The link is shown once: only its hash is stored. */

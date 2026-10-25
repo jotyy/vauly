@@ -231,9 +231,10 @@ We don't:
 These need no store accounts.
 - **#10, offline:** keep the API's ciphertext in a documented, portable snapshot that the native cores can read as well. Bind it to the session the way device unlock is bound, and cap how stale it can get.
 - **Account deletion from inside the app.** Both stores require it, and today only an admin can remove someone. This needs a new issue.
-- **Apps can connect.**
-  - Allow the app origins (`capacitor://localhost`, `https://localhost`) in CORS.
+- **Apps can connect** (#78):
+  - The API allows the iPhone app's origin, `capacitor://localhost`, in CORS, without credentials. `https://localhost`, Android's, waits for the Android app to have an origin of its own.
   - Apps sign in with bearer tokens, which the API already accepts for the extension.
+  - Capacitor's native HTTP was turned down; [Security](../security.md#the-app-for-iphone) says why.
 - **Spike** the questions under [Prototype first](#prototype-first).
 
 ### Phase 1: iPhone, closing #12 and #13

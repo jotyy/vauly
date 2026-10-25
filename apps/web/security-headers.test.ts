@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { parseHeaders } from "./build-manifest";
 import {
+	appConnectPolicy,
+	appContentSecurityPolicy,
 	contentSecurityPolicy,
 	type HeaderOptions,
 	headersFile,
@@ -63,6 +65,58 @@ describe("contentSecurityPolicy", () => {
 	});
 });
 
+describe("appContentSecurityPolicy", () => {
+	test("is the website's policy, but may connect to any vauly over https", () => {
+		const policy = appContentSecurityPolicy({ debug: false });
+		const website = contentSecurityPolicy(options);
+		for (const name of ["default-src", "script-src", "style-src", "img-src"]) {
+			expect(directive(policy, name)).toEqual(directive(website, name));
+		}
+		expect(directive(policy, "object-src")).toEqual(["'none'"]);
+		expect(directive(policy, "base-uri")).toEqual(["'none'"]);
+		expect(directive(policy, "connect-src")).toEqual(["'self'", "https:"]);
+		expect(policy).not.toContain("http:");
+		expect(policy).not.toContain("wasm");
+		expect(policy).not.toContain("unsafe-eval");
+	});
+
+	test("lets only a debug build reach this computer over plain http", () => {
+		expect(
+			directive(appContentSecurityPolicy({ debug: true }), "connect-src"),
+		).toEqual(["'self'", "https:", "http://localhost:*", "http://127.0.0.1:*"]);
+	});
+
+	test("leaves out what a <meta> policy can't say", () => {
+		expect(appContentSecurityPolicy({ debug: false })).not.toContain(
+			"frame-ancestors",
+		);
+	});
+});
+
+describe("appConnectPolicy", () => {
+	test("narrows the app to the vauly it's connected to", () => {
+		expect(
+			appConnectPolicy({
+				address: "https://vault.example.test/",
+				server: "https://api.example.test/rpc",
+				breaches: true,
+			}),
+		).toBe(
+			"connect-src 'self' https://vault.example.test https://api.example.test https://api.pwnedpasswords.com",
+		);
+	});
+
+	test("names the address once when the API shares it", () => {
+		expect(
+			appConnectPolicy({
+				address: "https://vault.example.test",
+				server: "https://vault.example.test",
+				breaches: false,
+			}),
+		).toBe("connect-src 'self' https://vault.example.test");
+	});
+});
+
 describe("keyWorkerPolicy", () => {
 	test("lets the key worker compile WebAssembly and nothing else", () => {
 		const policy = keyWorkerPolicy();
@@ -106,6 +160,14 @@ describe("headersFile", () => {
 		expect(worker["content-security-policy"]).toBe(keyWorkerPolicy());
 		const { "content-security-policy": _, ...rest } = page;
 		expect(worker).toMatchObject(rest);
+	});
+
+	test("lets the vauly app read the instance's settings", () => {
+		const settings = parseHeaders(headersFile(options))["/vauly.json"] ?? {};
+		expect(settings["access-control-allow-origin"]).toBe("*");
+		expect(settings["content-security-policy"]).toBe(
+			contentSecurityPolicy(options),
+		);
 	});
 });
 

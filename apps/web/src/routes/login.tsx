@@ -9,9 +9,11 @@ import {
 	PasswordInput,
 	SubmitButton,
 } from "@/components/auth-layout";
+import { ConnectedTo } from "@/components/connect-screen";
 import Loader from "@/components/loader";
 import { demoAccount } from "@/env.public";
 import { TwoStepError, useKeyring, WrongPasswordError } from "@/lib/keyring";
+import { isNativeApp } from "@/lib/native";
 import { errorMessage, useWorkspace } from "@/lib/vault-data";
 
 export const Route = createFileRoute("/login")({
@@ -53,7 +55,9 @@ function SignIn() {
 						: "Use the email and master password you joined with."
 			}
 			footer={
-				demoAccount ? (
+				isNativeApp ? (
+					<ConnectedTo />
+				) : demoAccount ? (
 					<p>Look around and change anything: it all goes back on the hour.</p>
 				) : (
 					<p>New here? Ask a teammate for an invite link.</p>

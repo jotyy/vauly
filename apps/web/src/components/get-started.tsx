@@ -8,6 +8,7 @@ import { Button, buttonVariants } from "@vauly/ui/components/button";
 import { cn } from "@vauly/ui/lib/utils";
 import { type ReactNode, useState } from "react";
 
+import { webAddress } from "@/env.public";
 import { emergencyKitDone, openEmergencyKit } from "@/lib/emergency-kit";
 import { useKeyring } from "@/lib/keyring";
 import {
@@ -127,7 +128,7 @@ export function GetStarted() {
 							name: me.name,
 							email: me.email,
 							workspace: workspace.data?.workspaceName ?? "vauly",
-							address: window.location.origin,
+							address: webAddress(),
 						});
 						if (opened) setKitDone(true);
 						else

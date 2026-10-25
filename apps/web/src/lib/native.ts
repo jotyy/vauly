@@ -15,6 +15,16 @@ type Bridge = {
 				type: "SUCCESS" | "WARNING" | "ERROR";
 			}): Promise<void>;
 		};
+		/** The app's own plugin (apps/mobile): its session, kept in the Keychain. */
+		VaulySession?: {
+			get(): Promise<{ address?: string; server?: string; token?: string }>;
+			set(session: {
+				address: string;
+				server: string;
+				token?: string;
+			}): Promise<void>;
+			clear(): Promise<void>;
+		};
 	};
 };
 
@@ -23,11 +33,52 @@ const bridge = (globalThis as { Capacitor?: Bridge }).Capacitor;
 /** Whether this is the vauly app, rather than a browser. */
 export const isNativeApp = bridge?.isNativePlatform() ?? false;
 
+/**
+ * Whether it's a debug build of the app, which may connect to a vauly on this computer
+ * over plain http. A debug build serves a page that says so (apps/mobile); its policy is
+ * also what lets it, and a release build's page holds it to https. Capacitor's own DEBUG
+ * can't tell: its prebuilt framework says debug in a release build too.
+ */
+export const isDebugApp =
+	isNativeApp &&
+	document.querySelector('meta[name="vauly-build"][content="debug"]') !== null;
+
+/** Where the app keeps which vauly it's connected to, and its session there. */
+export const sessionStore = bridge?.Plugins.VaulySession;
+
 /** Marks the page for the app's own styling (native.css), as `html[data-native="ios"]`. */
 export function markNativeApp() {
 	if (isNativeApp && bridge) {
 		document.documentElement.dataset.native = bridge.getPlatform();
+		keepFieldsInView();
 	}
+}
+
+/**
+ * With the keyboard up, the app's WebView is only as tall as the space above it, so a sheet
+ * stays under the status bar (the Keyboard plugin's native resize, apps/mobile). Moving to
+ * another field, the WebView grows back for a moment before it shrinks again: the sheet
+ * then fits, scrolls back to its top, and the field ends up behind the keyboard. So
+ * whenever the sheet with the field in it changes size, the field comes back into view.
+ */
+function keepFieldsInView() {
+	let sheet: Element | null = null;
+	const observer = new ResizeObserver(() => {
+		const field = document.activeElement;
+		if (field instanceof HTMLElement && sheet?.contains(field)) {
+			field.scrollIntoView({ block: "nearest" });
+		}
+	});
+	document.addEventListener("focusin", (event) => {
+		const next =
+			event.target instanceof Element
+				? event.target.closest('[role="dialog"]')
+				: null;
+		if (next === sheet) return;
+		if (sheet) observer.unobserve(sheet);
+		sheet = next;
+		if (sheet) observer.observe(sheet);
+	});
 }
 
 /**

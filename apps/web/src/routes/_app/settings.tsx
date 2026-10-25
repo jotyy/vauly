@@ -23,6 +23,7 @@ import { useTheme } from "next-themes";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { switchVauly } from "@/components/connect-screen";
 import { notify } from "@/components/notify";
 import { Page, SectionTitle } from "@/components/page";
 import {
@@ -37,7 +38,7 @@ import {
 	TurnOnTwoStepDialog,
 } from "@/components/two-step-dialogs";
 import { instance } from "@/config";
-import { demoAccount } from "@/env.public";
+import { demoAccount, webAddress } from "@/env.public";
 import { authClient } from "@/lib/auth-client";
 import {
 	breachCheckAvailable,
@@ -54,6 +55,7 @@ import {
 	useKeyring,
 } from "@/lib/keyring";
 import { logosAvailable, setLogosShown, useLogosShown } from "@/lib/logos";
+import { isNativeApp } from "@/lib/native";
 import {
 	OFFLINE_DAYS,
 	setOfflineCopyEnabled,
@@ -160,7 +162,7 @@ function Settings() {
 								name: me.name,
 								email: me.email,
 								workspace: workspaceName,
-								address: window.location.origin,
+								address: webAddress(),
 							});
 							if (!opened)
 								notify.error(
@@ -176,6 +178,33 @@ function Settings() {
 
 			<SectionTitle>This device</SectionTitle>
 			<Card>
+				{isNativeApp && (
+					<Row
+						label="Your vauly"
+						hint={`${new URL(webAddress()).host}. Using another one signs you out here first.`}
+					>
+						<Button
+							variant="outline"
+							onClick={async () => {
+								await keyring.signOut();
+								await switchVauly();
+							}}
+						>
+							Use another vauly
+						</Button>
+					</Row>
+				)}
+				{/* The app has no top bar, whose menu signs out in a browser. */}
+				{isNativeApp && (
+					<Row
+						label="Sign out"
+						hint="Ends this app's session. Signing in again takes your master password."
+					>
+						<Button variant="outline" onClick={() => keyring.signOut()}>
+							Sign out
+						</Button>
+					</Row>
+				)}
 				{(passkeySupported || keyring.deviceUnlock) && (
 					<Row
 						label="Unlock with this device"
