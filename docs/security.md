@@ -4,7 +4,7 @@ vauly is built so that the server holding your data can't read it. This page des
 
 ## Goals
 
-- Someone with the database, or full control of the API, learns no passwords, item names or item contents.
+- Someone with the database, or full control of the API, learns no passwords, item names or item contents from what it stores. [Limits](#limits) says where that ends: the server delivers the web app, and hands out the public keys that vaults and items are shared to.
 - Your master password never leaves your device, so the server can't leak it.
 - People only open the vaults that were shared with them, enforced by cryptography as well as by the API.
 - Scripts and agents get the values they're allowed to use, inside the command they run, and nothing else.
@@ -223,13 +223,14 @@ vauly verify https://vault.example.test
 
 What it can't prove:
 - **It shows what was served to you, just now.** A host can serve other files to other people, or to you at another time. A service worker your browser installed earlier keeps running what it was given until it updates.
-- **It covers the web app, not the server.** The API Worker can't read your items, but it decides who gets what and could serve another app later. Verify again when it matters.
+- **It covers the web app, not the server.** The API Worker can't read what it stores, but it decides who gets what, hands out the public keys that keys are wrapped to (see [Limits](#limits)), and could serve another app later. Verify again when it matters.
 - **A matching build means the files come from that commit and its locked dependencies.** It doesn't mean the source, or the dependencies, are free of mistakes.
 
 ## Limits
 
 These are the things vauly does not protect against. Please read them before you rely on it.
 - **The server delivers the app.** vauly runs in the browser, and the browser loads its code from your instance. Someone who controls the web app's hosting could ship code that captures your master password the next time you sign in. This holds for every web-based end-to-end encrypted app, and the Content-Security-Policy can't help, since the same hosting serves the policy. Host vauly yourself, keep your Cloudflare account secure, limit who can deploy to it, and use `vauly verify` (above) to check what it serves.
+- **The server hands out public keys, and the apps don't check them yet.** To share a vault with a member, or give an agent an item, the app wraps the key to the public key the server says is theirs; a new vault's key is wrapped to your own public key, as the server gives it. Someone in full control of the server or its database could put a key of their own in place of a member's or an agent's, and open what's shared with that member or agent from then on. What was shared before stays out of their reach. Checking public keys is planned.
 - **Requiring two-step login doesn't close the gap before someone sets it up.** Until a member has set it up, their password alone signs them in, and whoever does that first sets up the second step: someone who knows their password could add their own phone. Each setup is in the activity log, and admins hear about it on their devices if they turned notifications on, as do the member's own devices that it signed out. If it wasn't them, an admin resets the member's two-step login on the **Members** page, which signs them out everywhere, the other person too, and sends them back to set it up. They should then change their master password, since someone else knows it. A device with an offline copy can still open it with the master password, as the next point says.
 - **A device that stays offline keeps its offline copy.** Signing a session out, removing someone or changing the master password reaches a device only when it next connects. Until then, someone with that device and the master password (an old one too, since the key pair doesn't change) can read the items it held at its last sync. Turn the offline copy off on devices you might lose.
 - **Deleting an account deletes what only it could open.** Someone who deletes their account takes their private vault and agents with them, and any shared vault nobody else could open; those are gone for everyone, as nobody holds their keys anymore. Shared vaults others can open stay, and the activity log keeps their name. See [Self-hosting](self-hosting.md#when-someone-deletes-their-account).
