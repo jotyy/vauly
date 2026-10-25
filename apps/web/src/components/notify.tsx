@@ -76,7 +76,8 @@ function show(kind: keyof typeof icons, title: string, detail?: string) {
 		() => (
 			<Pill>
 				{icons[kind]}
-				<span className="truncate">{title}</span>
+				{/* The verb stays whole; only what it's about shortens. */}
+				<span className={cn("truncate", detail && "shrink-0")}>{title}</span>
 				{detail && <span className="truncate opacity-60">{detail}</span>}
 			</Pill>
 		),

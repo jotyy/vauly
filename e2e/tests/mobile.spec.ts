@@ -103,3 +103,32 @@ test("nothing on the main pages is wider than the screen", async ({ page }) => {
 		expect(overflow, `${name} scrolls sideways`).toBeLessThanOrEqual(0);
 	}
 });
+
+test("a toast keeps its word whole and shortens the name", async ({ page }) => {
+	await signInOnPhone(page);
+	await page.getByRole("button", { name: "Menu" }).click();
+	await page
+		.getByRole("navigation", { name: "Menu" })
+		.getByRole("link", { name: "All items" })
+		.click();
+	await page
+		.getByRole("region", { name: "Items" })
+		.getByRole("link", { name: /Wi-Fi router/ })
+		.click();
+	await page.getByRole("button", { name: "Edit" }).click();
+	const form = page.getByRole("dialog");
+	await form
+		.getByLabel("Name", { exact: true })
+		.fill("Wi-Fi router in the second floor meeting room, behind the plant");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+
+	const pill = page.locator("[data-slot=toast-pill]");
+	const cut = (text: string) =>
+		pill
+			.getByText(text)
+			.evaluate((span) => span.scrollWidth > span.clientWidth);
+	await expect(pill.getByText("Saved", { exact: true })).toBeVisible();
+	expect(await cut("Saved")).toBe(false);
+	expect(await cut("Wi-Fi router in the second floor")).toBe(true);
+});
