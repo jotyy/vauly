@@ -285,6 +285,31 @@ describe("a code is used once, even by tries at once", () => {
 		expect(sorted(results)).toEqual(["ok", "wrong"]);
 	});
 
+	/** Turning it off with `code`, from what an earlier read found of Mei's account. */
+	async function turnOffFrom(
+		db: ReturnType<typeof workspace>["db"],
+		read: unknown,
+		code: string,
+	) {
+		const procedure = appRouter.account.disableTwoStep;
+		return procedure["~orpc"].handler({
+			context: {
+				...as(db),
+				member: read,
+				userId: "usr_mei",
+				twoStepRequired: false,
+			},
+			input: { code },
+			path: [],
+			procedure,
+			signal: undefined,
+			lastEventId: undefined,
+			errors: {},
+		} as never);
+	}
+	const eventsNow = (sqlite: ReturnType<typeof workspace>["sqlite"]) =>
+		sqlite.query("SELECT count(*) AS n FROM event").get();
+
 	test("a code a sign-in just used doesn't also turn two-step login off", async () => {
 		for (const code of [RECOVERY, await appCode()]) {
 			const { sqlite, db } = await withTwoStep();
@@ -294,29 +319,31 @@ describe("a code is used once, even by tries at once", () => {
 				.from(member)
 				.where(eq(member.userId, "usr_mei"));
 			expect(await checkSecondStep(db, "usr_mei", code)).toBe("ok");
-			const procedure = appRouter.account.disableTwoStep;
-			await expect(
-				procedure["~orpc"].handler({
-					context: {
-						...as(db),
-						member: read,
-						userId: "usr_mei",
-						twoStepRequired: false,
-					},
-					input: { code },
-					path: [],
-					procedure,
-					signal: undefined,
-					lastEventId: undefined,
-					errors: {},
-				} as never),
-			).rejects.toMatchObject({ code: "BAD_REQUEST" });
+			await expect(turnOffFrom(db, read, code)).rejects.toMatchObject({
+				code: "BAD_REQUEST",
+			});
 			expect(
 				sqlite.query("SELECT totp_secret AS secret FROM member").get(),
 			).toEqual({ secret: SECRET });
-			expect(sqlite.query("SELECT count(*) AS n FROM event").get()).toEqual({
-				n: 0,
+			expect(eventsNow(sqlite)).toEqual({ n: 0 });
+		}
+	});
+
+	test("turned off elsewhere in the meantime, it isn't logged as this person's doing", async () => {
+		for (const code of [RECOVERY, await appCode()]) {
+			const { sqlite, db } = await withTwoStep();
+			const [read] = await db
+				.select()
+				.from(member)
+				.where(eq(member.userId, "usr_mei"));
+			// An admin's reset, between that read and this request's change.
+			sqlite.run(
+				"UPDATE member SET totp_secret = NULL, recovery_codes = NULL WHERE user_id = 'usr_mei'",
+			);
+			await expect(turnOffFrom(db, read, code)).rejects.toMatchObject({
+				code: "BAD_REQUEST",
 			});
+			expect(eventsNow(sqlite)).toEqual({ n: 0 });
 		}
 	});
 });

@@ -416,13 +416,18 @@ export const accountRouter = {
 					sessionId: context.session.session.id,
 					kdfSalt: input.keys.kdfSalt,
 				}),
+				// Whoever kept the next sign-in waiting with the old master password can't now.
+				db
+					.update(member)
+					.set(noWrongTries)
+					.where(
+						and(
+							eq(member.userId, userId),
+							eq(member.kdfSalt, input.keys.kdfSalt),
+						),
+					),
 			]);
 			if (swapped.length === 0) throw changedElsewhere();
-			// Whoever kept the next sign-in waiting with the old master password can't now.
-			await db
-				.update(member)
-				.set(noWrongTries)
-				.where(eq(member.userId, userId));
 			await logEvent(db, {
 				actorType: "member",
 				actorId: userId,
@@ -662,9 +667,23 @@ export const accountRouter = {
 					!recovery.includes(await hashRecoveryCode(input.code))
 				)
 					return false;
-				// Only if the code is still unused: a sign-in at the same moment may have used it.
-				// The event is written in the same batch, only if two-step login went off.
-				const [off] = await db.batch([
+				// Only if two-step login is still on with this code unused: a sign-in, or an
+				// admin's reset, at the same moment may have got there first. The event goes
+				// first, on the same condition, so it's written exactly when the change is.
+				const still = and(
+					eq(member.userId, me.userId),
+					eq(member.totpSecret, secret),
+					step === null
+						? eq(member.recoveryCodes, recovery)
+						: or(isNull(member.totpStep), lt(member.totpStep, step)),
+				);
+				const [, off] = await db.batch([
+					logEventIf(db, me.userId, still, {
+						actorType: "member",
+						actorId: me.userId,
+						action: "updated",
+						detail: "two-step login off",
+					}),
 					db
 						.update(member)
 						.set({
@@ -673,22 +692,8 @@ export const accountRouter = {
 							totpStep: null,
 							recoveryCodes: null,
 						})
-						.where(
-							and(
-								eq(member.userId, me.userId),
-								eq(member.totpSecret, secret),
-								step === null
-									? eq(member.recoveryCodes, recovery)
-									: or(isNull(member.totpStep), lt(member.totpStep, step)),
-							),
-						)
+						.where(still)
 						.returning({ userId: member.userId }),
-					logEventIf(db, me.userId, isNull(member.totpSecret), {
-						actorType: "member",
-						actorId: me.userId,
-						action: "updated",
-						detail: "two-step login off",
-					}),
 				]);
 				return off.length > 0;
 			});
