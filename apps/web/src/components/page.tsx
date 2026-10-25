@@ -13,7 +13,7 @@ import { isNativeApp } from "@/lib/native";
  * In the app, whether the page's large title has scrolled up under the nav bar, which
  * then shows it small, the way an iPhone's large titles collapse.
  */
-function useTitleCollapsed(title: RefObject<HTMLElement | null>) {
+export function useTitleCollapsed(title: RefObject<HTMLElement | null>) {
 	const [collapsed, setCollapsed] = useState(false);
 	useEffect(() => {
 		const element = title.current;

@@ -239,6 +239,10 @@ These need no store accounts.
 ### Phase 1: iPhone, closing #12 and #13
 
 - **The app:** a Capacitor iOS app with **VaulyKit**, a Swift package that holds the crypto, the cache reader and Keychain unlock, and passes the test vectors.
+- **The look (#82):** inside the app, `apps/web` dresses as an iPhone app. `lib/native.ts` finds Capacitor's bridge and sets `html[data-native="ios"]`, and `native.css` styles only under it, so the website never changes. The web build carries no Capacitor code.
+  - **Layout:** a tab bar, large titles that collapse into the nav bar, inset-grouped lists, rows that swipe to show actions, an open item with Edit and ⋯ in its nav bar, and sheets with Cancel and the main button along the top.
+  - **Type:** SF for text, through WebKit's Dynamic Type keywords, so it follows the person's text size; Spline Sans for the titles.
+  - **Haptics** come from Capacitor's Haptics plugin, when the shell has it.
 - **The AutoFill extension:**
   - a list screen and a Face ID unlock;
   - silent filling when the vault is unlocked;

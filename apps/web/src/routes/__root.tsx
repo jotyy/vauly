@@ -11,6 +11,7 @@ import type { CSSProperties } from "react";
 
 import { ThemeProvider } from "@/components/theme-provider";
 import { KeyringProvider } from "@/lib/keyring";
+import { isNativeApp } from "@/lib/native";
 import type { orpc } from "@/utils/orpc";
 
 import "../index.css";
@@ -63,8 +64,10 @@ function RootComponent() {
 				<Toaster
 					position="bottom-center"
 					offset={24}
-					// Clear of a phone's home indicator.
-					mobileOffset={{ bottom: "calc(16px + env(safe-area-inset-bottom))" }}
+					// Clear of a phone's home indicator, and in the app of its tab bar.
+					mobileOffset={{
+						bottom: `calc(${isNativeApp ? 72 : 16}px + env(safe-area-inset-bottom))`,
+					}}
 					gap={8}
 					style={{ "--width": "36rem" } as CSSProperties}
 				/>

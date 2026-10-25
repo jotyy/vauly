@@ -3,17 +3,16 @@
  * is scoped to it, so the website and the desktop app never see it. It sits outside the
  * cascade layers, so it outranks the app's Tailwind utilities.
  *
- * Two type directions are compared for #82 (html[data-type]):
- *   sf     the system font with Apple's text styles. WebKit draws -apple-system exactly
- *          as UIKit draws the system font, size-specific tracking included (measured:
- *          the same widths at every text-style size), so letter-spacing stays normal.
- *   spline vauly's own face, Spline Sans, retuned for a phone, with tracking set per size.
- * Each maps the app's semantic sizes (text-caption, text-body-sm, …) to one phone scale.
+ * Type: SF for everything that's read, and Spline Sans, vauly's own face, for the titles.
+ * SF comes through WebKit's Dynamic Type keywords (-apple-system-body and the rest), so
+ * text follows the person's text size: at the default Body is 17px, at XXL 21px. WebKit
+ * draws them exactly as UIKit draws the system font, size-specific tracking included, so
+ * SF's letter-spacing stays normal.
  */
 
 /* ── Surfaces: an iPhone's grouped background, with white groups on it ───────────── */
 
-html[data-native][data-type] {
+html[data-native="ios"] {
 	--frame: #f2f2f7;
 	--canvas: #f2f2f7;
 	--background: #f2f2f7;
@@ -32,11 +31,15 @@ html[data-native][data-type] {
 	--round-panel: 22px;
 	--native-material: rgb(242 242 247 / 0.82);
 	--native-bar: rgb(255 255 255 / 0.72);
+	--native-menu: rgb(255 255 255 / 0.84);
 	--native-press: rgb(0 0 0 / 0.06);
+	--native-fill: rgb(118 118 128 / 0.12);
+	--native-orange: #ff9500;
+	--native-red: #ff3b30;
 	background-color: var(--frame);
 }
 
-html.dark[data-native][data-type] {
+html.dark[data-native="ios"] {
 	--frame: #000000;
 	--canvas: #000000;
 	--background: #000000;
@@ -52,20 +55,23 @@ html.dark[data-native][data-type] {
 	--line-strong: rgb(84 84 88 / 0.8);
 	--native-material: rgb(0 0 0 / 0.78);
 	--native-bar: rgb(37 37 40 / 0.72);
+	--native-menu: rgb(37 37 40 / 0.84);
 	--native-press: rgb(255 255 255 / 0.08);
+	--native-fill: rgb(118 118 128 / 0.24);
+	--native-orange: #ff9f0a;
+	--native-red: #ff453a;
 }
 
-/* ── Type: (A) the system font, and the mix: SF text under Spline Sans titles ──────── */
+/* ── Type ──────────────────────────────────────────────────────────────────────── */
 
-/*
- * Apple's text styles through WebKit's Dynamic Type keywords: they follow the person's
- * text size (at the default, Body is 17px; at XXL, 21px). Large Title has no keyword, so
- * it's sized from Title 1 (see the page header). The line heights are Apple's ratios.
- */
-html[data-native]:is([data-type="sf"], [data-type="mix"]) {
+html[data-native="ios"] {
 	--font-text: -apple-system, system-ui, sans-serif;
-	--font-display: -apple-system, system-ui, sans-serif;
+	--font-display: "Spline Sans Variable", -apple-system, system-ui, sans-serif;
 	--font-code: ui-monospace, "SF Mono", Menlo, monospace;
+	/*
+	 * Apple's text styles. They're WebKit's system-font keywords, which name the face and
+	 * size together: no family list, so no generic family to fall back on, and none needed.
+	 */
 	--type-title1: -apple-system-title1;
 	--type-title2: -apple-system-title2;
 	--type-title3: -apple-system-title3;
@@ -74,181 +80,41 @@ html[data-native]:is([data-type="sf"], [data-type="mix"]) {
 	--type-subheadline: -apple-system-subheadline;
 	--type-footnote: -apple-system-footnote;
 	--type-caption: -apple-system-caption1;
+	/* Tab bar labels stay at 10px whatever the text size, as UIKit's do. */
 	--type-tab: 600 10px / 1.2 var(--font-text);
-	--large-em: 1.2143em;
-	--lh-large: 1.206;
-	--display-weight: 700;
-	--track-display: normal;
-	--code-weight: 600;
-	--fs-title1: 28px;
+	/* Apple's line heights for each style. */
 	--lh-title1: 1.214;
-	--fs-title2: 22px;
 	--lh-title2: 1.273;
-	--fs-title3: 20px;
 	--lh-title3: 1.25;
-	--fs-body: 17px;
 	--lh-body: 1.294;
-	--fs-sub: 15px;
 	--lh-sub: 1.333;
-	--fs-foot: 13px;
 	--lh-foot: 1.385;
-	--fs-cap: 12px;
 	--lh-cap: 1.333;
-	--fw-title: 700;
-	--fw-title3: 600;
-	--fw-button: 500;
-	--track-large: normal;
-	--track-title: normal;
-	--track-body: normal;
-	--track-small: normal;
 	--track-label: 0.03em;
-	--type-code: -apple-system-title2;
-	--track-code: 0.04em;
-	--type-secret: -apple-system-body;
-}
-
-/*
- * The mix: Spline Sans only where vauly speaks in its own voice, the large titles, the
- * item's name over its fields and the sign-in title; SF for everything that's read. At
- * 34px Spline runs wider and darker than SF Display, so it sits a weight lighter and
- * tighter, to keep the same colour next to SF body text.
- */
-html[data-native][data-type="mix"] {
-	--font-display: "Spline Sans Variable", -apple-system, system-ui, sans-serif;
-	/* Titles a step under Apple's: page titles at Title 1 (28), the item's name at Title 2
-	   (22). At these sizes Spline wants a lighter weight than at 34 to stay crisp. */
-	--large-em: 1em;
-	--lh-large: 1.15;
+	/*
+	 * The titles, a step under Apple's: page titles at Title 1 (28px), the item's name and
+	 * sheet titles at Title 2 (22px). Spline runs wider and darker than SF, so it sits at
+	 * 610 and a little tighter, to keep the same colour as the SF around it.
+	 */
 	--display-weight: 610;
 	--track-large: -0.024em;
 	--track-display: -0.016em;
-	--type-item-title: -apple-system-title2;
-	--header-margin: 0 0 16px;
-}
-
-/* ── Type: (B) Spline Sans, retuned for a phone ─────────────────────────────────── */
-
-html[data-native][data-type="spline"] {
-	--font-text: "Spline Sans Variable", system-ui, sans-serif;
-	--font-display: "Spline Sans Variable", system-ui, sans-serif;
-	--font-code: "Spline Sans Mono Variable", ui-monospace, monospace;
-	/* Spline runs wide with a tall x-height, so each step sits a little under Apple's,
-	   with tighter tracking as the size grows and a touch looser in the small sizes. */
-	--type-large: 650 32px / 1.125 var(--font-display);
-	--type-title1: 620 26px / 1.154 var(--font-display);
-	--type-title2: 620 22px / 1.182 var(--font-display);
-	--type-title3: 600 19px / 1.263 var(--font-display);
-	--type-headline: 560 16px / 1.375 var(--font-text);
-	--type-body: 400 16px / 1.4 var(--font-text);
-	--type-subheadline: 400 14.5px / 1.379 var(--font-text);
-	--type-footnote: 420 13px / 1.385 var(--font-text);
-	--type-caption: 480 12px / 1.333 var(--font-text);
-	--type-tab: 580 10.5px / 1.2 var(--font-text);
-	--fs-title1: 26px;
-	--lh-title1: 1.154;
-	--fs-title2: 22px;
-	--lh-title2: 1.182;
-	--fs-title3: 19px;
-	--lh-title3: 1.263;
-	--fs-body: 16px;
-	--lh-body: 1.4;
-	--fs-sub: 14.5px;
-	--lh-sub: 1.379;
-	--fs-foot: 13px;
-	--lh-foot: 1.385;
-	--fs-cap: 12px;
-	--lh-cap: 1.333;
-	--fw-title: 620;
-	--fw-title3: 600;
-	--fw-button: 470;
-	--large-em: 1.2308em;
-	--lh-large: 1.125;
-	--display-weight: 650;
-	--track-display: -0.018em;
-	--code-weight: 500;
-	--track-large: -0.026em;
-	--track-title: -0.018em;
-	--track-body: -0.006em;
-	--track-small: 0.004em;
-	--track-label: 0.06em;
-	--type-code: 500 21px / 1.2 var(--font-code);
-	--track-code: 0.03em;
-	--type-secret: 400 15.5px / 1.4 var(--font-code);
+	--code-weight: 600;
+	--track-code: 0.04em;
 }
 
 /*
- * The app's sizes, mapped onto the phone scale. Only size, line height and tracking: the
- * weight, family and figures stay with each element's own classes. :where() keeps these
- * below the component rules further down; unlayered, they still outrank the utilities.
+ * The app's semantic sizes, mapped onto Apple's styles. `font` also resets weight,
+ * figures and face, so each element's own get their say again after it. :where() keeps
+ * all of this below the component rules further down; unlayered, it still outranks the
+ * utilities. SF's tracking is built in, so the utilities' letter-spacing goes.
  */
-html[data-native][data-type] {
+html[data-native="ios"] {
 	& body {
-		font-size: var(--fs-body);
+		font: var(--type-body);
 		line-height: var(--lh-body);
-		letter-spacing: var(--track-body);
 	}
-	& :where(.text-h3) {
-		font-size: var(--fs-title1);
-		line-height: var(--lh-title1);
-		font-weight: var(--fw-title);
-		letter-spacing: var(--track-title);
-	}
-	& :where(.text-h4, .text-stat) {
-		font-size: var(--fs-title2);
-		line-height: var(--lh-title2);
-		letter-spacing: var(--track-title);
-	}
-	& :where(.text-h5) {
-		font-size: var(--fs-title3);
-		line-height: var(--lh-title3);
-		font-weight: var(--fw-title3);
-		letter-spacing: var(--track-title);
-	}
-	/* Fields and the few places that ask for body text get Body; the app's running text,
-	   rows that read as sentences, gets Subheadline; small print gets Footnote. */
-	& :where(.text-body, .text-field) {
-		font-size: var(--fs-body);
-		line-height: var(--lh-body);
-		letter-spacing: var(--track-body);
-	}
-	& :where(.text-body-sm) {
-		font-size: var(--fs-sub);
-		line-height: var(--lh-sub);
-		letter-spacing: var(--track-small);
-	}
-	& :where(.text-caption) {
-		font-size: var(--fs-foot);
-		line-height: var(--lh-foot);
-		letter-spacing: var(--track-small);
-	}
-	& :where(.text-micro) {
-		font-size: var(--fs-cap);
-		line-height: var(--lh-cap);
-		letter-spacing: var(--track-small);
-	}
-	/* Fields read at body size, which they need anyway: no zoom, and no mismatch. */
-	&
-		:where(
-			input:not(
-				[type="checkbox"],
-				[type="radio"],
-				[type="range"],
-				[type="file"]
-			),
-			textarea,
-			select
-		) {
-		font-size: var(--fs-body);
-		line-height: var(--lh-body);
-		letter-spacing: var(--track-body);
-	}
-}
-
-/*
- * SF text takes Apple's styles whole, so it follows Dynamic Type. The `font` keyword also
- * resets weight, figures and face, so each element's own get their say again after it.
- */
-html[data-native]:is([data-type="sf"], [data-type="mix"]) {
+	/* Fields read at Body, which they need anyway: under 16px, iOS zooms in on them. */
 	&
 		:where(
 			.text-body,
@@ -262,35 +128,43 @@ html[data-native]:is([data-type="sf"], [data-type="mix"]) {
 			textarea,
 			select
 		) {
-		font: -apple-system-body;
+		font: var(--type-body);
 		line-height: var(--lh-body);
+		letter-spacing: normal;
 	}
+	/* The app's running text, rows that read as sentences, gets Subheadline. */
 	& :where(.text-body-sm) {
-		font: -apple-system-subheadline;
+		font: var(--type-subheadline);
 		line-height: var(--lh-sub);
+		letter-spacing: normal;
 	}
 	& :where(.text-caption) {
-		font: -apple-system-footnote;
+		font: var(--type-footnote);
 		line-height: var(--lh-foot);
+		letter-spacing: normal;
 	}
 	& :where(.text-micro) {
-		font: -apple-system-caption1;
+		font: var(--type-caption);
 		line-height: var(--lh-cap);
+		letter-spacing: normal;
 	}
 	& :where(.text-h5) {
-		font: -apple-system-title3;
+		font: var(--type-title3);
 		font-weight: 600;
 		line-height: var(--lh-title3);
+		letter-spacing: normal;
 	}
 	& :where(.text-h4, .text-stat) {
-		font: -apple-system-title2;
+		font: var(--type-title2);
 		font-weight: 700;
 		line-height: var(--lh-title2);
+		letter-spacing: normal;
 	}
 	& :where(.text-h3) {
-		font: -apple-system-title1;
+		font: var(--type-title1);
 		font-weight: 700;
 		line-height: var(--lh-title1);
+		letter-spacing: normal;
 	}
 	& :where(.font-medium) {
 		font-weight: 500;
@@ -311,7 +185,7 @@ html[data-native]:is([data-type="sf"], [data-type="mix"]) {
 
 /* ── The shell: no top bar or sidebar; a tab bar instead ────────────────────────── */
 
-html[data-native] {
+html[data-native="ios"] {
 	& [data-slot="topbar"] {
 		display: none;
 	}
@@ -321,7 +195,7 @@ html[data-native] {
 	}
 }
 
-html[data-native] [data-slot="tab-bar-dock"] {
+html[data-native="ios"] [data-slot="tab-bar-dock"] {
 	position: fixed;
 	right: 0;
 	bottom: max(calc(env(safe-area-inset-bottom) - 12px), 12px);
@@ -343,7 +217,7 @@ html[data-native] [data-slot="tab-bar-dock"] {
 	}
 }
 
-html[data-native] [data-slot="tab-bar"] {
+html[data-native="ios"] [data-slot="tab-bar"] {
 	display: flex;
 	flex: 1;
 	align-items: center;
@@ -352,7 +226,7 @@ html[data-native] [data-slot="tab-bar"] {
 	border-radius: 31px;
 }
 
-html[data-native] [data-slot="tab"] {
+html[data-native="ios"] [data-slot="tab"] {
 	display: flex;
 	flex: 1;
 	flex-direction: column;
@@ -362,7 +236,6 @@ html[data-native] [data-slot="tab"] {
 	height: 54px;
 	border-radius: 27px;
 	font: var(--type-tab);
-	letter-spacing: var(--track-small);
 	color: var(--fg-muted);
 	transition:
 		scale 160ms ease-out,
@@ -383,7 +256,7 @@ html[data-native] [data-slot="tab"] {
 	}
 }
 
-html[data-native] [data-slot="tab-search"] {
+html[data-native="ios"] [data-slot="tab-search"] {
 	display: flex;
 	flex: none;
 	align-items: center;
@@ -406,67 +279,68 @@ html[data-native] [data-slot="tab-search"] {
 
 /* ── Pages: a large title under a nav bar that takes it over as it scrolls away ──── */
 
-html[data-native] [data-slot="page"] {
+html[data-native="ios"] [data-slot="page"] {
 	padding: 0 16px;
 }
 
-html[data-native] [data-slot="nav-bar"] {
+/* The nav bars, a page's and an open item's: clear at rest, frosted once content
+   scrolls under them, when they show the title small. */
+html[data-native="ios"] :is([data-slot="nav-bar"], [data-slot="item-nav"]) {
 	position: sticky;
 	top: 0;
 	z-index: 20;
-	display: flex;
-	align-items: center;
-	justify-content: center;
 	height: 44px;
 	margin: 0 -16px;
-	padding: 0 56px;
 	transition:
 		background-color 200ms ease-out,
 		box-shadow 200ms ease-out;
-
-	& > span {
-		overflow: hidden;
-		font: var(--type-headline);
-		letter-spacing: var(--track-body);
-		color: var(--fg);
-		white-space: nowrap;
-		text-overflow: ellipsis;
-		opacity: 0;
-		translate: 0 4px;
-		transition:
-			opacity 200ms ease-out,
-			translate 200ms ease-out;
-	}
 
 	&[data-collapsed] {
 		background: var(--native-material);
 		backdrop-filter: blur(20px) saturate(1.8);
 		box-shadow: 0 0.5px 0 var(--line);
-
-		& > span {
-			opacity: 1;
-			translate: 0 0;
-		}
 	}
 }
 
-/*
- * The header carries Title 1, and the large title is sized from it in em (34 over 28),
- * so it grows with the person's text size though no keyword names it.
- */
-html[data-native] [data-slot="page-header"] {
+html[data-native="ios"] [data-slot="nav-bar"] {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 56px;
+}
+
+html[data-native="ios"]
+	:where([data-slot="nav-bar"] > span, [data-slot="item-nav-title"]) {
+	overflow: hidden;
+	font: var(--type-headline);
+	color: var(--fg);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	opacity: 0;
+	translate: 0 4px;
+	transition:
+		opacity 200ms ease-out,
+		translate 200ms ease-out;
+
+	[data-collapsed] > & {
+		opacity: 1;
+		translate: 0 0;
+	}
+}
+
+/* The large title, at Title 1 in Spline. */
+html[data-native="ios"] [data-slot="page-header"] {
 	align-items: flex-start;
 	gap: 4px;
-	margin: var(--header-margin, 2px 0 20px);
+	margin: 0 0 16px;
 	padding: 0 4px;
-	font: var(--type-title1);
 	text-align: start;
 
 	& h1 {
+		font: var(--type-title1);
 		font-family: var(--font-display);
-		font-size: var(--large-em);
 		font-weight: var(--display-weight);
-		line-height: var(--lh-large);
+		line-height: 1.15;
 		letter-spacing: var(--track-large);
 		text-wrap: balance;
 	}
@@ -474,14 +348,13 @@ html[data-native] [data-slot="page-header"] {
 	& p {
 		font: var(--type-subheadline);
 		line-height: var(--lh-sub);
-		letter-spacing: var(--track-small);
 		color: var(--fg-subtle);
 		text-wrap: pretty;
 	}
 }
 
-/* Section titles over grouped lists: a small uppercase label, one tracking everywhere. */
-html[data-native] [data-slot="section-title"] {
+/* Section titles over grouped lists: a small uppercase label. */
+html[data-native="ios"] [data-slot="section-title"] {
 	margin-bottom: 6px;
 	padding: 0 16px;
 
@@ -493,71 +366,92 @@ html[data-native] [data-slot="section-title"] {
 	}
 }
 
-/* Settings rows: the label at body size, its hint as small print. */
-html[data-native] [data-slot="row-label"] {
+/* Settings rows: the label at Body, its hint as small print. */
+html[data-native="ios"] [data-slot="row-label"] {
 	font: var(--type-body);
-	letter-spacing: var(--track-body);
 }
 
-html[data-native] [data-slot="row-hint"] {
+html[data-native="ios"] [data-slot="row-hint"] {
 	font: var(--type-footnote);
-	letter-spacing: var(--track-small);
 	color: var(--fg-subtle);
 	text-wrap: pretty;
 }
 
-/* Buttons a step under body, medium, so a row's label stays the loudest thing in it. */
-html[data-native] [data-slot="button"] {
-	font-size: var(--fs-sub);
-	font-weight: var(--fw-button);
-	letter-spacing: var(--track-small);
+/* Buttons a step under Body, medium, so a row's label stays the loudest thing in it.
+   They give a little under the finger. */
+html[data-native="ios"] [data-slot="button"] {
+	font: var(--type-subheadline);
+	font-weight: 500;
+	transition-property: scale, color, background-color, box-shadow;
+	transition-duration: 160ms;
+	transition-timing-function: ease-out;
+
+	&:active:not(:disabled) {
+		scale: 0.96;
+	}
 }
 
 /* Short paragraphs end on more than one word. */
-html[data-native] :where(p) {
+html[data-native="ios"] :where(p) {
 	text-wrap: pretty;
 }
 
-/* The copy and reveal buttons in an item's fields: a finger's worth to hit. */
-html[data-native] [data-slot="field"] [data-slot="button"] {
-	min-width: 44px;
-	min-height: 44px;
-}
-
-html[data-native] [data-slot="dialog-title"] {
-	font: var(--type-title3);
-	letter-spacing: var(--track-title);
-	text-wrap: balance;
-}
-
 /* Cards become inset groups: flat on the grouped background, no shadow. */
-html[data-native] .rounded-window.shadow-card {
+html[data-native="ios"] .rounded-window.shadow-card {
 	border-radius: 22px;
 	box-shadow: none;
 }
 
-/* ── Items: an inset-grouped list, and an item pushed on top of it ─────────────── */
+/* ── Search: a filled field, as iOS draws one ──────────────────────────────────── */
 
-html[data-native] [data-slot="page-toolbar"] {
+html[data-native="ios"] [data-slot="page-toolbar"] {
 	gap: 10px;
 	margin-bottom: 16px;
 
 	& [data-slot="input-group"] {
 		height: 40px;
 		border: 0;
-		border-radius: 12px;
-		background: rgb(118 118 128 / 0.12);
+		border-radius: 20px;
+		background: var(--native-fill);
 		box-shadow: none;
 	}
 }
 
-html[data-native] [data-slot="item-list"] {
+/* Overview's search, first under the title: the field, and its matches in a group. */
+html[data-native="ios"] [data-slot="search-card"] {
+	margin-bottom: 24px;
+	background: none;
+
+	& > :first-child {
+		height: 40px;
+		padding: 0 8px 0 12px;
+		gap: 8px;
+		border-radius: 20px;
+		background: var(--native-fill);
+	}
+
+	& > :where(:first-child) svg {
+		width: 18px;
+		height: 18px;
+	}
+
+	& > :nth-child(2) {
+		margin-top: 8px;
+		border: 0;
+		border-radius: 22px;
+		background: var(--surface);
+	}
+}
+
+/* ── Items: an inset-grouped list, and an item pushed on top of it ─────────────── */
+
+html[data-native="ios"] [data-slot="item-list"] {
 	gap: 0;
 	padding: 0;
 	overflow: hidden;
 }
 
-html[data-native] [data-slot="item-row"] {
+html[data-native="ios"] [data-slot="item-row"] {
 	position: relative;
 	gap: 12px;
 	min-height: 62px;
@@ -565,17 +459,6 @@ html[data-native] [data-slot="item-row"] {
 	border-radius: 0;
 	background: none;
 	transition: background-color 120ms ease-out;
-
-	/* A separator from the text's edge to the right, as in iOS lists. */
-	& + &::before {
-		content: "";
-		position: absolute;
-		top: 0;
-		right: 0;
-		left: 64px;
-		height: 0.5px;
-		background: var(--line);
-	}
 
 	/* The disclosure chevron. */
 	&::after {
@@ -597,20 +480,82 @@ html[data-native] [data-slot="item-row"] {
 	}
 }
 
-html[data-native] [data-slot="item-name"] {
-	font: var(--type-body);
-	font-weight: 500;
-	letter-spacing: var(--track-body);
+/* A separator between rows, from the text's edge to the right, as in iOS lists. */
+html[data-native="ios"]
+	[data-slot="swipe-row"]
+	+ [data-slot="swipe-row"]
+	[data-slot="item-row"]::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 64px;
+	height: 0.5px;
+	background: var(--line);
 }
 
-html[data-native] [data-slot="item-subtitle"] {
+html[data-native="ios"] [data-slot="item-name"] {
+	font: var(--type-body);
+	font-weight: 500;
+}
+
+html[data-native="ios"] [data-slot="item-subtitle"] {
 	font: var(--type-subheadline);
-	letter-spacing: var(--track-small);
 	color: var(--fg-subtle);
 }
 
+/* Rows slide left to show their actions (swipe-row.tsx). Each action is 74px wide. */
+html[data-native="ios"] [data-slot="swipe-row"] {
+	position: relative;
+	overflow: hidden;
+	touch-action: pan-y;
+}
+
+html[data-native="ios"] [data-slot="swipe-actions"] {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+}
+
+html[data-native="ios"] [data-slot="swipe-action"] {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	width: 74px;
+	font: var(--type-footnote);
+	font-weight: 500;
+	color: #ffffff;
+
+	& svg {
+		width: 22px;
+		height: 22px;
+	}
+
+	&[data-tone="favorite"] {
+		background: var(--native-orange);
+	}
+
+	&[data-tone="danger"] {
+		background: var(--native-red);
+	}
+}
+
+html[data-native="ios"] [data-slot="swipe-content"] {
+	position: relative;
+	background: var(--surface);
+	transition: translate 320ms cubic-bezier(0.32, 0.72, 0, 1);
+
+	[data-dragging] > & {
+		transition: none;
+	}
+}
+
 /* An open item replaces the list, the way a pushed screen does. */
-html[data-native]
+html[data-native="ios"]
 	[data-slot="page"]:has([data-slot="item-browser"][data-open])
 	:is(
 		[data-slot="nav-bar"],
@@ -620,51 +565,95 @@ html[data-native]
 	display: none;
 }
 
-html[data-native] [data-slot="item-back"] {
-	position: sticky;
-	top: 0;
-	z-index: 20;
-	width: calc(100% + 32px);
+/* The open item's nav bar: back on the left, the name in the middle once it scrolls
+   away, Edit and ⋯ on the right. */
+html[data-native="ios"] [data-slot="item-nav"] {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	align-items: center;
+	padding: 0 8px;
+}
+
+html[data-native="ios"] [data-slot="item-nav-title"] {
+	max-width: 46vw;
+}
+
+html[data-native="ios"] [data-slot="item-nav-back"] {
+	display: flex;
+	align-items: center;
+	justify-self: start;
+	max-width: 100%;
 	height: 44px;
-	margin: 0 -16px;
-	padding: 0 12px 0 8px;
-	justify-content: flex-start;
-	border-radius: 0;
-	background: var(--native-material);
-	backdrop-filter: blur(20px) saturate(1.8);
+	padding-right: 8px;
 	font: var(--type-body);
-	letter-spacing: var(--track-body);
 	color: var(--brand);
 
 	& svg {
+		flex: none;
 		width: 22px;
 		height: 22px;
 	}
+
+	& span {
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
 }
 
-/* The item's header: tile and actions on top, the name across the full width under them,
-   so a long name wraps in whole lines instead of a column beside the buttons. */
-html[data-native] [data-slot="item-header"] {
+html[data-native="ios"] [data-slot="item-nav-actions"] {
+	display: flex;
+	align-items: center;
+	justify-self: end;
+}
+
+html[data-native="ios"] [data-slot="nav-text-button"] {
+	height: 44px;
+	padding: 0 8px;
+	font: var(--type-body);
+	color: var(--brand);
+}
+
+html[data-native="ios"] [data-slot="nav-icon-button"] {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	color: var(--brand);
+
+	& svg {
+		width: 26px;
+		height: 26px;
+	}
+}
+
+html[data-native="ios"]
+	:is(
+		[data-slot="nav-text-button"],
+		[data-slot="nav-icon-button"],
+		[data-slot="item-nav-back"]
+	):active {
+	opacity: 0.4;
+}
+
+/* The item's header: tile on top, the name across the full width under it, so a long
+   name wraps in whole lines. */
+html[data-native="ios"] [data-slot="item-header"] {
 	flex-wrap: wrap;
 	align-items: center;
 	row-gap: 14px;
 	border-bottom: 0;
 
-	& > [data-slot="item-actions"] {
-		order: 1;
-		margin-left: auto;
-	}
-
 	& > [data-slot="item-heading"] {
-		order: 2;
 		flex-basis: 100%;
 	}
 }
 
-html[data-native] [data-slot="item-title"] {
+html[data-native="ios"] [data-slot="item-title"] {
 	overflow: visible;
 	text-overflow: clip;
-	font: var(--type-item-title, var(--type-title1));
+	font: var(--type-title2);
 	font-family: var(--font-display);
 	font-weight: var(--display-weight);
 	line-height: 1.2;
@@ -674,7 +663,7 @@ html[data-native] [data-slot="item-title"] {
 }
 
 /* The sign-in pages' title, in the display face. */
-html[data-native] [data-slot="auth-title"] {
+html[data-native="ios"] [data-slot="auth-title"] {
 	font: var(--type-title2);
 	font-family: var(--font-display);
 	font-weight: var(--display-weight);
@@ -684,7 +673,7 @@ html[data-native] [data-slot="auth-title"] {
 }
 
 /* Fields: a small label over its value, the way the Passwords app shows them. */
-html[data-native] [data-slot="field"] {
+html[data-native="ios"] [data-slot="field"] {
 	flex-direction: column;
 	align-items: stretch;
 	gap: 2px;
@@ -694,28 +683,71 @@ html[data-native] [data-slot="field"] {
 	& > dt {
 		width: auto;
 		font: var(--type-footnote);
-		letter-spacing: var(--track-small);
 		color: var(--fg-subtle);
 	}
 
 	& > dd {
 		font: var(--type-body);
-		letter-spacing: var(--track-body);
 	}
 
-	/* Secrets in the face's mono; one-time codes keep their own style, below. */
+	/* Secrets in mono; one-time codes keep their own style, below. */
 	& .font-mono:not([data-slot="one-time-code"]) {
-		font: var(--type-secret);
+		font: var(--type-body);
 		font-family: var(--font-code);
+	}
+
+	/* The copy and reveal buttons: a finger's worth to hit. */
+	& [data-slot="button"] {
+		min-width: 44px;
+		min-height: 44px;
 	}
 }
 
 /* One-time codes: tabular, so the digits don't jump as the code changes. */
-html[data-native] [data-slot="one-time-code"] {
-	font: var(--type-code);
+html[data-native="ios"] [data-slot="one-time-code"] {
+	font: var(--type-title2);
 	font-weight: var(--code-weight);
 	letter-spacing: var(--track-code);
 	font-variant-numeric: tabular-nums;
+}
+
+/* ── Menus: a frosted list of full-width rows, icons trailing, as iOS draws them ─── */
+
+html[data-native="ios"] [data-slot="dropdown-menu-content"] {
+	min-width: 250px;
+	padding: 6px 0;
+	border-radius: 18px;
+	background: var(--native-menu);
+	backdrop-filter: blur(30px) saturate(1.8);
+	box-shadow:
+		0 0 0 0.5px var(--line),
+		0 12px 40px rgb(0 0 0 / 0.18);
+}
+
+html[data-native="ios"] [data-slot="dropdown-menu-item"] {
+	flex-direction: row-reverse;
+	justify-content: space-between;
+	gap: 12px;
+	min-height: 44px;
+	padding: 0 16px;
+	border-radius: 0;
+	font: var(--type-body);
+	color: var(--fg);
+
+	& svg {
+		width: 20px;
+		height: 20px;
+	}
+
+	&[data-variant="destructive"] {
+		color: var(--native-red);
+	}
+}
+
+html[data-native="ios"] [data-slot="dropdown-menu-label"] {
+	padding: 8px 16px 4px;
+	font: var(--type-footnote);
+	color: var(--fg-subtle);
 }
 
 /* ── Sheets: dialogs rise from the bottom ───────────────────────────────────────── */
@@ -732,7 +764,13 @@ html[data-native] [data-slot="one-time-code"] {
 	}
 }
 
-html[data-native] [data-slot="dialog-content"] {
+@keyframes native-bar-edge {
+	to {
+		box-shadow: 0 0.5px 0 var(--line);
+	}
+}
+
+html[data-native="ios"] [data-slot="dialog-content"] {
 	top: auto;
 	right: 0;
 	bottom: 0;
@@ -752,6 +790,7 @@ html[data-native] [data-slot="dialog-content"] {
 		position: absolute;
 		top: 7px;
 		left: 50%;
+		z-index: 3;
 		width: 36px;
 		height: 5px;
 		translate: -50% 0;
@@ -764,29 +803,103 @@ html[data-native] [data-slot="dialog-content"] {
 	}
 }
 
+html[data-native="ios"] [data-slot="dialog-title"] {
+	font: var(--type-title2);
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	line-height: 1.2;
+	letter-spacing: var(--track-display);
+	text-wrap: balance;
+}
+
+/*
+ * A sheet with one or two buttons puts them in a bar across its top, as iOS does: Cancel
+ * on the left, the main button on the right, the title under them. display: contents
+ * flattens only the boxes around the footer, so its buttons stay in their form and still
+ * submit it, and the bar stays put while the sheet scrolls. Three buttons stay stacked
+ * along the bottom.
+ */
+html[data-native="ios"]
+	[data-slot="dialog-content"]:has(
+		[data-slot="dialog-footer"] > :last-child:nth-child(-n + 2)
+	) {
+	display: flex;
+	flex-direction: column;
+	padding-top: 0;
+
+	& :not([data-slot="dialog-footer"]):has([data-slot="dialog-footer"]) {
+		display: contents;
+	}
+
+	/* What's in the sheet keeps its height; the sheet scrolls instead. */
+	& > *,
+	& :not([data-slot="dialog-footer"]):has([data-slot="dialog-footer"]) > * {
+		flex-shrink: 0;
+	}
+
+	/* Cancel, in the bar, closes it. */
+	& > [data-slot="dialog-close"] {
+		display: none;
+	}
+
+	& [data-slot="dialog-footer"] {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		order: -1;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		height: 56px;
+		margin: 0 -20px;
+		padding: 6px 8px 0;
+		border: 0;
+		border-radius: 28px 28px 0 0;
+		background: var(--popover);
+
+		/* A hairline under the bar once the sheet scrolls under it. */
+		@supports (animation-timeline: scroll()) {
+			animation: native-bar-edge linear both;
+			animation-timeline: scroll(nearest);
+			animation-range: 0 16px;
+		}
+
+		& [data-slot="button"] {
+			height: 44px;
+			padding: 0 12px;
+			border: 0;
+			background: none;
+			box-shadow: none;
+			font: var(--type-body);
+			color: var(--brand);
+
+			&:last-child {
+				margin-left: auto;
+				font-weight: 600;
+			}
+
+			&[data-variant="destructive"] {
+				color: var(--native-red);
+			}
+
+			&:disabled {
+				color: var(--fg-faint);
+				opacity: 1;
+			}
+		}
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
-	html[data-native] [data-slot="dialog-content"] {
+	html[data-native="ios"] [data-slot="dialog-content"] {
 		animation: none;
 
 		&[data-closed] {
 			animation: none;
 		}
 	}
-}
 
-/* Toasts sit above the tab bar, not over it. */
-html[data-native] [data-sonner-toaster] {
-	--mobile-offset-bottom: calc(env(safe-area-inset-bottom) + 72px) !important;
-}
-
-/* ── Press feedback ─────────────────────────────────────────────────────────────── */
-
-html[data-native] [data-slot="button"] {
-	transition-property: scale, color, background-color, box-shadow;
-	transition-duration: 160ms;
-	transition-timing-function: ease-out;
-
-	&:active:not(:disabled) {
-		scale: 0.96;
+	html[data-native="ios"] [data-slot="swipe-content"] {
+		transition: none;
 	}
 }
