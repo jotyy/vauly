@@ -32,11 +32,11 @@ function signInFrom(request: APIRequestContext, ip?: string) {
 	});
 }
 
-test("one address gets three sign-ins in ten seconds, and nobody else's are counted with them", async ({
+test("one address gets ten sign-ins a minute, and nobody else's are counted with them", async ({
 	request,
 }) => {
 	const busy = address();
-	for (let i = 0; i < 3; i++)
+	for (let i = 0; i < 10; i++)
 		expect((await signInFrom(request, busy)).status()).toBe(401);
 	const refused = await signInFrom(request, busy);
 	expect(refused.status()).toBe(429);

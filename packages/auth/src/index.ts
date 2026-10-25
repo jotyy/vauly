@@ -73,15 +73,20 @@ export function createAuth(
 		disabledPaths: ["/change-password", "/update-user"],
 		secret: env.BETTER_AUTH_SECRET,
 		baseURL: env.BETTER_AUTH_URL,
-		// Better Auth's own limits per client address: three sign-ins in ten seconds, and a
-		// hundred requests in ten seconds to any of its other routes. It turns them on only
+		// Limits per client address: ten sign-ins a minute, and Better Auth's own hundred
+		// requests in ten seconds to any of its other routes. Better Auth turns them on only
 		// where NODE_ENV says production, which a Worker doesn't, so they're on here. They
 		// count in the database, which every instance of the Worker shares.
 		rateLimit: {
 			enabled: true,
 			storage: "database",
+			// The first rule whose path matches applies, so sign-in's comes first.
 			customRules: {
-				"/**": (request, rule) => (counted(request) ? rule : false),
+				// For guessing across accounts. A team behind one office address shares it,
+				// and guessing one account's codes is slowed down per account (./pace.ts).
+				"/sign-in/email": (request) =>
+					counted(request) && { window: 60, max: 10 },
+				"/**": (request, rule) => counted(request) && rule,
 			},
 		},
 		hooks: {
