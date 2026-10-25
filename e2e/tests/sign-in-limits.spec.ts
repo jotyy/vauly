@@ -49,6 +49,16 @@ test("one address gets ten sign-ins a minute, and nobody else's are counted with
 		expect((await signInFrom(request)).status()).toBe(401);
 });
 
+test("Better Auth's route for checking a password isn't served", async ({
+	request,
+}) => {
+	const response = await request.post(`${API_URL}/api/auth/verify-password`, {
+		headers: { origin: `http://localhost:${WEB_PORT}` },
+		data: { password: "0".repeat(64) },
+	});
+	expect(response.status()).toBe(404);
+});
+
 test("a session token opens a session only with its signature", async ({
 	page,
 	playwright,
