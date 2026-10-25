@@ -119,22 +119,15 @@ export const rpcHandler = new RPCHandler(appRouter, {
 });
 
 app.use("/*", async (c, next) => {
-	// The API acts on a session cookie only from the web app's own pages: another site's
-	// link, image or form gets the cookie sent along too (packages/api/src/same-origin.ts). The reference
-	// pages under /api-reference are read with GET, and its routes are all POSTs.
-	const path = new URL(c.req.url).pathname;
-	const api =
-		path === "/rpc" ||
-		path.startsWith("/rpc/") ||
-		(path.startsWith("/api-reference/") && c.req.method === "POST");
-	if (api && !fromOwnPages(c.req.raw, ownOrigins(c.req.url, ENV.CORS_ORIGIN))) {
-		return c.json(
-			{ message: "vauly's API takes a session cookie only from its own pages" },
-			403,
-		);
-	}
-
-	const context = await createContext({ context: c });
+	// The API uses the session cookie only for the web app's own pages, since the browser
+	// sends it with other sites' requests too (packages/api/src/same-origin.ts).
+	const context = await createContext({
+		context: c,
+		cookie: fromOwnPages(
+			c.req.raw,
+			ownOrigins(c.req.url, ENV.CORS_ORIGIN, ENV.BETTER_AUTH_URL),
+		),
+	});
 
 	const rpcResult = await rpcHandler.handle(c.req.raw, {
 		prefix: "/rpc",

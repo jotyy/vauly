@@ -39,7 +39,7 @@ Whoever runs the Cloudflare account, someone who takes it over, or Cloudflare it
 
 ### A website you visit
 
-- **It can't use your session.** Your browser sends vauly's session cookie with requests that other sites make too, but the API acts on it only for vauly's own pages ([How the app is served](security.md#how-the-app-is-served)).
+- **It can't use your session.** Your browser sends vauly's session cookie with requests that other sites make too, but the API uses it only for vauly's own pages, and handles the rest as though no one were signed in ([How the app is served](security.md#how-the-app-is-served)).
 
 With the extension installed, every site's page sits next to vauly's button and fill menu. See [Browser extension](security.md#browser-extension) and [Passkeys](security.md#passkeys).
 - **It can't read them.** Both sit in closed shadow roots, and the menu is a frame of the extension's own page that never holds a password. They look the same whatever vauly holds, so the page learns nothing about your vaults from them. A page that frames the menu's page itself gets nothing: the extension answers only the frame its own script opened, with a one-time token.
