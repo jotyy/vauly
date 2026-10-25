@@ -2,7 +2,9 @@ import Capacitor
 
 // Capacitor registers a few plugins of its own in every app, whatever capacitor.config.json
 // says. Two of them would let a script that got into the page around the app's limits, so
-// these take their place, under the same names, and refuse every call.
+// these take their place and refuse every call. Each is registered twice: under the
+// plugin's name, and under its class name, since Capacitor loads a plugin it hasn't
+// registered by its class name when the page calls it that way.
 
 /// Capacitor's native HTTP sends requests from native code, where the page's
 /// Content-Security-Policy doesn't reach, so it could send anything anywhere. vauly's
@@ -10,9 +12,15 @@ import Capacitor
 @objc(RefusedHttpPlugin)
 public class RefusedHttpPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "RefusedHttpPlugin"
-    public let jsName = "CapacitorHttp"
+    /// "CapacitorHttp", or "CAPHttpPlugin", the class Capacitor would load.
+    public let jsName: String
     public let pluginMethods: [CAPPluginMethod] = ["request", "get", "post", "put", "patch", "delete"].map {
         CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise)
+    }
+
+    init(jsName: String) {
+        self.jsName = jsName
+        super.init()
     }
 
     @objc func request(_ call: CAPPluginCall) { refuse(call) }
@@ -28,10 +36,16 @@ public class RefusedHttpPlugin: CAPPlugin, CAPBridgedPlugin {
 @objc(RefusedWebViewPlugin)
 public class RefusedWebViewPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "RefusedWebViewPlugin"
-    public let jsName = "WebView"
+    /// "WebView", or "CAPWebViewPlugin", the class Capacitor would load.
+    public let jsName: String
     public let pluginMethods: [CAPPluginMethod] = [
         "setServerAssetPath", "setServerBasePath", "getServerBasePath", "persistServerBasePath"
     ].map { CAPPluginMethod(name: $0, returnType: CAPPluginReturnPromise) }
+
+    init(jsName: String) {
+        self.jsName = jsName
+        super.init()
+    }
 
     @objc func setServerAssetPath(_ call: CAPPluginCall) { refuse(call) }
     @objc func setServerBasePath(_ call: CAPPluginCall) { refuse(call) }

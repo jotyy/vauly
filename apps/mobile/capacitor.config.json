@@ -2,6 +2,7 @@
 	"appId": "app.vauly",
 	"appName": "vauly",
 	"webDir": "www",
+	"loggingBehavior": "none",
 	"plugins": {
 		"CapacitorHttp": {
 			"enabled": false
