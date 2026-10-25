@@ -10,6 +10,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 - Turning on two-step login now tells the account's other devices, the ones it signs out, if they have notifications on. The notification names the device that turned it on, and says, if it wasn't you, to ask the workspace's owner or an admin to reset your two-step login and then change your master password.
 - A release now sends the extension to the Chrome Web Store by itself: its tag uploads the new version and submits it for review, and the store publishes it once the review passes.
 
+### Changed
+
+- **The API uses the web app's session cookie only for the web app's own pages.** The browser sends the cookie with other sites' requests too, and the API's procedures now handle those as though no one were signed in. A request counts as the web app's when the browser's Fetch Metadata says it's same-origin, or its `Origin` is the API's own address, `CORS_ORIGIN` or `BETTER_AUTH_URL`; a request with neither must come from the address bar, or from a browser that sends no Fetch Metadata, and anything but a GET must send JSON. The browser extension, the app for iPhone and agents sign in with their own tokens and aren't affected.
+
 ### Fixed
 
 - On an iPhone, tapping a field no longer zooms the page in and leaves it zoomed: fields use 16px text on touch screens. The app fills the screen around the notch and the home indicator when it's installed.
