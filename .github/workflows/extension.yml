@@ -1,0 +1,172 @@
+name: Extension
+
+# Sends the browser extension to the Chrome Web Store when a version tag (v0.3.0) is
+# pushed. The first job builds the Chrome zip from the tag. The second uploads it to
+# vauly's item and submits it for review, and the store publishes it once the review
+# passes. Only the second job gets the store's credentials, and it runs none of the
+# repository's code or dependencies.
+#
+# The credentials are two secrets in the chrome-web-store environment, made as
+# apps/extension/store/listing.md describes. Until they're there, the second job says so
+# and does nothing.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# One upload at a time: the store takes a version only when it's newer than the last.
+concurrency:
+  group: chrome-web-store
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build for Chrome
+    # Copies made by the Deploy to Cloudflare button get this file too; they don't need it.
+    if: github.repository == 'jotyy/vauly'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the version
+        id: version
+        run: |
+          set -euo pipefail
+          version=$(jq -r .version apps/extension/package.json)
+          # A pre-release such as v0.3.0-rc.1 stays out of the store.
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            echo "::notice title=Chrome Web Store::$GITHUB_REF_NAME is a pre-release, so it isn't sent to the store."
+            exit 0
+          fi
+          # A release commit gives the extension vauly's version (CONTRIBUTING.md).
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error title=Chrome Web Store::The tag is $GITHUB_REF_NAME, but apps/extension/package.json says $version."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: oven-sh/setup-bun@v2
+        if: steps.version.outputs.version
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+        if: steps.version.outputs.version
+      - run: bun run --cwd apps/extension zip
+        if: steps.version.outputs.version
+      - uses: actions/upload-artifact@v7
+        if: steps.version.outputs.version
+        with:
+          name: extension-chrome
+          path: apps/extension/.output/vauly-extension-${{ steps.version.outputs.version }}-chrome.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Chrome Web Store
+    needs: build
+    if: needs.build.outputs.version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Its secrets can be limited to v* tags in the environment's settings.
+    environment: chrome-web-store
+    env:
+      ITEM: hjjbfdlkdnnbgaempacaeihooaopoock
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - name: Check for the store's credentials
+        id: credentials
+        env:
+          HAVE_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_KEY != '' }}
+          HAVE_PUBLISHER: ${{ secrets.CWS_PUBLISHER_ID != '' }}
+        run: |
+          if [ "$HAVE_KEY" = true ] && [ "$HAVE_PUBLISHER" = true ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            message="$VERSION wasn't sent to the Chrome Web Store: the chrome-web-store environment needs the secrets CWS_SERVICE_ACCOUNT_KEY and CWS_PUBLISHER_ID. apps/extension/store/listing.md has the steps."
+            echo "::notice title=Chrome Web Store::$message"
+            echo "$message" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/download-artifact@v7
+        if: steps.credentials.outputs.ready == 'true'
+        with:
+          name: extension-chrome
+          path: dist
+
+      - name: Upload and submit for review
+        if: steps.credentials.outputs.ready == 'true'
+        env:
+          KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}
+          PUBLISHER: ${{ secrets.CWS_PUBLISHER_ID }}
+        run: |
+          set -euo pipefail
+          say() { echo "$1"; echo "$1" >>"$GITHUB_STEP_SUMMARY"; }
+          # Prints the answer, or stops the job with it.
+          request() {
+            local answer
+            if ! answer=$(curl -sS --fail-with-body "$@"); then
+              echo "::error title=Chrome Web Store::${answer:-The request got no answer.}" >&2
+              exit 1
+            fi
+            printf '%s\n' "$answer"
+          }
+          zip="dist/vauly-extension-$VERSION-chrome.zip"
+
+          # An access token from the service account's key: a JWT it signs, exchanged at
+          # Google's token endpoint. The token stays in this step.
+          b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
+          now=$(date +%s)
+          header=$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | b64url)
+          claims=$(jq -cj --argjson now "$now" '{
+            iss: .client_email,
+            scope: "https://www.googleapis.com/auth/chromewebstore",
+            aud: "https://oauth2.googleapis.com/token",
+            iat: $now,
+            exp: ($now + 600)
+          }' <<<"$KEY" | b64url)
+          signature=$(printf '%s.%s' "$header" "$claims" |
+            openssl dgst -sha256 -sign <(jq -r .private_key <<<"$KEY") | b64url)
+          token=$(request https://oauth2.googleapis.com/token \
+            --data-urlencode grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer \
+            --data-urlencode "assertion=$header.$claims.$signature" | jq -r .access_token)
+          echo "::add-mask::$token"
+
+          api="https://chromewebstore.googleapis.com/v2/publishers/$PUBLISHER/items/$ITEM"
+          call() { request -H "Authorization: Bearer $token" "$@"; }
+
+          # Run again for a tag the store already has, it stops here.
+          status=$(call "$api:fetchStatus")
+          published=$(jq -r '.publishedItemRevisionStatus.distributionChannels[0].crxVersion // empty' <<<"$status")
+          submitted=$(jq -r '.submittedItemRevisionStatus.distributionChannels[0].crxVersion // empty' <<<"$status")
+          state=$(jq -r '.submittedItemRevisionStatus.state // empty' <<<"$status")
+          if [ "$published" = "$VERSION" ] || { [ "$submitted" = "$VERSION" ] && [ "$state" != CANCELLED ]; }; then
+            say "The Chrome Web Store already has $VERSION${state:+ ($state)}."
+            exit 0
+          fi
+          # A version still in review stays there: cancelling its review is a person's choice.
+          if [ "$state" = PENDING_REVIEW ]; then
+            echo "::error title=Chrome Web Store::$submitted is still in review. Wait for it, or cancel its review in the developer dashboard, then re-run this job."
+            exit 1
+          fi
+
+          upload=$(call -X POST -H "Content-Type: application/zip" --data-binary "@$zip" \
+            "https://chromewebstore.googleapis.com/upload/v2/publishers/$PUBLISHER/items/$ITEM:upload")
+          upload_state=$(jq -r '.uploadState // empty' <<<"$upload")
+          # The store may still be checking the package when the upload returns.
+          for _ in $(seq 30); do
+            [ "$upload_state" = IN_PROGRESS ] || break
+            sleep 10
+            upload_state=$(call "$api:fetchStatus" | jq -r '.lastAsyncUploadState // empty')
+          done
+          if [ "$upload_state" != SUCCEEDED ]; then
+            echo "::error title=Chrome Web Store::The upload of $VERSION ended as ${upload_state:-unknown}: $upload"
+            exit 1
+          fi
+
+          # Published as soon as the review passes, with the visibility the item has.
+          submission=$(call -X POST -H "Content-Type: application/json" -d '{}' "$api:publish")
+          say "Uploaded $VERSION to the Chrome Web Store and submitted it: $(jq -r .state <<<"$submission"). The store publishes it once the review passes."
