@@ -155,8 +155,8 @@ test("turning it on says who it holds up, and Members marks them", async () => {
 test("a member without it is sent to set it up, and the server refuses the rest", async ({
 	browser,
 }) => {
-	// With the app open, the next request is refused, and the app shows why.
-	await sidebarLink(mei, "Activity").click();
+	// With the app open, the next request is refused, and the app shows why. The app asks
+	// for requests every few seconds by itself; a click here could land as the sidebar goes.
 	await expect(setupScreen(mei)).toBeVisible();
 	// Still signed in, to set it up: this isn't a session that ended.
 	await expect(mei.getByText("You were signed out")).toHaveCount(0);
@@ -223,7 +223,7 @@ test("a reset signs them out everywhere, to sign in and set it up again", async 
 	await expect(admin.getByText("Needs two-step login")).toHaveCount(1);
 
 	// Whoever set it up in Mei's name is signed out with her, rather than set it up again.
-	await sidebarLink(mei, "Members").click();
+	// Her app finds out at its next request, as above.
 	await expect(mei.getByText("You were signed out")).toBeVisible();
 	await signInToSetUp(mei, teammate);
 });
