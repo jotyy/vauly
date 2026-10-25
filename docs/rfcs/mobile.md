@@ -1,6 +1,6 @@
 # RFC: how vauly gets onto iPhone and Android
 
-- **Status:** proposed, waiting for the maintainer's decision
+- **Status:** accepted on October 24, 2026. The maintainer's choices are under [Decisions](#decisions); two are still open.
 - **Issue:** [#8](https://github.com/jotyy/vauly/issues/8). It also plans [#10](https://github.com/jotyy/vauly/issues/10), [#11](https://github.com/jotyy/vauly/issues/11), [#12](https://github.com/jotyy/vauly/issues/12) and [#13](https://github.com/jotyy/vauly/issues/13).
 - **Facts checked:** October 23, 2026, against the sources at the end. Effort figures are estimates, not facts.
 
@@ -25,9 +25,9 @@ If we later want native screens, these cores are the foundation they would need,
 - Phase 2, Android: #11.
 - Phase 3, later: passkeys, and native screens where the WebView falls short.
 
-**Before phase 1 starts:**
-- A two-week prototype answers the open technical questions; see [Prototype first](#prototype-first).
-- The maintainer makes the decisions listed under [Decisions for the maintainer](#decisions-for-the-maintainer).
+**Where it stands:**
+- The prototypes ran and back the plan; see [Prototype first](#prototype-first). Argon2id fits in the AutoFill extension at 64 MiB, and Capacitor runs the web app unchanged. The results are in [#8](https://github.com/jotyy/vauly/issues/8).
+- The maintainer chose (b), iPhone first; see [Decisions](#decisions).
 
 ## Where vauly is today
 
@@ -249,7 +249,7 @@ These need no store accounts.
   - saving new logins once iOS 26.2 is in reach.
   - Keyboard-bar suggestions are opt-in.
 - **The Safari web extension** from `apps/extension`, packaged with `xcrun safari-web-extension-packager` inside the same app (#13) [A20].
-- **Distribution:** TestFlight, then the App Store. This needs the Apple Developer Program.
+- **Distribution:** TestFlight, then the App Store. This needs the Apple Developer Program, on a personal account that doesn't exist yet.
 
 ### Phase 2: Android, closing #11
 
@@ -259,9 +259,8 @@ These need no store accounts.
   - an unlock Activity with `BiometricPrompt`;
   - saving, with uploads queued.
 - **Distribution:**
-  - Google Play's internal testing track, then production;
-  - APKs on GitHub Releases;
-  - F-Droid later.
+  - Google Play's closed testing track, then production;
+  - APKs on GitHub Releases, and F-Droid later, if the maintainer agrees (decision 4 is still open).
 
 ### Phase 3: later
 
@@ -269,7 +268,7 @@ These need no store accounts.
 - **One-time codes** in the iOS extension (iOS 18 and later) [A2].
 - **Native screens** wherever the WebView falls short, built on the phase 1 and 2 cores.
 
-**Which platform first** is the maintainer's call; see the decisions below. iPhone comes first here because the PWA is weakest there, and because the Safari extension (#13) can ship in the same app. Android first would avoid Apple's fee while we build, and APKs can go out without a store.
+**iPhone comes first**, as the maintainer decided. The PWA is weakest there, and the Safari extension (#13) can ship in the same app.
 
 ## Prototype first
 
@@ -302,17 +301,19 @@ These go into docs/security.md when the apps ship.
   - **Apple export compliance:** the apps rely on the operating system's crypto, plus WebCrypto in the WebView. The exact export-compliance answer is a legal question [A18].
   - **Google Data safety form:** vault contents are end-to-end encrypted, which the form treats as not collected. Account email and team membership still have to be declared [G14].
 
-## Decisions for the maintainer
+## Decisions
 
-1. **Approve (b)**, or pick another option.
-2. **Which platform first:** iPhone, as recommended, or Android.
-3. **Store accounts, and who holds them:**
-   - The Apple Developer Program costs 99 USD a year. Enrolling as an organization needs a D-U-N-S number [A19].
-   - A Google Play developer account costs a one-time 25 USD [G17].
-   - Nothing has been created.
-4. **Distribution outside the stores:** APKs on GitHub Releases, and F-Droid later.
-5. **App identity:** the name, the bundle and package IDs, and who keeps the signing keys.
-6. **Keyboard-bar suggestions on iOS:** on by default, or opt-in. This RFC suggests opt-in.
+The maintainer decided on October 24, 2026:
+1. **(b): Capacitor around `apps/web`, with native autofill.** Expo and React Native were reconsidered the same day, after the Capacitor shell looked like a web page in the simulator, and Capacitor stayed. Making the app look and feel like an iPhone app became #82.
+2. **iPhone first**, then Android.
+3. **Personal developer accounts** on both stores. Neither has been created yet.
+   - The Apple Developer Program costs 99 USD a year [A19]. The AutoFill extension works on either account type.
+   - A Google Play developer account costs a one-time 25 USD [G17]. On a personal account, Play requires a closed test with at least 12 testers for 14 days in a row before the app can go to production (#83).
+   - Each store's listing shows the account holder's name.
+4. **Distribution outside the stores** (APKs on GitHub Releases, and F-Droid later): **still open.**
+5. **App identity** (the name, the bundle and package IDs, and who keeps the signing keys): **still open.**
+6. **Keyboard-bar suggestions on iOS are opt-in** (#81).
+7. **No push in the first version** (#84). The app shows what needs the person when it opens. Android gets UnifiedPush when it ships.
 
 ## Sources
 
