@@ -36,7 +36,35 @@ export const sessionStore = bridge?.Plugins.VaulySession;
 export function markNativeApp() {
 	if (isNativeApp && bridge) {
 		document.documentElement.dataset.native = bridge.getPlatform();
+		keepFieldsInView();
 	}
+}
+
+/**
+ * With the keyboard up, the app's WebView is only as tall as the space above it, so a sheet
+ * stays under the status bar (the Keyboard plugin's native resize, apps/mobile). Moving to
+ * another field, the WebView grows back for a moment before it shrinks again: the sheet
+ * then fits, scrolls back to its top, and the field ends up behind the keyboard. So
+ * whenever the sheet with the field in it changes size, the field comes back into view.
+ */
+function keepFieldsInView() {
+	let sheet: Element | null = null;
+	const observer = new ResizeObserver(() => {
+		const field = document.activeElement;
+		if (field instanceof HTMLElement && sheet?.contains(field)) {
+			field.scrollIntoView({ block: "nearest" });
+		}
+	});
+	document.addEventListener("focusin", (event) => {
+		const next =
+			event.target instanceof Element
+				? event.target.closest('[role="dialog"]')
+				: null;
+		if (next === sheet) return;
+		if (sheet) observer.unobserve(sheet);
+		sheet = next;
+		if (sheet) observer.observe(sheet);
+	});
 }
 
 /**
