@@ -59,7 +59,7 @@ A copy on 0.1.0 then moves to the latest release. A copy that already took main 
 
 ### Updating from 0.2
 
-**Limits on tries:** nothing to do. A migration adds a table that counts recent sign-ins by address, and two columns that count each account's wrong codes and master passwords in a row ([Security](security.md#keys) has the limits). Everyone stays signed in, the browser extension too. Going back to 0.2 is safe: it leaves the table and the columns alone.
+**Limits on tries:** nothing to do. A migration adds a table that counts recent sign-ins by address, and columns that count each account's wrong codes and master passwords in a row ([Security](security.md#keys) has the limits). Everyone stays signed in, the browser extension too. Going back to 0.2 is safe: it leaves the table and the columns alone.
 
 ### Updating from 0.1.0
 

@@ -18,7 +18,7 @@ When your team deploys vauly, it runs as a Worker with a D1 database in your Clo
 - **Account details**: each person's name, email address and role, and the hash of a key derived from their master password, never the master password itself.
 - **An activity log** of who opened, copied, filled, changed or shared which item, and when. It names items by their ID; it never holds their contents or the websites they're for.
 - **Sessions**, with the IP address and the browser each one signed in from, so you can see and end them under **Settings**.
-- **Counts that slow down guessing**: recent requests to sign in, by IP address, deleted once they're a minute old as new requests come in; and, for each account, how many wrong codes or master passwords were given in a row.
+- **Counts that slow down guessing**: recent requests to sign in, by IP address, deleted after a minute once a later request comes in; and, for each account, how many wrong codes or master passwords were given in a row.
 
 Cloudflare processes this as your provider, under your agreement with them. [Security](security.md) describes what the server can and can't see in detail.
 
