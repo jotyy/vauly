@@ -79,7 +79,7 @@ export async function checkSecondStep(
 	if (!code?.trim()) return "missing";
 	const secret = row.secret;
 
-	const result = await paced(db, userId, async () => {
+	const result = await paced(db, userId, "sign-in", async () => {
 		const step = await verifyTotp(secret, code, { after: row.step ?? -1 });
 		if (step !== null)
 			return (await spendStep(db, userId, secret, step)).length > 0;

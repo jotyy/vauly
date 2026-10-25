@@ -4,8 +4,13 @@ import { and, eq } from "drizzle-orm";
 
 // Codes and master passwords are checked at a pace: a few wrong ones in a row are free,
 // then each next try waits, twice as long after each wrong one, up to five minutes. A right
-// one starts the count again. Nothing locks an account, so whoever gets it wrong can only
-// slow it down, and only after they've passed the master password (or hold a session).
+// one starts the count again. Nothing locks an account.
+//
+// Each account keeps two counts. Two-step codes at sign-in count apart from the checks
+// inside a session (the master password before changing it, the codes that turn two-step
+// login on and off), so someone who has the master password and keeps guessing codes can
+// hold up the next sign-in, but never a session that's already open. From there, a new
+// master password ends their guessing, and clears the count.
 
 /** Wrong tries in a row before the next one waits. */
 const FREE_TRIES = 3;
@@ -28,42 +33,62 @@ export function tryAgainIn({ wait }: Wait) {
 	return `Try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
 }
 
+/** The two counts: codes at sign-in, and the checks inside a session. */
+const counts = {
+	"sign-in": {
+		tries: member.signInWrongTries,
+		next: member.signInNextTryAt,
+		set: (tries: number, next: Date | null) => ({
+			signInWrongTries: tries,
+			signInNextTryAt: next,
+		}),
+	},
+	session: {
+		tries: member.sessionWrongTries,
+		next: member.sessionNextTryAt,
+		set: (tries: number, next: Date | null) => ({
+			sessionWrongTries: tries,
+			sessionNextTryAt: next,
+		}),
+	},
+};
+
+/** Both counts back to none, for an update of the member row. */
+export const noWrongTries = {
+	...counts["sign-in"].set(0, null),
+	...counts.session.set(0, null),
+};
+
 /**
  * Runs `check`, a check of a code or an auth key for this person, unless their last wrong
- * try was too recent. A try counts as wrong before it's checked, so tries sent at once
- * can't all go first, and the count goes back to none once one is right.
+ * try on this count was too recent. A try counts as wrong before it's checked, so tries
+ * sent at once can't all go first, and the count goes back to none once one is right.
  */
 export async function paced(
 	db: Database,
 	userId: string,
+	count: keyof typeof counts,
 	check: () => Promise<boolean>,
 ): Promise<"right" | "wrong" | Wait> {
+	const { tries, next, set } = counts[count];
 	// Another try may take the count between the read and the write; then read again.
 	for (let round = 0; round < 5; round++) {
 		const [row] = await db
-			.select({ wrongTries: member.wrongTries, nextTryAt: member.nextTryAt })
+			.select({ tries, next })
 			.from(member)
 			.where(eq(member.userId, userId));
 		if (!row) return "wrong";
 		const now = Date.now();
-		const next = row.nextTryAt?.getTime() ?? 0;
-		if (next > now) return { wait: Math.ceil((next - now) / 1000) };
+		const due = row.next?.getTime() ?? 0;
+		if (due > now) return { wait: Math.ceil((due - now) / 1000) };
 		const counted = await db
 			.update(member)
-			.set({
-				wrongTries: row.wrongTries + 1,
-				nextTryAt: new Date(now + waitAfter(row.wrongTries + 1)),
-			})
-			.where(
-				and(eq(member.userId, userId), eq(member.wrongTries, row.wrongTries)),
-			)
+			.set(set(row.tries + 1, new Date(now + waitAfter(row.tries + 1))))
+			.where(and(eq(member.userId, userId), eq(tries, row.tries)))
 			.returning({ userId: member.userId });
 		if (counted.length === 0) continue;
 		if (!(await check())) return "wrong";
-		await db
-			.update(member)
-			.set({ wrongTries: 0, nextTryAt: null })
-			.where(eq(member.userId, userId));
+		await db.update(member).set(set(0, null)).where(eq(member.userId, userId));
 		return "right";
 	}
 	return { wait: 1 };

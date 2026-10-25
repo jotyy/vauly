@@ -1,7 +1,7 @@
 {
 	"version": "7",
 	"dialect": "sqlite",
-	"id": "276d1055-3cca-467e-9b72-abc09c39aa2b",
+	"id": "618a5b39-56a2-4f0c-b4c4-792cf3f8faa7",
 	"prevIds": ["8433eb65-d17b-4389-bfe6-ab1c670d7bca"],
 	"ddl": [
 		{
@@ -1320,7 +1320,7 @@
 			"autoincrement": false,
 			"default": "0",
 			"generated": null,
-			"name": "wrong_tries",
+			"name": "sign_in_wrong_tries",
 			"entityType": "columns",
 			"table": "member"
 		},
@@ -1330,7 +1330,27 @@
 			"autoincrement": false,
 			"default": null,
 			"generated": null,
-			"name": "next_try_at",
+			"name": "sign_in_next_try_at",
+			"entityType": "columns",
+			"table": "member"
+		},
+		{
+			"type": "integer",
+			"notNull": true,
+			"autoincrement": false,
+			"default": "0",
+			"generated": null,
+			"name": "session_wrong_tries",
+			"entityType": "columns",
+			"table": "member"
+		},
+		{
+			"type": "integer",
+			"notNull": false,
+			"autoincrement": false,
+			"default": null,
+			"generated": null,
+			"name": "session_next_try_at",
 			"entityType": "columns",
 			"table": "member"
 		},

@@ -1,5 +1,5 @@
 import { ORPCError } from "@orpc/server";
-import { paced, tryAgainIn, type Wait } from "@vauly/auth/pace";
+import { noWrongTries, paced, tryAgainIn, type Wait } from "@vauly/auth/pace";
 import {
 	hashRecoveryCode,
 	matchCode,
@@ -27,7 +27,7 @@ import {
 	twoStepPolicy,
 } from "../index";
 import { signOutOthersAfter, swapKeys } from "../key-swap";
-import { hashToken, logEvent, newId } from "../lib";
+import { hashToken, logEvent, logEventIf, newId } from "../lib";
 import {
 	liveDevices,
 	ownTwoStepNotice,
@@ -122,7 +122,7 @@ async function checkAuthKey(
 		);
 	const hash = credential?.password;
 	const result = hash
-		? await paced(context.db, context.userId, () =>
+		? await paced(context.db, context.userId, "session", () =>
 				auth.password.verify({ hash, password: authKey }),
 			)
 		: "wrong";
@@ -418,6 +418,11 @@ export const accountRouter = {
 				}),
 			]);
 			if (swapped.length === 0) throw changedElsewhere();
+			// Whoever kept the next sign-in waiting with the old master password can't now.
+			await db
+				.update(member)
+				.set(noWrongTries)
+				.where(eq(member.userId, userId));
 			await logEvent(db, {
 				actorType: "member",
 				actorId: userId,
@@ -559,7 +564,7 @@ export const accountRouter = {
 				throw new ORPCError("BAD_REQUEST", { message: "Start again" });
 			}
 			const matched: { step: number | null } = { step: null };
-			const result = await paced(db, me.userId, async () => {
+			const result = await paced(db, me.userId, "session", async () => {
 				matched.step = await matchCode(pending, input.code);
 				return matched.step !== null;
 			});
@@ -649,7 +654,7 @@ export const accountRouter = {
 				});
 			}
 			const secret = me.totpSecret;
-			const result = await paced(db, me.userId, async () => {
+			const result = await paced(db, me.userId, "session", async () => {
 				const step = await matchCode(secret, input.code, me.totpStep ?? -1);
 				const recovery = me.recoveryCodes ?? [];
 				if (
@@ -658,24 +663,33 @@ export const accountRouter = {
 				)
 					return false;
 				// Only if the code is still unused: a sign-in at the same moment may have used it.
-				const off = await db
-					.update(member)
-					.set({
-						totpSecret: null,
-						totpPending: null,
-						totpStep: null,
-						recoveryCodes: null,
-					})
-					.where(
-						and(
-							eq(member.userId, me.userId),
-							eq(member.totpSecret, secret),
-							step === null
-								? eq(member.recoveryCodes, recovery)
-								: or(isNull(member.totpStep), lt(member.totpStep, step)),
-						),
-					)
-					.returning({ userId: member.userId });
+				// The event is written in the same batch, only if two-step login went off.
+				const [off] = await db.batch([
+					db
+						.update(member)
+						.set({
+							totpSecret: null,
+							totpPending: null,
+							totpStep: null,
+							recoveryCodes: null,
+						})
+						.where(
+							and(
+								eq(member.userId, me.userId),
+								eq(member.totpSecret, secret),
+								step === null
+									? eq(member.recoveryCodes, recovery)
+									: or(isNull(member.totpStep), lt(member.totpStep, step)),
+							),
+						)
+						.returning({ userId: member.userId }),
+					logEventIf(db, me.userId, isNull(member.totpSecret), {
+						actorType: "member",
+						actorId: me.userId,
+						action: "updated",
+						detail: "two-step login off",
+					}),
+				]);
 				return off.length > 0;
 			});
 			if (typeof result === "object") throw tooSoon(result);
@@ -684,12 +698,6 @@ export const accountRouter = {
 					message: "That code didn't work",
 				});
 			}
-			await logEvent(db, {
-				actorType: "member",
-				actorId: me.userId,
-				action: "updated",
-				detail: "two-step login off",
-			});
 			return { ok: true };
 		}),
 
