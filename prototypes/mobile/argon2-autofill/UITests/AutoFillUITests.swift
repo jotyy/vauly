@@ -203,4 +203,96 @@ final class AutoFillUITests: XCTestCase {
 		sleep(3)
 		shot("\(prefix)11-vault-long-name")
 	}
+
+	/** #78: apps/mobile, installed fresh, connects to a local vauly and signs in. */
+	func testConnectsToAnyVauly() throws {
+		let app = XCUIApplication(bundleIdentifier: "app.vauly")
+		let env = ProcessInfo.processInfo.environment
+		// Attached to a copy already running, its console stays with whoever started it.
+		let attach = env["VAULY_PROTO_ATTACH"] != nil
+		if attach { app.activate() } else { app.launch() }
+		let web = app.webViews.firstMatch
+		let address = env["VAULY_PROTO_ADDRESS"] ?? "http://127.0.0.1:3202"
+		func tap(_ label: String) {
+			let any = web.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label))
+			let element = any.allElementsBoundByIndex.first(where: { $0.isHittable }) ?? any.firstMatch
+			XCTAssertTrue(element.waitForExistence(timeout: 15), label)
+			element.tap()
+			sleep(2)
+		}
+		func fill(_ field: XCUIElement, _ text: String) {
+			XCTAssertTrue(field.waitForExistence(timeout: 15))
+			// The caret goes where the tap lands: at the end, then delete back to empty.
+			field.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+			let old = (field.value as? String) ?? ""
+			if !old.isEmpty, old != field.placeholderValue {
+				field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count + 2))
+			}
+			field.typeText(text)
+		}
+		let field = web.textFields["Address"]
+		XCTAssertTrue(field.waitForExistence(timeout: 30))
+		sleep(1)
+		shot("c1-connect")
+		fill(field, "gone.invalid")
+		web.buttons["Connect"].tap()
+		let unreachable = web.staticTexts.matching(NSPredicate(format: "label CONTAINS 'reach gone.invalid'")).firstMatch
+		XCTAssertTrue(unreachable.waitForExistence(timeout: 40))
+		shot("c2-unreachable")
+		fill(field, address)
+		web.buttons["Connect"].tap()
+		let email = web.textFields["Email"]
+		XCTAssertTrue(email.waitForExistence(timeout: 30))
+		sleep(1)
+		shot("c3-sign-in")
+		fill(email, "alex@acme.test")
+		let password = web.secureTextFields["Master password"]
+		password.tap()
+		sleep(1)
+		password.typeText("correct horse battery staple 42")
+		web.buttons["Sign in"].tap()
+		XCTAssertTrue(web.links["Items"].waitForExistence(timeout: 60))
+		sleep(3)
+		shot("c4-signed-in")
+		tap("Settings")
+		sleep(1)
+		shot("c5-settings")
+		let device = web.staticTexts["Your vauly"]
+		for _ in 0..<6 where !device.isHittable { web.swipeUp(velocity: .slow) }
+		sleep(2)
+		shot("c5b-settings-this-device")
+		tap("Items")
+		tap("New item")
+		let name = app.webViews.textFields["Name"].firstMatch
+		XCTAssertTrue(name.waitForExistence(timeout: 10))
+		if env["VAULY_PROTO_NOTES_FIRST"] == nil {
+			name.tap()
+			name.typeText("G")
+			sleep(2)
+			shot("c6-sheet-keyboard")
+		}
+		let notes = app.webViews.textViews.firstMatch
+		if notes.waitForExistence(timeout: 5) {
+			print("NOTES before: \(notes.frame) hittable \(notes.isHittable)")
+			// Scrolled into view first, as a person would, then tapped.
+			for _ in 0..<4 where !notes.isHittable { web.swipeUp(velocity: .slow) }
+			sleep(1)
+			print("NOTES scrolled: \(notes.frame) hittable \(notes.isHittable)")
+			shot("c6a-sheet-scrolled")
+			notes.tap()
+			notes.typeText("n")
+			sleep(2)
+			print("NOTES typing: \(notes.frame) hittable \(notes.isHittable)")
+			shot("c6b-sheet-keyboard-notes")
+		}
+		web.buttons["Cancel"].firstMatch.tap()
+		sleep(1)
+		if attach { return }
+		// The session is in the Keychain: a new launch opens locked, not signed out.
+		app.terminate()
+		app.launch()
+		XCTAssertTrue(web.secureTextFields.firstMatch.waitForExistence(timeout: 30))
+		sleep(2)
+		shot("c7-relaunched")
+	}
 }
