@@ -116,9 +116,9 @@ final class RefusalTests: XCTestCase {
 	}
 
 	func testCheckKdfKeepsToTheMemoryThisProcessHas() throws {
+		XCTAssertNoThrow(try checkKdf(argon(19_456), argon2idSeen: true, memoryLimit: Argon2Memory.autoFill))
 		XCTAssertNoThrow(try checkKdf(argon(64 * 1024), argon2idSeen: true, memoryLimit: Argon2Memory.autoFill))
-		XCTAssertNoThrow(try checkKdf(argon(80 * 1024), argon2idSeen: true, memoryLimit: Argon2Memory.autoFill))
-		XCTAssertThrowsError(try checkKdf(argon(80 * 1024 + 1), argon2idSeen: true, memoryLimit: Argon2Memory.autoFill)) {
+		XCTAssertThrowsError(try checkKdf(argon(64 * 1024 + 1), argon2idSeen: true, memoryLimit: Argon2Memory.autoFill)) {
 			XCTAssertEqual($0 as? VaulyKitError, .overMemoryLimit)
 		}
 		XCTAssertNoThrow(try checkKdf(argon(1024 * 1024), argon2idSeen: true, memoryLimit: Argon2Memory.app))
@@ -212,12 +212,30 @@ final class RefusalTests: XCTestCase {
 			Login(name: "a", url: "https://one.example"))
 		for json in [
 			#"{"name":"a","url":"https://one.example","url":"https://two.example"}"#,
-			// The same key once escaped: JSON.parse reads both as "url".
-			#"{"name":"a","url":"https://one.example","url":"https://two.example"}"#,
+			// The same key once escaped: JSON.parse reads each pair as one key.
+			#"{"name":"a","url":"https://one.example","\u0075\u0072\u006c":"https://two.example"}"#,
+			#"{"name":"a","a/b":1,"a\/b":2}"#,
+			#"{"name":"a","😀":1,"\ud83d\ude00":2}"#,
 			#"{"name":"a","nested":{"x":1,"x":2}}"#,
 			#"{"name":"a","list":[{"x":1},{"y":1,"y":2}]}"#,
 		] {
 			assertMalformed(try openJson(Login.self, key, sealed(json, key)))
+		}
+		// Keys must be in NFC, or JSONDecoder could read a field JSON.parse doesn't see: the
+		// Kelvin sign for K, a decomposed é, a lone surrogate.
+		for json in [
+			"{\"name\":\"a\",\"\u{212A}ey\":1}",
+			"{\"name\":\"a\",\"e\u{0301}\":1}",
+			#"{"name":"a","\#u{5C}ud83d":1}"#,
+			#"{"name":"a","\#u{5C}u+041":1}"#,
+		] {
+			assertMalformed(try openJson(Login.self, key, sealed(json, key)))
+		}
+		for json in [
+			#"{"name":"a","é":1,"名前":2,"😀":3,"\#u{5C}u00e9t\#u{5C}u00e9":4}"#,
+			"{\"name\":\"a\",\"\u{00E9}\":1}",
+		] {
+			XCTAssertNoThrow(try openJson(Login.self, key, sealed(json, key)), json)
 		}
 		// The same name in different objects is fine.
 		XCTAssertNoThrow(try openJson(Login.self, key, sealed(#"{"name":"a","list":[{"x":1},{"x":2}]}"#, key)))
@@ -288,5 +306,10 @@ final class RefusalTests: XCTestCase {
 		XCTAssertNoThrow(try totpCode(config, now: Date(timeIntervalSince1970: -100)))
 		XCTAssertTrue((1...30).contains(totpSecondsLeft(config, now: Date(timeIntervalSince1970: -100))))
 		XCTAssertEqual(totpSecondsLeft(config, now: Date(timeIntervalSince1970: 1e300)), 0)
+		// A period no link would give, but a stored item could hold.
+		let longest = TotpConfig(secret: "JBSWY3DPEHPK3PXP", period: .max)
+		XCTAssertTrue((1...Int.max).contains(totpSecondsLeft(longest, now: Date(timeIntervalSince1970: -100))))
+		XCTAssertTrue((1...Int.max).contains(totpSecondsLeft(longest)))
+		XCTAssertNoThrow(try totpCode(longest))
 	}
 }

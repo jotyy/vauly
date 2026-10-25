@@ -311,15 +311,21 @@ final class VectorTests: XCTestCase {
 		}
 	}
 
-	/// The limits table, which packages/crypto is checked against too. A case Swift can't
-	/// decode (an algorithm it doesn't know, a field missing) counts as refused.
+	/// The limits table, which packages/crypto is checked against too. Only an algorithm
+	/// Swift doesn't know may fail to decode, which refuses it as well.
 	func testKdfLimits() throws {
 		let cases = try XCTUnwrap(vectorsJson["kdfLimits"] as? [[String: Any]])
 		for limit in cases {
 			let why = limit["why"] as! String
-			let json = try JSONSerialization.data(withJSONObject: limit["settings"]!)
-			let settings = try? JSONDecoder().decode(KdfSettings.self, from: json)
-			XCTAssertEqual(settings.map(kdfAllowed) ?? false, limit["allowed"] as! Bool, why)
+			let fields = limit["settings"] as! [String: Any]
+			let allowed = limit["allowed"] as! Bool
+			let json = try JSONSerialization.data(withJSONObject: fields)
+			guard let settings = try? JSONDecoder().decode(KdfSettings.self, from: json) else {
+				XCTAssertEqual(fields["kdf"] as? String, "scrypt", "\(why) fails to decode")
+				XCTAssertFalse(allowed, why)
+				continue
+			}
+			XCTAssertEqual(kdfAllowed(settings), allowed, why)
 		}
 	}
 }

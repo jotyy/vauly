@@ -109,11 +109,12 @@ public struct KdfSettings: Codable, Equatable, Sendable {
 /// The most memory Argon2id may take, in KiB, by where it runs. iOS gives an AutoFill
 /// extension about 120 MiB in all and ends it, rather than failing an allocation, when it
 /// goes over, so the extension stops well short and leaves heavier accounts to the app.
+/// At 64 MiB, today's default, the extension prototype peaked at 88 MiB (#8).
 public enum Argon2Memory {
 	/// The app itself: all of vauly's range, up to 1 GiB.
 	public static let app = 1024 * 1024
 	/// The AutoFill extension.
-	public static let autoFill = 80 * 1024
+	public static let autoFill = 64 * 1024
 }
 
 /// vauly's limits, the same as packages/crypto's and the server's: PBKDF2 needs at least

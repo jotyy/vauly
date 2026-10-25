@@ -21,7 +21,7 @@ Everything unlocking and filling needs, each checked against `packages/crypto/te
 - **Checked settings:** the only way to derive is through `checkKdf`, which `checkedMasterKeys` and `unlockAccount` call first. It refuses:
   - key derivation outside vauly's limits, as `packages/crypto` does;
   - PBKDF2 for an account this device has seen on Argon2id (`argon2idSeen`, which the caller must give);
-  - Argon2id that needs more memory than the caller can spare (`memoryLimit`). The AutoFill extension passes `Argon2Memory.autoFill`, 80 MiB, and sends the person to the app on `overMemoryLimit`, since iOS ends an extension that goes over rather than failing the allocation.
+  - Argon2id that needs more memory than the caller can spare (`memoryLimit`). The AutoFill extension passes `Argon2Memory.autoFill`, 64 MiB (today's default, measured at an 88 MiB peak in the extension), and sends the person to the app on `overMemoryLimit`, since iOS ends an extension that goes over rather than failing the allocation.
 - **Refused rather than trusted:** JSON with a key twice in one object (`openJson`: the web app reads the last, `JSONDecoder` the first), one-time code settings outside 6 to 10 digits and 1 to 300 seconds, and device secrets or peppers that are too short.
 
 ## Tests

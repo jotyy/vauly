@@ -99,5 +99,7 @@ public func totpCode(_ config: TotpConfig, now: Date = Date()) throws -> String 
 public func totpSecondsLeft(_ config: TotpConfig, now: Date = Date()) -> Int {
 	guard config.period > 0, let seconds = Int(exactly: now.timeIntervalSince1970.rounded(.down))
 	else { return 0 }
-	return config.period - (seconds % config.period + config.period) % config.period
+	// Before 1970 the remainder is negative; adding the period to it never overflows.
+	let into = seconds % config.period
+	return config.period - (into < 0 ? into + config.period : into)
 }

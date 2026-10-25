@@ -3,12 +3,22 @@ import Foundation
 // JSONDecoder keeps the first of two equal keys in an object, and the web app's JSON.parse
 // the last, so one sealed JSON text could read one way on the web and another on iOS: a
 // website shown in one and filled in the other. openJson refuses such JSON instead.
+//
+// JSONDecoder also matches keys as Swift compares strings, by canonical equivalence, where
+// JavaScript compares code units: "K" spelt with U+212A KELVIN SIGN names a field in Swift
+// and none in JavaScript. So a key must already be in NFC, as the ASCII keys vauly writes
+// are; then comparing code units is the same as comparing canonically.
 
 private let malformed = VaulyKitError.malformed("JSON")
 
+private func isHexDigit(_ byte: UInt8) -> Bool {
+	(0x30...0x39).contains(byte) || (0x41...0x46).contains(byte) || (0x61...0x66).contains(byte)
+}
+
 /// Throws if an object anywhere in `json` has a key twice, with keys compared the way
-/// JavaScript compares them: as UTF-16 code units, once escapes are read. JSON this can't
-/// read is refused as well; JSONDecoder checks the rest (numbers and literals).
+/// JavaScript compares them: as UTF-16 code units, once escapes are read. A key not in NFC
+/// is refused, and so is JSON this can't read; JSONDecoder checks the rest (numbers and
+/// literals).
 func refuseDuplicateKeys(_ json: Data) throws {
 	var reader = KeyReader(bytes: [UInt8](json))
 	try reader.value(depth: 0)
@@ -57,7 +67,11 @@ private struct KeyReader {
 		}
 		while true {
 			guard try next() == UInt8(ascii: "\"") else { throw malformed }
-			guard keys.insert(try string()).inserted else {
+			let key = try string()
+			// Lone surrogates come back as U+FFFD, so they differ too.
+			let nfc = String(decoding: key, as: UTF16.self).precomposedStringWithCanonicalMapping
+			guard Array(nfc.utf16) == key else { throw VaulyKitError.malformed("JSON key") }
+			guard keys.insert(key).inserted else {
 				throw VaulyKitError.malformed("JSON with a key twice")
 			}
 			guard try next() == UInt8(ascii: ":") else { throw malformed }
@@ -115,7 +129,8 @@ private struct KeyReader {
 				case UInt8(ascii: "r"): units.append(0x0d)
 				case UInt8(ascii: "t"): units.append(0x09)
 				case UInt8(ascii: "u"):
-					guard at + 4 <= bytes.count,
+					// Exactly four hex digits: UInt16(_:radix:) alone would take a sign too.
+					guard at + 4 <= bytes.count, bytes[at..<at + 4].allSatisfy(isHexDigit),
 						let unit = UInt16(String(decoding: bytes[at..<at + 4], as: UTF8.self), radix: 16)
 					else { throw malformed }
 					units.append(unit)
