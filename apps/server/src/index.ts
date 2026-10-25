@@ -4,6 +4,7 @@ import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@vauly/api/routers/index";
+import { fromOwnPages, ownOrigins } from "@vauly/api/same-origin";
 import { APP_ORIGINS } from "@vauly/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -13,6 +14,7 @@ import { createContext } from "./context";
 import { demoGuard, isDemo, mountDemo, restore } from "./demo";
 import { resetDatabase } from "./e2e-reset";
 import { ENV } from "./env.server";
+
 import { createAuth, getDb, prepare } from "./services";
 
 const app = new Hono();
@@ -117,6 +119,21 @@ export const rpcHandler = new RPCHandler(appRouter, {
 });
 
 app.use("/*", async (c, next) => {
+	// The API acts on a session cookie only from the web app's own pages: another site's
+	// link, image or form gets the cookie sent along too (packages/api/src/same-origin.ts). The reference
+	// pages under /api-reference are read with GET, and its routes are all POSTs.
+	const path = new URL(c.req.url).pathname;
+	const api =
+		path === "/rpc" ||
+		path.startsWith("/rpc/") ||
+		(path.startsWith("/api-reference/") && c.req.method === "POST");
+	if (api && !fromOwnPages(c.req.raw, ownOrigins(c.req.url, ENV.CORS_ORIGIN))) {
+		return c.json(
+			{ message: "vauly's API takes a session cookie only from its own pages" },
+			403,
+		);
+	}
+
 	const context = await createContext({ context: c });
 
 	const rpcResult = await rpcHandler.handle(c.req.raw, {
