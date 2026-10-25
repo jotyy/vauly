@@ -4,7 +4,9 @@ import UIKit
 /// The web view the app runs vauly in, with vauly's own plugins added to Capacitor's bridge.
 class AppViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
+        Keychain.forgetAfterReinstall()
         bridge?.registerPluginInstance(SessionPlugin())
+        bridge?.registerPluginInstance(UnlockPlugin())
         // These take the place of two plugins Capacitor always registers; see RefusedPlugins.
         for name in ["CapacitorHttp", "CAPHttpPlugin"] {
             bridge?.registerPluginInstance(RefusedHttpPlugin(jsName: name))

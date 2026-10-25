@@ -1,5 +1,5 @@
 {
-  "originHash" : "8b1115bf8b66d448fab1e2a9f2b15fdf810b28e7976502e4aada015d3ed45eaf",
+  "originHash" : "675ef26cb3b3314c65aeeb74bd787796fdbc02fec6310c03433177cccc792294",
   "pins" : [
     {
       "identity" : "capacitor-swift-pm",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "4c7f346d16196e21fbe23d4a7a6fc7af62af6742",
         "version" : "8.5.3"
+      }
+    },
+    {
+      "identity" : "swift-sodium",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jedisct1/swift-sodium.git",
+      "state" : {
+        "revision" : "4f9164a0a2c9a6a7ff53a2833d54a5c79c957342",
+        "version" : "0.9.1"
       }
     }
   ],

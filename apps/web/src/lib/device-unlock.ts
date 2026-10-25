@@ -2,6 +2,7 @@ import {
 	type DeviceCopyContext,
 	deviceKey,
 	fromBase64,
+	importPrivateKey,
 	openDeviceCopy,
 	randomBytes,
 	sealDeviceCopy,
@@ -11,7 +12,7 @@ import {
 import { client } from "@/utils/orpc";
 
 import { objectStore } from "./idb";
-import { isNativeApp } from "./native";
+import { biometricUnlock, isNativeApp, type NativeCopy } from "./native";
 
 // Unlocking with a passkey on this device: Face ID, Touch ID, Windows Hello or the
 // device's PIN instead of the master password. Turning it on creates a passkey with the
@@ -19,6 +20,11 @@ import { isNativeApp } from "./native";
 // together make the key that seals a copy of the account's private key, kept here in
 // IndexedDB. The server never sees the PRF output or the passkey; once the session ends,
 // or after DEVICE_UNLOCK_DAYS, it stops handing out the pepper and the copy can't open.
+//
+// Inside the vauly app it's Face ID or Touch ID instead, with the same pepper: the app's
+// native side keeps a secret in the Keychain in place of the PRF output, seals the copy
+// there with VaulyKit, and opens it only after Face ID (apps/mobile, UnlockPlugin.swift).
+// The sealed copy and the secret never come out to the page.
 
 /** The server refuses the pepper for older copies; this only stops offering them. */
 export const DEVICE_UNLOCK_DAYS = 14;
@@ -41,11 +47,59 @@ export class DeviceUnlockUnavailable extends Error {
 }
 
 export const isCancel = (err: unknown) =>
-	err instanceof DOMException &&
-	(err.name === "NotAllowedError" || err.name === "AbortError");
+	(err instanceof DOMException &&
+		(err.name === "NotAllowedError" || err.name === "AbortError")) ||
+	// The app's Face ID or Touch ID, turned down.
+	nativeCode(err) === "CANCELLED";
+
+/** In the app: a face or finger added or removed since the copy was made, which ends it. */
+export const biometryChanged = (err: unknown) =>
+	nativeCode(err) === "INVALIDATED";
+
+/** In the app: Face ID locked after too many tries, until the iPhone's passcode is entered. */
+export const biometryLockedOut = (err: unknown) =>
+	nativeCode(err) === "LOCKED_OUT";
+
+/** In the app: Face ID can't be used just now, as when it's off for apps. The copy stays. */
+export const biometryUnavailable = (err: unknown) =>
+	nativeCode(err) === "UNAVAILABLE";
+
+/** In the app: a copy past DEVICE_UNLOCK_DAYS, which the app has deleted. */
+export const copyExpired = (err: unknown) => nativeCode(err) === "EXPIRED";
+
+const nativeCode = (err: unknown) =>
+	isNativeApp && err && typeof err === "object" && "code" in err
+		? err.code
+		: undefined;
 
 export const expiresAt = (record: DeviceUnlock) =>
 	new Date(record.issuedAt + DEVICE_UNLOCK_DAYS * 24 * 60 * 60_000);
+
+/** How this device unlocks without the master password. */
+export type UnlockMethod = "passkey" | "Face ID" | "Touch ID" | "Optic ID";
+
+/**
+ * What the interface calls it: "passkey", or the iPhone's own name for it. A copy made with
+ * Face ID that's since been turned off in the iPhone's settings still says Face ID.
+ */
+export const unlockName = (method: UnlockMethod | null): UnlockMethod =>
+	method ?? (isNativeApp ? "Face ID" : "passkey");
+
+/**
+ * This device's way, or null if it has none: a passkey in a browser that can use one,
+ * and in the app, whichever of Face ID, Touch ID or Optic ID the iPhone has set up.
+ */
+export async function deviceUnlockMethod(): Promise<UnlockMethod | null> {
+	if (!isNativeApp) return (await deviceUnlockSupported()) ? "passkey" : null;
+	const kind = await biometricUnlock?.biometry().then(
+		(biometry) => biometry.kind,
+		() => "none",
+	);
+	if (kind === "faceID") return "Face ID";
+	if (kind === "touchID") return "Touch ID";
+	if (kind === "opticID") return "Optic ID";
+	return null;
+}
 
 /** Whether to offer it: a platform authenticator that verifies the person, and PRF. */
 export async function deviceUnlockSupported() {
@@ -65,9 +119,24 @@ export async function deviceUnlockSupported() {
 	}
 }
 
+/** The app's copies, as records like the browser's, without the sealed key. */
+async function nativeRecords(): Promise<DeviceUnlock[]> {
+	const found = await biometricUnlock?.copies();
+	return (found?.copies ?? []).map((copy: NativeCopy) => ({
+		...copy,
+		credentialId: copy.credentialId ?? "",
+		prfSalt: "",
+		sealedPrivateKey: "",
+	}));
+}
+
 export async function readDeviceUnlock(
 	accountId: string,
 ): Promise<DeviceUnlock | null> {
+	if (isNativeApp) {
+		const records = await nativeRecords().catch(() => []);
+		return records.find((record) => record.accountId === accountId) ?? null;
+	}
 	try {
 		const found = await request<DeviceUnlock | undefined>("readonly", (store) =>
 			store.get(accountId),
@@ -82,9 +151,20 @@ export async function readDeviceUnlock(
  * Deletes this device's copies, every one or those `which` picks, and tells the passkey
  * provider their passkeys are no longer used.
  */
+const every = () => true;
+
 export async function forgetDeviceUnlocks(
-	which: (record: DeviceUnlock) => boolean = () => true,
+	which: (record: DeviceUnlock) => boolean = every,
 ) {
+	if (isNativeApp) {
+		// Every one: the app deletes them all, even any that no longer read.
+		if (which === every) return biometricUnlock?.forget();
+		const records = await nativeRecords().catch(() => []);
+		for (const record of records.filter(which)) {
+			await biometricUnlock?.forget({ accountId: record.accountId });
+		}
+		return;
+	}
 	try {
 		const records = await request<DeviceUnlock[]>("readonly", (store) =>
 			store.getAll(),
@@ -122,6 +202,7 @@ export function startEnrolment(
 	},
 	privateKeyPkcs8: Uint8Array,
 ): Enrolment {
+	if (isNativeApp) return startBiometricEnrolment(account, privateKeyPkcs8);
 	// A fresh user handle each time, so passkeys from two devices never replace each other.
 	const userHandle = randomBytes(16);
 	const prfSalt = randomBytes(32);
@@ -208,6 +289,36 @@ export function startEnrolment(
 }
 
 /**
+ * In the app: the server's pepper for a new copy, then the app seals the private key
+ * after Face ID. One step, since Face ID needs no tap of its own; a cancelled Face ID
+ * keeps the key, to try again, until the dialog closes.
+ */
+function startBiometricEnrolment(
+	account: { id: string; publicKey: string; sessionId: string },
+	privateKeyPkcs8: Uint8Array,
+): Enrolment {
+	return {
+		async create() {
+			const unlock = biometricUnlock;
+			if (!unlock) throw new DeviceUnlockUnavailable();
+			const { issuedAt, pepper } = await client.account.devicePepper({});
+			await unlock.turnOn({
+				accountId: account.id,
+				publicKey: account.publicKey,
+				sessionId: account.sessionId,
+				issuedAt,
+				pepper,
+				privateKey: toBase64(privateKeyPkcs8),
+			});
+			privateKeyPkcs8.fill(0);
+			return "done";
+		},
+		async confirm() {},
+		cancel: () => privateKeyPkcs8.fill(0),
+	};
+}
+
+/**
  * Asks for the passkey, then the server's pepper, and opens the private key. The account
  * comes from the server, not from this device's storage, so a copy only opens for it.
  */
@@ -215,6 +326,26 @@ export async function unlockWithDevice(
 	record: DeviceUnlock,
 	account: { id: string; publicKey: string },
 ) {
+	if (isNativeApp) {
+		const unlock = biometricUnlock;
+		if (!unlock) throw new DeviceUnlockUnavailable();
+		// The pepper first: without the session or a connection, Face ID isn't asked for
+		// nothing. The app checks the key inside against the account's public key.
+		const { pepper } = await client.account.devicePepper({
+			issuedAt: record.issuedAt,
+		});
+		const { privateKey } = await unlock.unlock({
+			accountId: account.id,
+			publicKey: account.publicKey,
+			pepper,
+		});
+		const pkcs8 = fromBase64(privateKey);
+		try {
+			return await importPrivateKey(pkcs8);
+		} finally {
+			pkcs8.fill(0);
+		}
+	}
 	// The passkey first, so its prompt starts right in the tap.
 	const output = await prfOutput(
 		record.credentialId,

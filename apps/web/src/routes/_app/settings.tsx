@@ -20,7 +20,7 @@ import { Skeleton } from "@vauly/ui/components/skeleton";
 import { Switch } from "@vauly/ui/components/switch";
 import { Tabs, TabsList, TabsTrigger } from "@vauly/ui/components/tabs";
 import { useTheme } from "next-themes";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { switchVauly } from "@/components/connect-screen";
@@ -45,7 +45,7 @@ import {
 	setBreachCheck,
 	useBreachCheck,
 } from "@/lib/breaches";
-import { deviceUnlockSupported } from "@/lib/device-unlock";
+import { unlockName } from "@/lib/device-unlock";
 import { openEmergencyKit } from "@/lib/emergency-kit";
 import { fileSize, useFileUsage } from "@/lib/files";
 import { ago, plural, timeLeft } from "@/lib/format";
@@ -89,14 +89,10 @@ function Settings() {
 	const [exporting, setExporting] = useState(false);
 	const [twoStep, setTwoStep] = useState<"on" | "off" | null>(null);
 	const [passkey, setPasskey] = useState(false);
-	const [passkeySupported, setPasskeySupported] = useState(false);
 	const logosShown = useLogosShown();
 	const offlineCopy = useOfflineCopy();
 	const breachCheck = useBreachCheck();
-
-	useEffect(() => {
-		deviceUnlockSupported().then(setPasskeySupported);
-	}, []);
+	const unlockWay = unlockName(keyring.deviceUnlockMethod);
 	const me = keyring.me;
 	if (!me) return null;
 	const isAdmin = me.role !== "member";
@@ -205,24 +201,40 @@ function Settings() {
 						</Button>
 					</Row>
 				)}
-				{(passkeySupported || keyring.deviceUnlock) && (
+				{(keyring.deviceUnlockMethod || keyring.deviceUnlock) && (
 					<Row
-						label="Unlock with this device"
+						label={
+							unlockWay === "passkey"
+								? "Unlock with this device"
+								: `Unlock with ${unlockWay}`
+						}
 						hint={
-							keyring.deviceUnlockUntil
-								? `Face ID, Touch ID, Windows Hello or this device's PIN instead of the master password, here only. It asks for the master password again ${timeLeft(keyring.deviceUnlockUntil)}.`
-								: "Face ID, Touch ID, Windows Hello or this device's PIN instead of the master password, here only, for 14 days at a time. Signing in still needs the master password."
+							unlockWay === "passkey"
+								? keyring.deviceUnlockUntil
+									? `Face ID, Touch ID, Windows Hello or this device's PIN instead of the master password, here only. It asks for the master password again ${timeLeft(keyring.deviceUnlockUntil)}.`
+									: "Face ID, Touch ID, Windows Hello or this device's PIN instead of the master password, here only, for 14 days at a time. Signing in still needs the master password."
+								: keyring.deviceUnlockUntil
+									? `${unlockWay} instead of the master password, on this iPhone only. It asks for the master password again ${timeLeft(keyring.deviceUnlockUntil)}.`
+									: `${unlockWay} instead of the master password, on this iPhone only, for 14 days at a time. Signing in still needs the master password.`
 						}
 					>
 						<Switch
-							aria-label="Unlock with this device"
+							aria-label={
+								unlockWay === "passkey"
+									? "Unlock with this device"
+									: `Unlock with ${unlockWay}`
+							}
 							checked={keyring.deviceUnlock}
 							onCheckedChange={async (on) => {
 								if (on) return setPasskey(true);
 								await keyring.turnOffDeviceUnlock();
 								notify.success(
-									"Unlocking with a passkey is off",
-									"This device asks for the master password again.",
+									unlockWay === "passkey"
+										? "Unlocking with a passkey is off"
+										: `Unlocking with ${unlockWay} is off`,
+									unlockWay === "passkey"
+										? "This device asks for the master password again."
+										: "This iPhone asks for the master password again.",
 								);
 							}}
 						/>

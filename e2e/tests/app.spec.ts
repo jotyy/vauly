@@ -1,7 +1,14 @@
-import { devices, expect, type Page, test } from "@playwright/test";
+import { devices, expect, test } from "@playwright/test";
 import { parseTotp, totpCode } from "@vauly/crypto";
 
 import { API_URL, WEB_PORT } from "../playwright.config";
+import {
+	ADDRESS,
+	asTheApp,
+	connect,
+	keychain,
+	signInToTheApp,
+} from "./app-helpers";
 import {
 	createWorkspace,
 	openUserMenu,
@@ -10,11 +17,8 @@ import {
 	signIn as signInInBrowser,
 } from "./helpers";
 
-// The vauly app for iPhone runs this web app in a WebView, which here is Chromium with a
-// stand-in for what the app adds: Capacitor's bridge, and the app's plugin that keeps its
-// session in the Keychain, here in sessionStorage so it outlives the app's reloads. The
-// real app's page has another origin than the API, so the API's CORS gets a check of its
-// own below.
+// The vauly app for iPhone, stood in for in Chromium (app-helpers.ts). The real app's page
+// has another origin than the API, so the API's CORS gets a check of its own below.
 
 test.describe.configure({ mode: "serial" });
 test.use({
@@ -24,9 +28,7 @@ test.use({
 });
 
 const oneWorker = Boolean(process.env.VAULY_E2E_ONE_WORKER);
-/** The address someone opens this vauly at, which they give the app. */
-const ADDRESS = `http://localhost:${WEB_PORT}`;
-/** Its API, which the app keeps from when it connects. */
+/** The vauly's API, which the app keeps from when it connects. */
 const API = oneWorker ? ADDRESS : API_URL;
 const APP = "capacitor://localhost";
 
@@ -38,76 +40,6 @@ test.beforeAll(async ({ browser, request }) => {
 	await createWorkspace(desktop);
 	await desktop.close();
 });
-
-/** Makes the page the app: a debug build, which may use a vauly on this computer. */
-async function asTheApp(page: Page, { debug = true } = {}) {
-	await page.addInitScript((debug: boolean) => {
-		const key = "e2e.keychain";
-		// What a debug build's page says about itself (apps/mobile/scripts/copy-web.ts),
-		// once the page has a root to say it in.
-		if (debug) {
-			const say = () => {
-				const meta = document.createElement("meta");
-				meta.name = "vauly-build";
-				meta.content = "debug";
-				document.documentElement.append(meta);
-			};
-			if (document.documentElement) say();
-			else
-				new MutationObserver((_, observer) => {
-					if (!document.documentElement) return;
-					observer.disconnect();
-					say();
-				}).observe(document, { childList: true });
-		}
-		Object.assign(window, {
-			Capacitor: {
-				isNativePlatform: () => true,
-				getPlatform: () => "ios",
-				Plugins: {
-					VaulySession: {
-						get: async () => JSON.parse(sessionStorage.getItem(key) ?? "{}"),
-						set: async (session: object) =>
-							sessionStorage.setItem(key, JSON.stringify(session)),
-						clear: async () => sessionStorage.removeItem(key),
-					},
-				},
-			},
-		});
-	}, debug);
-}
-
-const keychain = (page: Page) =>
-	page.evaluate(
-		() =>
-			JSON.parse(sessionStorage.getItem("e2e.keychain") ?? "{}") as {
-				address?: string;
-				server?: string;
-				token?: string;
-			},
-	);
-
-async function connect(page: Page) {
-	await page.goto("/");
-	await page.getByLabel("Address").fill(ADDRESS);
-	await page.getByRole("button", { name: "Connect" }).click();
-	await expect(
-		page.getByRole("heading", { name: `Sign in to ${owner.workspace}` }),
-	).toBeVisible();
-}
-
-async function signIn(page: Page, code?: () => Promise<string>) {
-	await page.getByLabel("Email").fill(owner.email);
-	await page.getByLabel("Master password").fill(owner.password);
-	await page.getByRole("button", { name: "Sign in" }).click();
-	if (code) {
-		await page
-			.getByLabel("Code from your authenticator app")
-			.fill(await code());
-		await page.getByRole("button", { name: "Continue" }).click();
-	}
-	await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
-}
 
 test("the app asks which vauly to use before anything else", async ({
 	page,
@@ -182,7 +114,7 @@ test("it signs in with a bearer token and keeps no cookie", async ({
 }) => {
 	await asTheApp(page);
 	await connect(page);
-	await signIn(page);
+	await signInToTheApp(page);
 	// The token as the API signs it, in its set-auth-token header: token.signature.
 	const { token } = await keychain(page);
 	expect(token).toMatch(/^[^.]+\.[^.]+$/);
@@ -202,7 +134,7 @@ test("signing out keeps the vauly, and another vauly starts over", async ({
 }) => {
 	await asTheApp(page);
 	await connect(page);
-	await signIn(page);
+	await signInToTheApp(page);
 	await page
 		.getByRole("navigation", { name: "Main" })
 		.getByRole("link", { name: "Settings" })
@@ -225,7 +157,7 @@ test("an API that moves gets nothing until the app connects again", async ({
 }) => {
 	await asTheApp(page);
 	await connect(page);
-	await signIn(page);
+	await signInToTheApp(page);
 	// The vauly names another API from now on, as one whose host was taken over might.
 	const settings = await (
 		await page.request.get(`${ADDRESS}/vauly.json`)
@@ -286,7 +218,7 @@ test("two-step login works in the app", async ({ browser, page }) => {
 	await asTheApp(page);
 	await connect(page);
 	// The next time step's code: the one that turned it on is used up.
-	await signIn(page, () => totpCode(config, Date.now() + 30_000));
+	await signInToTheApp(page, () => totpCode(config, Date.now() + 30_000));
 	expect((await keychain(page)).token).toBeTruthy();
 });
 

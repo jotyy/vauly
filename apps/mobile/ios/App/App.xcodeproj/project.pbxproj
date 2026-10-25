@@ -18,7 +18,10 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		69A09CEC71B0DD280E01395F /* SessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67AC1C1DE8BD00653F38E63F /* SessionPlugin.swift */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		B7C9E214024AFAA365193777 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718A8A13C955AB570A9270CC /* Keychain.swift */; };
 		C17E069304B1CDF42587713C /* AppViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9641F640F8B807610BC507A2 /* AppViewController.swift */; };
+		D8B95D83EBE2B2F5F6C90B8B /* VaulyKit in Frameworks */ = {isa = PBXBuildFile; productRef = ACC96221F9FBACDC9C9D650E /* VaulyKit */; };
+		F4C1B012FE95B66860E9E2EC /* UnlockPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0F1CD1C7D295F16E0ACF0A8 /* UnlockPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,9 +36,12 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		5E3FC52010CC5692099556FB /* RefusedPlugins.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RefusedPlugins.swift; sourceTree = "<group>"; };
 		67AC1C1DE8BD00653F38E63F /* SessionPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionPlugin.swift; sourceTree = "<group>"; };
+		6EBFCE1D31BD31421B9B0534 /* App.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		718A8A13C955AB570A9270CC /* Keychain.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		9641F640F8B807610BC507A2 /* AppViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppViewController.swift; sourceTree = "<group>"; };
+		E0F1CD1C7D295F16E0ACF0A8 /* UnlockPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UnlockPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +50,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+				D8B95D83EBE2B2F5F6C90B8B /* VaulyKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -82,6 +89,9 @@
 				9641F640F8B807610BC507A2 /* AppViewController.swift */,
 				67AC1C1DE8BD00653F38E63F /* SessionPlugin.swift */,
 				5E3FC52010CC5692099556FB /* RefusedPlugins.swift */,
+				718A8A13C955AB570A9270CC /* Keychain.swift */,
+				E0F1CD1C7D295F16E0ACF0A8 /* UnlockPlugin.swift */,
+				6EBFCE1D31BD31421B9B0534 /* App.entitlements */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -104,6 +114,7 @@
 			name = App;
 			packageProductDependencies = (
 				4D22ABE82AF431CB00220026 /* CapApp-SPM */,
+				ACC96221F9FBACDC9C9D650E /* VaulyKit */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -136,6 +147,7 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
+				264BBBC052D492DEFFC18293 /* XCLocalSwiftPackageReference "VaulyKit" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -172,6 +184,8 @@
 				C17E069304B1CDF42587713C /* AppViewController.swift in Sources */,
 				69A09CEC71B0DD280E01395F /* SessionPlugin.swift in Sources */,
 				0EF0CFD3FC9E1CEA6C7A834A /* RefusedPlugins.swift in Sources */,
+				B7C9E214024AFAA365193777 /* Keychain.swift in Sources */,
+				F4C1B012FE95B66860E9E2EC /* UnlockPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,6 +325,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -333,6 +348,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -374,6 +390,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		264BBBC052D492DEFFC18293 /* XCLocalSwiftPackageReference "VaulyKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../../native/VaulyKit;
+		};
 		D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "CapApp-SPM";
@@ -385,6 +405,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
+		};
+		ACC96221F9FBACDC9C9D650E /* VaulyKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 264BBBC052D492DEFFC18293 /* XCLocalSwiftPackageReference "VaulyKit" */;
+			productName = VaulyKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
