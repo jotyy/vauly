@@ -9,15 +9,19 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 - Turning on two-step login now tells the account's other devices, the ones it signs out, if they have notifications on. The notification names the device that turned it on, and says, if it wasn't you, to ask the workspace's owner or an admin to reset your two-step login and then change your master password.
 - A release now sends the extension to the Chrome Web Store by itself: its tag uploads the new version and submits it for review, and the store publishes it once the review passes.
 
-### Changed
-
-- **Sign-in is harder to guess at.** One address gets a run of ten sign-ins, then waits a minute, counted across the whole server. After three wrong two-step codes in a row, an account's next sign-in waits five seconds, then twice as long after each wrong one, up to five minutes, and a right one starts the count again; the master password and the codes checked inside a session are counted apart, so guessing codes at sign-in never holds up a session that's already open, and nothing locks the account. The browser extension's session token now counts only with its signature, like the web app's cookie. A migration adds the counts; see [Updating from 0.2.1](docs/updating.md#updating-from-021).
-
 ### Fixed
 
 - On an iPhone, tapping a field no longer zooms the page in and leaves it zoomed: fields use 16px text on touch screens. The app fills the screen around the notch and the home indicator when it's installed.
 - When the device is online but vauly's server doesn't answer, messages name the server instead of saying you're offline, and an error page from in front of the server says so.
 - On a narrow screen, a notification about a long name keeps its first word whole, as in "Saved", and shortens the name instead. It used to cut both.
+
+## 0.2.2 - 2026-10-25
+
+Limits on how often sign-in and two-step codes can be tried, and session tokens that count only with their signature. A migration runs on its own; read [Updating vauly](docs/updating.md#updating-from-021).
+
+### Changed
+
+- **Sign-in is harder to guess at.** One address gets a run of ten sign-ins, then waits a minute, counted across the whole server. After three wrong two-step codes in a row, an account's next sign-in waits five seconds, then twice as long after each wrong one, up to five minutes, and a right one starts the count again; the master password and the codes checked inside a session are counted apart, so guessing codes at sign-in never holds up a session that's already open, and nothing locks the account. The browser extension's session token now counts only with its signature, like the web app's cookie. A migration adds the counts; see [Updating from 0.2.1](docs/updating.md#updating-from-021).
 
 ## 0.2.1 - 2026-10-25
 

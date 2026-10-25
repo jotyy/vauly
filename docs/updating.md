@@ -10,7 +10,7 @@ New versions of vauly are [releases on GitHub](https://github.com/jotyy/vauly/re
 ## Update the server
 
 **A copy made with the Deploy to Cloudflare button:** in your copy of vauly on GitHub, open **Actions → Update vauly → Run workflow**. It replaces the files with the latest release of vauly and pushes, and Cloudflare builds and deploys it.
-- **Another version.** In the **version** box, a release such as `v0.2.1` takes that one. `next` takes vauly's development branch, which has changes that aren't released yet.
+- **Another version.** In the **version** box, a release such as `v0.2.2` takes that one. `next` takes vauly's development branch, which has changes that aren't released yet.
 - **Never backwards.** It never moves a copy back to an older version, since database migrations can't be undone, and it does nothing when the copy is already on the version you asked for.
 - **What it keeps.**
   - `wrangler.jsonc`, which names your Worker and its database. When an update needs a change there, the notes below say so.
@@ -18,11 +18,11 @@ New versions of vauly are [releases on GitHub](https://github.com/jotyy/vauly/re
 
 If the run says "Updated to jotyy/vauly@…" with no version, your copy still has the workflow from before releases. See [Copies whose Update vauly takes main](#copies-whose-update-vauly-takes-main).
 
-**Deployed from your machine:** check out the [latest release](https://github.com/jotyy/vauly/releases/latest), for example `v0.2.1`, then build and deploy:
+**Deployed from your machine:** check out the [latest release](https://github.com/jotyy/vauly/releases/latest), for example `v0.2.2`, then build and deploy:
 
 ```sh
 git fetch --tags
-git checkout v0.2.1
+git checkout v0.2.2
 bun install
 bun run build
 bun run deploy
@@ -59,7 +59,8 @@ A copy on 0.1.0 then moves to the latest release. A copy that already took main 
 
 ### Updating from 0.2.1
 
-**Limits on tries:** nothing to do. A migration adds a table that counts recent sign-ins by address, and columns that count each account's wrong codes and master passwords in a row ([Security](security.md#keys) has the limits). Everyone stays signed in, the browser extension too. Going back to an earlier 0.2 is safe: it leaves the table and the columns alone.
+**Limits on tries:** nothing to do. A migration adds a table that counts recent requests to the sign-in and session routes by address, and columns that count each account's wrong codes and master passwords in a row ([Security](security.md#keys) has the limits). Everyone stays signed in, the browser extension too. Going back to an earlier 0.2 is safe: it leaves the table and the columns alone.
+
 ### Updating from 0.2.0
 
 Nothing to do on the server: 0.2.1 has no migrations, and everything carries over. Update the browser extension too, since most of the changes are in it. One change people may notice: the menu inside a page offers a login only on the address it was saved for, with or without `www.`. On another address of the same site, such as a sign-in page on a subdomain, the login is in the extension's popup, which names the address it was saved for.
