@@ -9,9 +9,8 @@ import { Toaster } from "@vauly/ui/components/sonner";
 import { TooltipProvider } from "@vauly/ui/components/tooltip";
 import type { CSSProperties } from "react";
 
-import { ConnectScreen } from "@/components/connect-screen";
+import { appGate } from "@/components/connect-screen";
 import { ThemeProvider } from "@/components/theme-provider";
-import { appAddress } from "@/lib/app-session";
 import { KeyringProvider } from "@/lib/keyring";
 import { isNativeApp } from "@/lib/native";
 import type { orpc } from "@/utils/orpc";
@@ -58,10 +57,8 @@ function RootComponent() {
 				disableTransitionOnChange
 				storageKey="vauly-theme"
 			>
-				{/* The vauly app asks which vauly to use before anything else. */}
-				{isNativeApp && !appAddress() ? (
-					<ConnectScreen />
-				) : (
+				{/* In the app: which vauly to use, before anything else (connect-screen.tsx). */}
+				{appGate() ?? (
 					<KeyringProvider>
 						<TooltipProvider delay={300}>
 							<Outlet />

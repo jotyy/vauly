@@ -5,8 +5,9 @@
 // the device, to start without a connection.
 
 import { appConnectPolicy } from "../security-headers";
-import { loadAppSession } from "./lib/app-session";
-import { isNativeApp } from "./lib/native";
+import { disconnectApp, loadAppSession } from "./lib/app-session";
+import { allowedOrigin } from "./lib/connect";
+import { isDebugApp, isNativeApp } from "./lib/native";
 
 export type InstanceConfig = {
 	/** The API's address; empty when the app and the API share one origin. */
@@ -52,23 +53,47 @@ function parse(value: unknown): InstanceConfig {
 	};
 }
 
+/** In the app, when its vauly now names another API than when the person connected. */
+export type ApiMoved = { address: string; kept: string; named: string };
+let moved: ApiMoved | null = null;
+
 /**
  * Reads /vauly.json, or the last copy of it when the server can't be reached. Inside the
- * vauly app, it's the one at the address the person connected the app to, which is the
- * API's too unless it names another. Until they've named one there's nothing to read, and
- * the app asks for it (components/connect-screen.tsx).
+ * vauly app, it's the one at the address the person connected the app to, and the API is
+ * the one kept from when they connected: if vauly.json names another now, the app sends
+ * nothing until they connect again (components/connect-screen.tsx). Until they've named a
+ * vauly there's nothing to read, and the app asks for it.
  */
 export async function loadConfig() {
-	const address = isNativeApp
-		? ((await loadAppSession())?.address ?? null)
-		: "";
-	if (address === null) return;
-	current = await readConfig(address);
-	if (address) {
-		current = { ...current, server: current.server || address };
-		limitConnections(address);
+	if (!isNativeApp) {
+		current = await readConfig("");
+		return;
 	}
+	const session = await loadAppSession();
+	if (!session) return;
+	const { address, server } = session;
+	// A debug build's plain-http address, in a release build: connect again.
+	if (!allowedOrigin(new URL(server), { local: isDebugApp })) {
+		await disconnectApp();
+		return;
+	}
+	current = await readConfig(address);
+	const named = current.server || address;
+	if (originOf(named) !== server) moved = { address, kept: server, named };
+	current = { ...current, server };
+	limitConnections(address);
 }
+
+const originOf = (address: string) => {
+	try {
+		return new URL(address).origin;
+	} catch {
+		return address;
+	}
+};
+
+/** The API's move that stops the app, if there is one. */
+export const apiMoved = () => moved;
 
 async function readConfig(address: string) {
 	try {

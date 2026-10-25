@@ -17,10 +17,18 @@ describe("addressOf", () => {
 		);
 	});
 
-	test("allows plain http only for this computer", () => {
-		expect(addressOf("http://localhost:3000")).toBe("http://localhost:3000");
-		expect(addressOf("http://127.0.0.1:3000")).toBe("http://127.0.0.1:3000");
-		expect(() => addressOf("http://vault.example.test")).toThrow(
+	test("allows plain http only to this computer, and only in a debug build", () => {
+		const local = { local: true };
+		expect(addressOf("http://localhost:3000", local)).toBe(
+			"http://localhost:3000",
+		);
+		expect(addressOf("http://127.0.0.1:3000", local)).toBe(
+			"http://127.0.0.1:3000",
+		);
+		expect(() => addressOf("http://localhost:3000")).toThrow(
+			"vauly needs an https:// address.",
+		);
+		expect(() => addressOf("http://vault.example.test", local)).toThrow(
 			"vauly needs an https:// address.",
 		);
 		expect(() => addressOf("ftp://vault.example.test")).toThrow(AddressError);
@@ -66,11 +74,13 @@ describe("checkAddress", () => {
 	const settings = (body: object) =>
 		Response.json({ server: "", version: "0.3.0", ...body });
 
-	test("passes a vauly that lets the app in", async () => {
+	test("passes a vauly that lets the app in, and its API is itself", async () => {
 		const asked = serve({
 			"https://vault.example.test/vauly.json": settings({ server: "" }),
 		});
-		await checkAddress("https://vault.example.test");
+		expect(await checkAddress("https://vault.example.test")).toBe(
+			"https://vault.example.test",
+		);
 		expect(asked).toEqual(["https://vault.example.test/vauly.json"]);
 	});
 
@@ -83,11 +93,25 @@ describe("checkAddress", () => {
 				server: "https://api.example.test",
 			}),
 		});
-		await checkAddress("https://vault.example.test");
+		expect(await checkAddress("https://vault.example.test")).toBe(
+			"https://api.example.test",
+		);
 		expect(asked).toEqual([
 			"https://vault.example.test/vauly.json",
 			"https://api.example.test/vauly.json",
 		]);
+	});
+
+	test("refuses an API that isn't https", async () => {
+		const asked = serve({
+			"https://vault.example.test/vauly.json": settings({
+				server: "http://api.example.test",
+			}),
+		});
+		await expect(checkAddress("https://vault.example.test")).rejects.toThrow(
+			"vault.example.test names an API that isn't https: api.example.test.",
+		);
+		expect(asked).toEqual(["https://vault.example.test/vauly.json"]);
 	});
 
 	test("says when a server answers but isn't a vauly", async () => {

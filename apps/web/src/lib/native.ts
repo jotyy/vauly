@@ -17,8 +17,12 @@ type Bridge = {
 		};
 		/** The app's own plugin (apps/mobile): its session, kept in the Keychain. */
 		VaulySession?: {
-			get(): Promise<{ address?: string; token?: string }>;
-			set(session: { address: string; token?: string }): Promise<void>;
+			get(): Promise<{ address?: string; server?: string; token?: string }>;
+			set(session: {
+				address: string;
+				server: string;
+				token?: string;
+			}): Promise<void>;
 			clear(): Promise<void>;
 		};
 	};
@@ -28,6 +32,16 @@ const bridge = (globalThis as { Capacitor?: Bridge }).Capacitor;
 
 /** Whether this is the vauly app, rather than a browser. */
 export const isNativeApp = bridge?.isNativePlatform() ?? false;
+
+/**
+ * Whether it's a debug build of the app, which may connect to a vauly on this computer
+ * over plain http. A debug build serves a page that says so (apps/mobile); its policy is
+ * also what lets it, and a release build's page holds it to https. Capacitor's own DEBUG
+ * can't tell: its prebuilt framework says debug in a release build too.
+ */
+export const isDebugApp =
+	isNativeApp &&
+	document.querySelector('meta[name="vauly-build"][content="debug"]') !== null;
 
 /** Where the app keeps which vauly it's connected to, and its session there. */
 export const sessionStore = bridge?.Plugins.VaulySession;

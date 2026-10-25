@@ -26,6 +26,8 @@ test.use({
 const oneWorker = Boolean(process.env.VAULY_E2E_ONE_WORKER);
 /** The address someone opens this vauly at, which they give the app. */
 const ADDRESS = `http://localhost:${WEB_PORT}`;
+/** Its API, which the app keeps from when it connects. */
+const API = oneWorker ? ADDRESS : API_URL;
 const APP = "capacitor://localhost";
 
 test.beforeAll(async ({ browser, request }) => {
@@ -37,9 +39,27 @@ test.beforeAll(async ({ browser, request }) => {
 	await desktop.close();
 });
 
-async function asTheApp(page: Page) {
-	await page.addInitScript(() => {
+/** Makes the page the app: a debug build, which may use a vauly on this computer. */
+async function asTheApp(page: Page, { debug = true } = {}) {
+	await page.addInitScript((debug: boolean) => {
 		const key = "e2e.keychain";
+		// What a debug build's page says about itself (apps/mobile/scripts/copy-web.ts),
+		// once the page has a root to say it in.
+		if (debug) {
+			const say = () => {
+				const meta = document.createElement("meta");
+				meta.name = "vauly-build";
+				meta.content = "debug";
+				document.documentElement.append(meta);
+			};
+			if (document.documentElement) say();
+			else
+				new MutationObserver((_, observer) => {
+					if (!document.documentElement) return;
+					observer.disconnect();
+					say();
+				}).observe(document, { childList: true });
+		}
 		Object.assign(window, {
 			Capacitor: {
 				isNativePlatform: () => true,
@@ -54,7 +74,7 @@ async function asTheApp(page: Page) {
 				},
 			},
 		});
-	});
+	}, debug);
 }
 
 const keychain = (page: Page) =>
@@ -62,6 +82,7 @@ const keychain = (page: Page) =>
 		() =>
 			JSON.parse(sessionStorage.getItem("e2e.keychain") ?? "{}") as {
 				address?: string;
+				server?: string;
 				token?: string;
 			},
 	);
@@ -132,7 +153,7 @@ test("the app asks which vauly to use before anything else", async ({
 	await expect(
 		page.getByText(`Connected to localhost:${WEB_PORT}.`),
 	).toBeVisible();
-	expect(await keychain(page)).toEqual({ address: ADDRESS });
+	expect(await keychain(page)).toEqual({ address: ADDRESS, server: API });
 	// Once it knows, the page may connect only to that vauly and its API.
 	const policies = await page
 		.locator('meta[http-equiv="Content-Security-Policy"]')
@@ -140,6 +161,19 @@ test("the app asks which vauly to use before anything else", async ({
 	expect(policies.at(-1)).toContain(
 		`connect-src 'self' ${ADDRESS}${oneWorker ? "" : ` ${API_URL}`}`,
 	);
+});
+
+test("a release build takes no plain http, not even to this computer", async ({
+	page,
+}) => {
+	await asTheApp(page, { debug: false });
+	await page.goto("/");
+	await page.getByLabel("Address").fill(ADDRESS);
+	await page.getByRole("button", { name: "Connect" }).click();
+	await expect(page.getByRole("alert")).toHaveText(
+		"vauly needs an https:// address.",
+	);
+	expect(await keychain(page)).toEqual({});
 });
 
 test("it signs in with a bearer token and keeps no cookie", async ({
@@ -177,13 +211,55 @@ test("signing out keeps the vauly, and another vauly starts over", async ({
 	await expect(
 		page.getByRole("heading", { name: `Sign in to ${owner.workspace}` }),
 	).toBeVisible();
-	expect(await keychain(page)).toEqual({ address: ADDRESS });
+	expect(await keychain(page)).toEqual({ address: ADDRESS, server: API });
 
 	await page.getByRole("button", { name: "Use another vauly" }).click();
 	await expect(
 		page.getByRole("heading", { name: "Connect to your vauly" }),
 	).toBeVisible();
 	expect(await keychain(page)).toEqual({});
+});
+
+test("an API that moves gets nothing until the app connects again", async ({
+	page,
+}) => {
+	await asTheApp(page);
+	await connect(page);
+	await signIn(page);
+	// The vauly names another API from now on, as one whose host was taken over might.
+	const settings = await (
+		await page.request.get(`${ADDRESS}/vauly.json`)
+	).json();
+	await page.route("**/vauly.json", (route) =>
+		route.fulfill({
+			json: { ...settings, server: "https://elsewhere.example.test" },
+		}),
+	);
+	const sent: string[] = [];
+	page.on("request", (request) => {
+		const url = request.url();
+		if (
+			url.includes("elsewhere.example.test") ||
+			/\/(rpc|api\/auth)\//.test(url)
+		)
+			sent.push(url);
+	});
+	await page.reload();
+	await expect(
+		page.getByRole("heading", { name: "Your vauly changed its API" }),
+	).toBeVisible();
+	await expect(page.getByText("elsewhere.example.test")).toBeVisible();
+	await expect(
+		page.getByText(new URL(API).host, { exact: true }),
+	).toBeVisible();
+	expect(sent).toEqual([]);
+
+	await page.getByRole("button", { name: "Connect again" }).click();
+	await expect(
+		page.getByRole("heading", { name: "Connect to your vauly" }),
+	).toBeVisible();
+	expect(await keychain(page)).toEqual({});
+	expect(sent).toEqual([]);
 });
 
 test("two-step login works in the app", async ({ browser, page }) => {
@@ -257,4 +333,19 @@ test("the API lets the app in without credentials, and no other origin", async (
 	});
 	expect(withCookie.status()).toBe(403);
 	expect(withCookie.headers()["access-control-allow-origin"]).toBeUndefined();
+	// However the origin is spelled, and wherever it's named, a cookie isn't trusted with it:
+	// the API refuses the first; Better Auth, which falls back on the Referer, the second.
+	const capitals = await request.post(`${API_URL}/api/auth/sign-out`, {
+		headers: { Origin: "Capacitor://LOCALHOST", Cookie: "session=anything" },
+	});
+	expect(capitals.status()).toBe(403);
+	const referer = await request.post(`${API_URL}/api/auth/sign-out`, {
+		headers: {
+			Referer: `${APP}/`,
+			Cookie: "better-auth.session_token=anything",
+		},
+		data: {},
+	});
+	expect(referer.status()).toBe(403);
+	expect((await referer.json()).code).toBe("INVALID_ORIGIN");
 });

@@ -1,5 +1,6 @@
+import { Button } from "@vauly/ui/components/button";
 import { Input } from "@vauly/ui/components/input";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
 	AuthLayout,
@@ -7,9 +8,30 @@ import {
 	FormError,
 	SubmitButton,
 } from "@/components/auth-layout";
-import { appAddress, connectApp, disconnectApp } from "@/lib/app-session";
+import { apiMoved } from "@/config";
+import {
+	appAddress,
+	appSessionUnreadable,
+	connectApp,
+	disconnectApp,
+} from "@/lib/app-session";
 import { AddressError, addressOf, checkAddress } from "@/lib/connect";
+import { isDebugApp, isNativeApp } from "@/lib/native";
 import { errorMessage } from "@/lib/vault-data";
+
+/**
+ * Inside the app, what comes before anything else, when something must: the Keychain
+ * can't be read, no vauly has been named yet, or the vauly names another API now. Null
+ * when the app can go on.
+ */
+export function appGate(): ReactNode {
+	if (!isNativeApp) return null;
+	if (appSessionUnreadable()) return <KeychainLockedScreen />;
+	if (!appAddress()) return <ConnectScreen />;
+	const moved = apiMoved();
+	if (moved) return <ApiMovedScreen {...moved} />;
+	return null;
+}
 
 /**
  * The vauly app's first screen: which vauly to use. Every team runs its own, so the app
@@ -35,9 +57,11 @@ export function ConnectScreen() {
 					setBusy(true);
 					setError("");
 					try {
-						const origin = addressOf(address);
-						await checkAddress(origin);
-						await connectApp(origin);
+						// A debug build may also use a vauly on this computer, over plain http.
+						const local = { local: isDebugApp };
+						const origin = addressOf(address, local);
+						const server = await checkAddress(origin, local);
+						await connectApp(origin, server);
 						// Starts over with that vauly's settings, and the page allowed only it.
 						window.location.replace("/");
 					} catch (err) {
@@ -93,5 +117,68 @@ export function ConnectedTo() {
 				Use another vauly
 			</button>
 		</p>
+	);
+}
+
+/**
+ * The vauly now names another API than when the app connected to it. The app sends
+ * nothing, to either, until the person connects again and so takes the new one.
+ */
+function ApiMovedScreen({
+	address,
+	kept,
+	named,
+}: {
+	address: string;
+	kept: string;
+	named: string;
+}) {
+	const host = (origin: string) => {
+		try {
+			return new URL(origin).host;
+		} catch {
+			return origin;
+		}
+	};
+	return (
+		<AuthLayout
+			title="Your vauly changed its API"
+			description={
+				<>
+					{host(address)} now sends the app to{" "}
+					<span className="text-fg">{host(named)}</span>, not{" "}
+					<span className="text-fg">{host(kept)}</span> as when you connected.
+					The app sends nothing to either until you connect again.
+				</>
+			}
+			footer={
+				<p>
+					If you didn't expect this, ask whoever runs your vauly before you
+					connect again.
+				</p>
+			}
+		>
+			<Button size="lg" className="h-10 w-full" onClick={switchVauly}>
+				Connect again
+			</Button>
+		</AuthLayout>
+	);
+}
+
+/** The Keychain can't be read just now, as before the iPhone is first unlocked. */
+function KeychainLockedScreen() {
+	return (
+		<AuthLayout
+			title="vauly can't open its Keychain"
+			description="iOS isn't letting the app read where it's connected just now. Unlock your iPhone, then try again."
+		>
+			<Button
+				size="lg"
+				className="h-10 w-full"
+				onClick={() => window.location.reload()}
+			>
+				Try again
+			</Button>
+		</AuthLayout>
 	);
 }

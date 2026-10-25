@@ -60,17 +60,23 @@ export function contentSecurityPolicy({
 
 /**
  * The policy inside the vauly app for iPhone. Its WebView loads the app's files from the
- * app itself, with no headers, so the mobile build writes this into index.html as a
- * <meta> tag (apps/mobile/scripts/copy-web.ts). The person names their vauly once the app
- * is running, so this lets it connect to any https address, and to the computer it runs
- * on for development; once the app knows the address, it narrows that to the one vauly
- * (appConnectPolicy). A <meta> policy can't name frame ancestors, and nothing can frame
- * the app anyway. It doesn't reach the key worker either, which runs only the app's own
- * file there.
+ * app itself, with no headers, so the mobile build writes this into its pages as a <meta>
+ * tag (apps/mobile/scripts/copy-web.ts). The person names their vauly once the app is
+ * running, so this lets it connect to any https address; once the app knows the address,
+ * it narrows that to the one vauly (appConnectPolicy). A debug build's page may also
+ * reach a vauly on this computer over plain http, for development; a release build's
+ * can't. A <meta> policy can't name frame ancestors, and nothing can frame the app
+ * anyway. Nor does it reach the workers, which run only the app's own files there.
  */
-export function appContentSecurityPolicy() {
+export function appContentSecurityPolicy({ debug }: { debug: boolean }) {
 	return join(
-		directives(["https:", "http://localhost:*", "http://127.0.0.1:*"], true),
+		directives(
+			[
+				"https:",
+				...(debug ? ["http://localhost:*", "http://127.0.0.1:*"] : []),
+			],
+			true,
+		),
 	);
 }
 

@@ -8,8 +8,18 @@ export const APP_SINCE = "0.3.0";
 /** Something wrong with the address, said so the person can fix it. */
 export class AddressError extends Error {}
 
-/** The origin `input` names. https, but for this computer, which development uses. */
-export function addressOf(input: string) {
+/**
+ * Whether an address is one the app may use: https, or, with `local`, as in a debug build,
+ * plain http to this computer for development.
+ */
+export function allowedOrigin(url: URL, { local = false } = {}) {
+	if (url.protocol === "https:") return true;
+	const here = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+	return local && here && url.protocol === "http:";
+}
+
+/** The origin `input` names, https unless it says otherwise. */
+export function addressOf(input: string, { local = false } = {}) {
 	const text = input.trim();
 	if (!text) throw new AddressError("Enter your vauly's address.");
 	let url: URL | null = null;
@@ -27,30 +37,39 @@ export function addressOf(input: string) {
 			"That isn't an address. Addresses look like vault.example.com.",
 		);
 	}
-	const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
 	if (url.username || url.password) {
 		throw new AddressError("Leave out any name and password.");
 	}
-	if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
+	if (!allowedOrigin(url, { local })) {
 		throw new AddressError("vauly needs an https:// address.");
 	}
 	return url.origin;
 }
 
-/** Checks the vauly at `address`, an origin, and its API. Throws an AddressError. */
-export async function checkAddress(address: string) {
+/**
+ * Checks the vauly at `address`, an origin, and its API, and returns the API's origin,
+ * which the app keeps with the address. Throws an AddressError.
+ */
+export async function checkAddress(address: string, { local = false } = {}) {
 	const settings = await readSettings(address);
+	const host = new URL(address).host;
 	let server = address;
 	if (settings.server) {
+		let url: URL;
 		try {
-			server = new URL(settings.server).origin;
+			url = new URL(settings.server);
 		} catch {
+			throw new AddressError(`${host} names an API address that isn't one.`);
+		}
+		if (!allowedOrigin(url, { local })) {
 			throw new AddressError(
-				`${new URL(address).host} names an API address that isn't one.`,
+				`${host} names an API that isn't https: ${url.host}. vauly needs https.`,
 			);
 		}
+		server = url.origin;
 	}
 	if (server !== address) await readSettings(server);
+	return server;
 }
 
 async function readSettings(origin: string) {

@@ -67,25 +67,29 @@ describe("contentSecurityPolicy", () => {
 
 describe("appContentSecurityPolicy", () => {
 	test("is the website's policy, but may connect to any vauly over https", () => {
-		const policy = appContentSecurityPolicy();
+		const policy = appContentSecurityPolicy({ debug: false });
 		const website = contentSecurityPolicy(options);
 		for (const name of ["default-src", "script-src", "style-src", "img-src"]) {
 			expect(directive(policy, name)).toEqual(directive(website, name));
 		}
 		expect(directive(policy, "object-src")).toEqual(["'none'"]);
 		expect(directive(policy, "base-uri")).toEqual(["'none'"]);
-		expect(directive(policy, "connect-src")).toEqual([
-			"'self'",
-			"https:",
-			"http://localhost:*",
-			"http://127.0.0.1:*",
-		]);
+		expect(directive(policy, "connect-src")).toEqual(["'self'", "https:"]);
+		expect(policy).not.toContain("http:");
 		expect(policy).not.toContain("wasm");
 		expect(policy).not.toContain("unsafe-eval");
 	});
 
+	test("lets only a debug build reach this computer over plain http", () => {
+		expect(
+			directive(appContentSecurityPolicy({ debug: true }), "connect-src"),
+		).toEqual(["'self'", "https:", "http://localhost:*", "http://127.0.0.1:*"]);
+	});
+
 	test("leaves out what a <meta> policy can't say", () => {
-		expect(appContentSecurityPolicy()).not.toContain("frame-ancestors");
+		expect(appContentSecurityPolicy({ debug: false })).not.toContain(
+			"frame-ancestors",
+		);
 	});
 });
 
