@@ -1,6 +1,6 @@
 {
 	"name": "vauly",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "A self-hosted, end-to-end encrypted password manager for small teams.",
 	"license": "AGPL-3.0-only",
 	"repository": {

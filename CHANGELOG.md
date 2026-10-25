@@ -2,6 +2,14 @@
 
 Notable changes to vauly. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.2.2 - 2026-10-25
+
+Limits on how often sign-in and two-step codes can be tried, and session tokens that count only with their signature. A migration runs on its own; read [Updating vauly](docs/updating.md#updating-from-021).
+
+### Changed
+
+- **Sign-in is harder to guess at.** One address gets a run of ten sign-ins, then waits a minute, counted across the whole server. After three wrong two-step codes in a row, an account's next sign-in waits five seconds, then twice as long after each wrong one, up to five minutes, and a right one starts the count again; the master password and the codes checked inside a session are counted apart, so guessing codes at sign-in never holds up a session that's already open, and nothing locks the account. The browser extension's session token now counts only with its signature, like the web app's cookie. A migration adds the counts; see [Updating from 0.2.1](docs/updating.md#updating-from-021).
+
 ## 0.2.1 - 2026-10-25
 
 Changes to the browser extension, mostly to where and when it fills. The server has no migrations in this release. Update the extension along with the server; [Updating vauly](docs/updating.md#updating-from-020) says what people may notice.
