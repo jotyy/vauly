@@ -1,7 +1,7 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
 
-import { type Entry, matchesPage, matchOf } from "./vault";
+import { type Entry, hostOf, matchesPage, matchOf } from "./vault";
 
 const login = (...urls: string[]) =>
 	({ kind: "login", url: urls[0], urls }) as unknown as Entry;
@@ -72,10 +72,38 @@ describe("which logins belong to a page", () => {
 			matchesPage(login("https://192.168.1.1"), "https://192.168.1.10/"),
 		).toBe(false);
 		expect(
-			matchOf(login("http://localhost:3000"), "http://localhost:8080/")?.kind,
+			matchOf(login("http://localhost:3000"), "http://localhost:3000/")?.kind,
 		).toBe("host");
 		expect(
+			matchesPage(login("http://localhost:3000"), "http://localhost:8080/"),
+		).toBe(false);
+		expect(
 			matchesPage(login("http://localhost"), "http://dev.localhost/"),
+		).toBe(false);
+	});
+
+	test("another port is another host, and the scheme's usual port is no port", () => {
+		expect(
+			matchOf(login("https://acme.test:8443"), "https://acme.test/"),
+		).toEqual({ kind: "site", host: "acme.test:8443" });
+		expect(
+			matchOf(login("https://acme.test:443"), "https://acme.test/")?.kind,
+		).toBe("host");
+		expect(
+			matchOf(login("http://router.test"), "https://router.test:443/")?.kind,
+		).toBe("host");
+		expect(hostOf("http://router.test:443/")).toBe("router.test:443");
+	});
+
+	test("www. goes only when what's left is a site of its own", () => {
+		expect(hostOf("https://www.github.com/")).toBe("github.com");
+		expect(hostOf("https://www.example.co.uk/")).toBe("example.co.uk");
+		// github.io and co.uk are suffixes many sites share, not sites.
+		expect(hostOf("https://www.github.io/")).toBe("www.github.io");
+		expect(hostOf("https://www.co.uk/")).toBe("www.co.uk");
+		expect(hostOf("http://www.localhost/")).toBe("www.localhost");
+		expect(
+			matchesPage(login("https://www.github.io"), "https://github.io/"),
 		).toBe(false);
 	});
 

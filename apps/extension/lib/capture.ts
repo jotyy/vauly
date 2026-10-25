@@ -1,5 +1,5 @@
 import type { OfferView } from "./messages";
-import { type EditableEntry, hostOf, matchesPage } from "./vault";
+import { type EditableEntry, hostOf, matchesPage, matchOf } from "./vault";
 
 // A login someone just typed into a page, held so the popup can offer to save it. It is
 // kept per tab in session storage, which lives in memory and which pages and content
@@ -44,22 +44,27 @@ export type Offer =
 	| { kind: "save"; capture: Capture }
 	| { kind: "update"; capture: Capture; entry: EditableEntry };
 
-/** What to offer for a capture: nothing if it's saved already, an update, or a new login. */
+/**
+ * What to offer for a capture: nothing if it's saved already, on this site, an update to
+ * the login for this very host, or a new login. Another host of the site gets a login of
+ * its own rather than changing one it may not share a password with.
+ */
 export function offerFor(
 	capture: Capture,
 	entries: EditableEntry[],
 ): Offer | null {
-	const logins = entries.filter(
-		(entry) => entry.kind === "login" && matchesPage(entry, capture.url),
-	);
-	const same = logins.find(
+	const same = entries.filter(
 		(entry) =>
-			(entry.username ?? "").toLowerCase() === capture.username.toLowerCase(),
+			entry.kind === "login" &&
+			(entry.username ?? "").toLowerCase() === capture.username.toLowerCase() &&
+			matchesPage(entry, capture.url),
 	);
-	if (same?.secret === capture.password) return null;
+	if (same.some((entry) => entry.secret === capture.password)) return null;
+	const own = same.find(
+		(entry) => matchOf(entry, capture.url)?.kind === "host",
+	);
 	// A login in a vault this person can only view can't be updated, nor saved twice.
-	if (same)
-		return same.editable ? { kind: "update", capture, entry: same } : null;
+	if (own) return own.editable ? { kind: "update", capture, entry: own } : null;
 	return { kind: "save", capture };
 }
 

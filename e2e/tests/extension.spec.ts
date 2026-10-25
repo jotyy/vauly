@@ -20,6 +20,7 @@ import {
 	resetWorkspace,
 	teammate,
 } from "./helpers";
+import { hidingTricks } from "./hiding-tricks";
 
 // The browser extension, built and loaded into Chromium, against the e2e stack. A made-up
 // site serves a login form so Fill has something to fill.
@@ -350,7 +351,47 @@ test("a page's styles can't fade, hide or move vauly's button and menu", async (
 	await page.close();
 });
 
-test("a menu the page has faded out doesn't fill", async () => {
+for (const [trick, play] of Object.entries(hidingTricks)) {
+	test(`the menu closes, without filling, when the page ${trick}`, async () => {
+		const page = await context.newPage();
+		await page.goto(`${site}/`);
+		const menu = await openMenu(page, "Email");
+		await expect(
+			menu.getByRole("button", {
+				name: `Fill ${login.name}, ${login.username}`,
+			}),
+		).toBeEnabled();
+		await page.evaluate(play);
+		await expect(page.locator("vauly-frame")).toHaveCount(0);
+		await expect(page.getByLabel("Password")).toHaveValue("");
+		await page.close();
+	});
+}
+
+test("a menu opened on a page that hides it says so, and fills nothing", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	await page.evaluate(() => {
+		document.documentElement.style.setProperty(
+			"mask-image",
+			"linear-gradient(black 40%, transparent 40%)",
+		);
+	});
+	const menu = await openMenu(page, "Email");
+	await expect(
+		menu.getByText(
+			"vauly doesn't fill while this page hides or covers its menu.",
+		),
+	).toBeVisible();
+	await expect(
+		menu.getByRole("button", {
+			name: `Fill ${login.name}, ${login.username}`,
+		}),
+	).toBeDisabled();
+	await page.close();
+});
+
+test("Chrome's word that something covers the menu holds it back until it has shown for a moment", async () => {
 	const page = await context.newPage();
 	await page.goto(`${site}/`);
 	const menu = await openMenu(page, "Email");
@@ -358,19 +399,31 @@ test("a menu the page has faded out doesn't fill", async () => {
 		name: `Fill ${login.name}, ${login.username}`,
 	});
 	await expect(fill).toBeEnabled();
-	// The whole page, vauly's menu with it, nearly invisible over a decoy.
+	// A cover the page script can't find: in the top layer, from inside a closed shadow root.
 	await page.evaluate(() => {
-		document.documentElement.style.opacity = "0.05";
+		const holder = document.createElement("div");
+		const cover = document.createElement("div");
+		cover.popover = "manual";
+		cover.style.cssText =
+			"inset: 0; width: 100vw; height: 100vh; background: white; pointer-events: none;";
+		holder.attachShadow({ mode: "closed" }).append(cover);
+		document.body.append(holder);
+		cover.showPopover();
+		(window as unknown as { uncover: () => void }).uncover = () =>
+			cover.hidePopover();
 	});
-	// Chrome reports what's visible at most every tenth of a second.
-	await page.waitForTimeout(500);
-	await fill.click();
 	await expect(
 		menu.getByText(
 			"vauly doesn't fill while this page hides or covers its menu.",
 		),
 	).toBeVisible();
-	await expect(page.getByLabel("Password")).toHaveValue("");
+	await expect(fill).toBeDisabled();
+	await page.evaluate(() =>
+		(window as unknown as { uncover: () => void }).uncover(),
+	);
+	await expect(fill).toBeEnabled();
+	await fill.click();
+	await expect(page.getByLabel("Email")).toHaveValue(login.username);
 	await page.close();
 });
 

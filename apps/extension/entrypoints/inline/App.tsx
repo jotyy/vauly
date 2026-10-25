@@ -22,8 +22,11 @@ import {
 // the same size whatever it shows, and it closes through the background, never by
 // posting to the page, so the page learns nothing from it about what vauly holds.
 
+const hash = new URLSearchParams(location.hash.slice(1));
 /** The page script gives the menu a token in its address; the background answers no other frame. */
-const token = new URLSearchParams(location.hash.slice(1)).get("token") ?? "";
+const token = hash.get("token") ?? "";
+/** The page script found the page fading or covering the menu as it opened. */
+const covered = hash.get("covered") === "1";
 const close = () => void ask({ type: "vauly:menu-close", token });
 
 export default function App() {
@@ -103,54 +106,81 @@ function Note({ children }: { children: ReactNode }) {
 
 // ── The fill menu, under a login field ──────────────────────────────────────────────
 
-/** How long the logins show before a click on one counts. */
+/** How long the logins show, unbroken, before a click on one counts. */
 const ARMED_MS = 500;
+
+const HIDDEN =
+	"vauly doesn't fill while this page hides or covers its menu. Use vauly in the toolbar.";
+
+/** Chrome can say whether anything covers, fades or distorts the menu; Firefox can't. */
+const tracksVisibility =
+	"IntersectionObserverEntry" in window &&
+	"isVisible" in IntersectionObserverEntry.prototype;
 
 /**
  * Whether a click on a login is someone choosing it, rather than a click a page tricked
  * out of them with the menu faded or covered: the logins have been showing for a moment,
- * the pointer has moved over them since (the keyboard needs no pointer), and, where the
- * browser can tell (Chrome), nothing covers, fades or distorts the menu.
+ * and the pointer has moved over them since (the keyboard needs no pointer). The page
+ * script closes the menu when the page starts to fade or cover it, and says so when it
+ * opens that way. Where the browser can tell (Chrome), anything hiding the menu starts
+ * the wait over, and the pointer must move again.
  */
 function useDeliberate(showing: boolean) {
 	const [armed, setArmed] = useState(false);
+	const [hidden, setHidden] = useState(covered);
 	const ready = useRef(false);
 	const moved = useRef(false);
-	const visible = useRef(true);
 	useEffect(() => {
-		if (!showing) return;
-		const timer = setTimeout(() => {
-			ready.current = true;
-			setArmed(true);
-		}, ARMED_MS);
-		return () => clearTimeout(timer);
-	}, [showing]);
-	useEffect(() => {
+		if (!showing || covered) return;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		let seen: boolean | undefined;
+		const see = (visible: boolean) => {
+			if (visible === seen) return;
+			seen = visible;
+			clearTimeout(timer);
+			ready.current = false;
+			moved.current = false;
+			setArmed(false);
+			setHidden(!visible);
+			if (visible)
+				timer = setTimeout(() => {
+					ready.current = true;
+					setArmed(true);
+				}, ARMED_MS);
+		};
 		const onMove = (event: PointerEvent) => {
 			if (event.isTrusted && ready.current) moved.current = true;
 		};
 		document.addEventListener("pointermove", onMove);
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (entry && "isVisible" in entry)
-					visible.current = Boolean(entry.isVisible);
-			},
-			{ trackVisibility: true, delay: 100 } as IntersectionObserverInit,
-		);
-		observer.observe(document.documentElement);
+		const observer = tracksVisibility
+			? new IntersectionObserver(
+					([entry]) => {
+						if (entry)
+							see(Boolean((entry as { isVisible?: boolean }).isVisible));
+					},
+					{ trackVisibility: true, delay: 100 } as IntersectionObserverInit,
+				)
+			: null;
+		if (observer) observer.observe(document.documentElement);
+		else see(true);
 		return () => {
+			clearTimeout(timer);
 			document.removeEventListener("pointermove", onMove);
-			observer.disconnect();
+			observer?.disconnect();
 		};
-	}, []);
+	}, [showing]);
 	return {
 		armed,
-		/** "fill", "ignore" a click that doesn't count, or "hidden" when the menu isn't seen. */
-		check(event: MouseEvent<HTMLButtonElement>) {
+		/** The menu is faded or covered, so nothing fills. */
+		hidden,
+		/** Whether this click counts. */
+		counts(event: MouseEvent<HTMLButtonElement>) {
 			const keyboard = event.detail === 0;
-			if (!event.nativeEvent.isTrusted || !ready.current) return "ignore";
-			if (!keyboard && !moved.current) return "ignore";
-			return visible.current ? "fill" : "hidden";
+			return (
+				event.nativeEvent.isTrusted &&
+				ready.current &&
+				(keyboard || moved.current)
+			);
 		},
 	};
 }
@@ -210,14 +240,7 @@ function Menu() {
 		login: MenuLogin,
 		event: MouseEvent<HTMLButtonElement>,
 	) => {
-		const choice = deliberate.check(event);
-		if (choice === "ignore") return;
-		if (choice === "hidden") {
-			setNote(
-				"vauly doesn't fill while this page hides or covers its menu. Use vauly in the toolbar.",
-			);
-			return;
-		}
+		if (!deliberate.counts(event)) return;
 		const result = await ask<FillResult>({
 			type: "vauly:fill",
 			id: login.id,
@@ -279,8 +302,8 @@ function Menu() {
 					))}
 				</ul>
 			)}
-			{note ? (
-				<Note>{note}</Note>
+			{note || deliberate.hidden ? (
+				<Note>{note || HIDDEN}</Note>
 			) : (
 				<div className="border-line-subtle text-micro text-fg-subtle flex items-center gap-1.5 border-t px-3 py-2">
 					<img src="/icon/16.png" alt="" className="size-3.5" />

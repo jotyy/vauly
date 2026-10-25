@@ -11,7 +11,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- **The extension fills only on the site a login was saved for.** The menu inside a page offers a login on the address it was saved for, with or without `www.`. The extension's popup also offers it on other addresses of the same site and names the address. Sites are told apart as the Public Suffix List draws them, and a login saved with `https://` isn't offered on an `http://` page. A login in the menu can be chosen a moment after the menu opens.
+- **The extension fills only on the site a login was saved for.** The menu inside a page offers a login on the address it was saved for: the same name and port, with or without `www.`. The extension's popup also offers it on other addresses of the same site and names the address. Sites are told apart as the Public Suffix List draws them, and a login saved with `https://` isn't offered on an `http://` page. A password typed on another address of the site is offered as a new login, not as an update. A login in the menu can be chosen a moment after the menu opens, and the menu closes if the page fades, covers or moves it.
 
 ### Fixed
 

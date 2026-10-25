@@ -19,8 +19,11 @@ export default defineContentScript({
 		/** A fill focuses the page's fields; that mustn't open the menu again. */
 		let quietUntil = 0;
 
-		browser.runtime.onMessage.addListener((message: PageMessage) => {
-			if (message.type === "vauly:filling") quietUntil = Date.now() + 1500;
+		browser.runtime.onMessage.addListener((message: PageMessage, _, reply) => {
+			if (message.type === "vauly:filling") {
+				quietUntil = Date.now() + 1500;
+				reply(frames.clearToFill(message.token));
+			}
 			if (message.type === "vauly:close-menu") frames.close("menu");
 			// A login form still holding the password wasn't sent, or didn't work.
 			if (message.type === "vauly:offer-ready" && !typedPassword())

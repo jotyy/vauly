@@ -72,8 +72,11 @@ export type Request =
 export type PageMessage =
 	/** A login was just captured on this page; offer to save it. */
 	| { type: "vauly:offer-ready" }
-	/** A fill is about to focus the page's fields; don't open the menu for that. */
-	| { type: "vauly:filling" }
+	/**
+	 * The menu with this token asked to fill. The page script answers true if that menu is
+	 * still open and clear to see; a fill focuses the page's fields, which mustn't open it again.
+	 */
+	| { type: "vauly:filling"; token: string }
 	/** The fill menu is done. */
 	| { type: "vauly:close-menu" }
 	/** The person chose in vauly's passkey prompt; hand the outcome to the site. */

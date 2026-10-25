@@ -231,7 +231,7 @@ async function answer(
 		case "vauly:menu":
 			return menuState(tab.url);
 		case "vauly:fill":
-			return fill(tab, request.id);
+			return fill(tab, request.id, request.token);
 		case "vauly:menu-close":
 			await browser.tabs
 				.sendMessage(
@@ -333,15 +333,21 @@ async function menuState(url: string): Promise<MenuState> {
 	};
 }
 
-async function fill(tab: Tab, id: string): Promise<FillResult> {
+async function fill(tab: Tab, id: string, token: string): Promise<FillResult> {
 	const open = await openVault();
 	const entry = open?.entries.find((e) => e.id === id);
 	// Only ever a login saved for the site the tab is on.
 	if (!open || !entry || !fillable(entry, tab.url)) return { ok: false };
 	await touch();
-	await browser.tabs
-		.sendMessage(tab.id, { type: "vauly:filling" } satisfies PageMessage)
-		.catch(() => {});
+	// Only while the page script still has the menu open, and nothing fades or covers it.
+	const clear = await browser.tabs
+		.sendMessage(
+			tab.id,
+			{ type: "vauly:filling", token } satisfies PageMessage,
+			{ frameId: 0 },
+		)
+		.catch(() => false);
+	if (clear !== true) return { ok: false };
 	const [result] = await browser.scripting.executeScript({
 		target: { tabId: tab.id, frameIds: [0] },
 		func: fillLoginForm,

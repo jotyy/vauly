@@ -368,11 +368,11 @@ export async function updatePassword(
 }
 
 /**
- * How an item belongs to a page. "host" when one of its websites is the page's host, with
- * or without www. "site" when it's another host of the same site: the registrable domain,
- * by the Public Suffix List, so one github.io site isn't another, and an IP address or a
- * name like localhost is only ever itself. A website saved with https never belongs to an
- * http page. `host` is the item's website that matched.
+ * How an item belongs to a page. "host" when one of its websites is the page's host, as
+ * `hostOf` gives it: the same name and port. "site" when it's another host of the same
+ * site: the registrable domain, by the Public Suffix List, so one github.io site isn't
+ * another, and an IP address or a name like localhost is only ever itself. A website saved
+ * with https never belongs to an http page. `host` is the item's website that matched.
  */
 export function matchOf(
 	entry: Entry,
@@ -396,23 +396,29 @@ export function matchesPage(entry: Entry, pageUrl: string | undefined) {
 	return matchOf(entry, pageUrl) !== null;
 }
 
+const PSL = { allowPrivateDomains: true };
+
 function siteOf(url: string | undefined) {
 	const host = hostOf(url);
 	if (!host || !url) return null;
-	const { domain, isIp } = parse(host, { allowPrivateDomains: true });
-	return {
-		host,
-		secure: new URL(url).protocol === "https:",
-		domain: isIp ? null : domain,
-	};
+	const { protocol, hostname } = new URL(url);
+	const { domain, isIp } = parse(hostname, PSL);
+	return { host, secure: protocol === "https:", domain: isIp ? null : domain };
 }
 
+/**
+ * A website's host as vauly names and matches it: the name, without a www. in front when
+ * what's left is a site of its own, and the port when it isn't the scheme's usual one.
+ */
 export function hostOf(url: string | undefined) {
 	if (!url) return "";
 	try {
-		const { protocol, hostname } = new URL(url);
+		const { protocol, hostname, port } = new URL(url);
 		if (protocol !== "http:" && protocol !== "https:") return "";
-		return hostname.replace(/^www\./, "");
+		const bare = hostname.slice(4);
+		const name =
+			hostname.startsWith("www.") && parse(bare, PSL).domain ? bare : hostname;
+		return port ? `${name}:${port}` : name;
 	} catch {
 		return "";
 	}
