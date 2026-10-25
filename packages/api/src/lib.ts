@@ -5,10 +5,19 @@ import {
 	type EventAction,
 	event,
 	item,
+	member,
 	type VaultRole,
 	vaultAccess,
 } from "@vauly/db/schema/vault";
-import { and, eq, inArray, isNull, notInArray } from "drizzle-orm";
+import {
+	and,
+	eq,
+	inArray,
+	isNull,
+	notInArray,
+	type SQL,
+	sql,
+} from "drizzle-orm";
 
 const alphabet = "0123456789abcdefghjkmnpqrstvwxyz";
 
@@ -159,17 +168,51 @@ export async function requireAgentFor(
 	}
 }
 
-export function logEvent(
-	db: Database,
-	entry: {
-		actorType: "member" | "agent" | "link";
-		actorId: string;
-		action: EventAction;
-		itemId?: string | null;
-		vaultId?: string | null;
-		subjectId?: string | null;
-		detail?: string | null;
-	},
-) {
+type EventEntry = {
+	actorType: "member" | "agent" | "link";
+	actorId: string;
+	action: EventAction;
+	itemId?: string | null;
+	vaultId?: string | null;
+	subjectId?: string | null;
+	detail?: string | null;
+};
+
+export function logEvent(db: Database, entry: EventEntry) {
 	return db.insert(event).values({ id: newId("evt"), ...entry });
+}
+
+/**
+ * The event for a change a batch makes only if it still can: written only if, when it
+ * runs after that change, the member's row matches `where`.
+ */
+export function logEventIf(
+	db: Database,
+	userId: string,
+	where: SQL | undefined,
+	entry: EventEntry,
+) {
+	return db.insert(event).select(
+		db
+			.select({
+				id: sql<string>`${newId("evt")}`.as("id"),
+				actorType: sql<EventEntry["actorType"]>`${entry.actorType}`.as(
+					"actor_type",
+				),
+				actorId: sql<string>`${entry.actorId}`.as("actor_id"),
+				action: sql<EventAction>`${entry.action}`.as("action"),
+				itemId: sql<string | null>`${entry.itemId ?? null}`.as("item_id"),
+				vaultId: sql<string | null>`${entry.vaultId ?? null}`.as("vault_id"),
+				subjectId: sql<string | null>`${entry.subjectId ?? null}`.as(
+					"subject_id",
+				),
+				detail: sql<string | null>`${entry.detail ?? null}`.as("detail"),
+				createdAt:
+					sql<Date>`(cast(unixepoch('subsecond') * 1000 as integer))`.as(
+						"created_at",
+					),
+			})
+			.from(member)
+			.where(and(eq(member.userId, userId), where)),
+	);
 }

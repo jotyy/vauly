@@ -1,5 +1,11 @@
 import type { Database } from "@vauly/db";
-import { account, session, user, verification } from "@vauly/db/schema/auth";
+import {
+	account,
+	rateLimit,
+	session,
+	user,
+	verification,
+} from "@vauly/db/schema/auth";
 import {
 	accessRequest,
 	agent,
@@ -43,5 +49,6 @@ export async function resetDatabase(db: Database) {
 		db.delete(account),
 		db.delete(verification),
 		db.delete(user),
+		db.delete(rateLimit),
 	]);
 }

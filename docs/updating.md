@@ -57,6 +57,9 @@ Until October 24, 2026, vauly's main branch had changes that weren't released ye
 
 A copy on 0.1.0 then moves to the latest release. A copy that already took main after 0.1.0 stays where it is, because its database may have changes that 0.1.x doesn't. It moves on once a release has everything it has, and until then **Settings › About** says it runs a development version.
 
+### Updating from 0.2.1
+
+**Limits on tries:** nothing to do. A migration adds a table that counts recent sign-ins by address, and columns that count each account's wrong codes and master passwords in a row ([Security](security.md#keys) has the limits). Everyone stays signed in, the browser extension too. Going back to an earlier 0.2 is safe: it leaves the table and the columns alone.
 ### Updating from 0.2.0
 
 Nothing to do on the server: 0.2.1 has no migrations, and everything carries over. Update the browser extension too, since most of the changes are in it. One change people may notice: the menu inside a page offers a login only on the address it was saved for, with or without `www.`. On another address of the same site, such as a sign-in page on a subdomain, the login is in the extension's popup, which names the address it was saved for.

@@ -53,6 +53,15 @@ export const member = sqliteTable("member", {
 	totpPending: text("totp_pending"),
 	totpStep: integer("totp_step"),
 	recoveryCodes: text("recovery_codes", { mode: "json" }).$type<string[]>(),
+	/**
+	 * Wrong tries in a row, and the moment the next one is checked again
+	 * (packages/auth/src/pace.ts): two-step codes at sign-in, and apart from them, the
+	 * codes and master passwords checked inside a session.
+	 */
+	signInWrongTries: integer("sign_in_wrong_tries").notNull().default(0),
+	signInNextTryAt: integer("sign_in_next_try_at", { mode: "timestamp_ms" }),
+	sessionWrongTries: integer("session_wrong_tries").notNull().default(0),
+	sessionNextTryAt: integer("session_next_try_at", { mode: "timestamp_ms" }),
 	lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
 	createdAt: createdAt(),
 });
