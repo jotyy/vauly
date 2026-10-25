@@ -61,6 +61,19 @@ describe("a request's session cookie", () => {
 		}
 	});
 
+	test("counts when the browser says the page is on this very address, whatever host a proxy passed on", () => {
+		expect(
+			fromOwnPages(
+				request({
+					origin: "https://vault.internal.test",
+					"sec-fetch-site": "same-origin",
+					"content-type": "application/json",
+				}),
+				origins,
+			),
+		).toBe(true);
+	});
+
 	test("doesn't count from any other origin, whatever it sends", () => {
 		for (const origin of [
 			"https://elsewhere.test",

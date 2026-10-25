@@ -9,6 +9,8 @@
  * browser extension, the iPhone app and agents send their own, which no other site's page
  * can send for them, and keep working whatever cookie the browser adds.
  *
+ * - **Fetch Metadata saying same-origin** is enough: a page can't set it, and it means the
+ *   page is on this very address as the browser sees it, whatever host a proxy passes on.
  * - **With an Origin header**, which browsers send on every cross-origin request and on
  *   every POST, it must be one of `origins`.
  * - **Without one**, Fetch Metadata must say the request is same-origin or came from the
@@ -20,10 +22,11 @@ export function fromOwnPages(
 	origins: readonly string[],
 ): boolean {
 	if (!request.headers.has("cookie")) return true;
+	const site = request.headers.get("sec-fetch-site");
+	if (site === "same-origin") return true;
 	const origin = request.headers.get("origin");
 	if (origin !== null) return origins.includes(origin.toLowerCase());
-	const site = request.headers.get("sec-fetch-site");
-	if (site !== null && site !== "same-origin" && site !== "none") return false;
+	if (site !== null && site !== "none") return false;
 	return request.method === "GET" || mediaType(request) === "application/json";
 }
 

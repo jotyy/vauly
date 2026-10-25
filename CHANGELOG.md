@@ -12,7 +12,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
-- **The API uses the web app's session cookie only for the web app's own pages.** The browser sends the cookie with other sites' requests too, and the API now handles those as though no one were signed in. A request counts as the web app's when its `Origin` is the API's own address, `CORS_ORIGIN` or `BETTER_AUTH_URL`; without an `Origin`, the browser's Fetch Metadata must say it's same-origin, and anything but a GET must send JSON. The browser extension, the app for iPhone and agents sign in with their own tokens and aren't affected.
+- **The API uses the web app's session cookie only for the web app's own pages.** The browser sends the cookie with other sites' requests too, and the API's procedures now handle those as though no one were signed in. A request counts as the web app's when the browser's Fetch Metadata says it's same-origin, or its `Origin` is the API's own address, `CORS_ORIGIN` or `BETTER_AUTH_URL`; a request with neither must come from the address bar, or from a browser that sends no Fetch Metadata, and anything but a GET must send JSON. The browser extension, the app for iPhone and agents sign in with their own tokens and aren't affected.
 
 ### Fixed
 

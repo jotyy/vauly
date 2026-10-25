@@ -8,8 +8,8 @@ import { createAuth, getDb, notifier, prepare } from "./services";
 
 export type CreateContextOptions = {
 	context: HonoContext;
-	/** Whether the request may use its session cookie (same-origin.ts); it may by default. */
-	cookie?: boolean;
+	/** Whether the request may use its session cookie (packages/api/src/same-origin.ts). */
+	cookie: boolean;
 };
 
 const MB = 1024 * 1024;
@@ -37,7 +37,7 @@ const fileLimits = () =>
 
 export async function createContext({
 	context,
-	cookie = true,
+	cookie,
 }: CreateContextOptions): Promise<ApiContext> {
 	const db = getDb();
 	const origin = new URL(context.req.url).origin;
