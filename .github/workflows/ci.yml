@@ -31,6 +31,7 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
       site: ${{ steps.filter.outputs.site }}
       firefox: ${{ steps.filter.outputs.firefox }}
+      native: ${{ steps.filter.outputs.native }}
     steps:
       - uses: actions/checkout@v7
       - id: filter
@@ -42,6 +43,7 @@ jobs:
             app:
               - "**"
               - "!apps/site/**"
+              - "!native/**"
               - "!docs/**"
               - "!e2e/site/**"
               - "!e2e/site.config.ts"
@@ -71,6 +73,10 @@ jobs:
               - "e2e/package.json"
               - "package.json"
               - "bun.lock"
+              - ".github/workflows/ci.yml"
+            native:
+              - "native/**"
+              - "packages/crypto/test-vectors.json"
               - ".github/workflows/ci.yml"
 
   check:
@@ -330,6 +336,21 @@ jobs:
             e2e/results
           retention-days: 7
 
+  # The iPhone app's crypto (native/VaulyKit), against the same test vectors as
+  # packages/crypto. macOS runners are free for public repositories.
+  native:
+    name: Swift crypto core
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: swift test
+        working-directory: native/VaulyKit
+
   # The one check branch protection asks for: it passes when every job above passed or
   # was skipped as not needed, and fails when any of them failed or was cancelled.
   passed:
@@ -345,6 +366,7 @@ jobs:
         e2e,
         one-worker,
         firefox,
+        native,
       ]
     runs-on: ubuntu-24.04
     steps:

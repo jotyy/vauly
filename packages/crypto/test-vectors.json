@@ -309,6 +309,242 @@
 			"secretHash": "cb966a295a9b50f2fbcb1871cbff1a031efcf64b36eeaac802ea793dd55423ac"
 		}
 	],
+	"kdfLimits": [
+		{
+			"why": "Argon2id under 19 MiB",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 2,
+				"kdfMemory": 19455
+			},
+			"allowed": false
+		},
+		{
+			"why": "Argon2id at 19 MiB and two passes",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 2,
+				"kdfMemory": 19456
+			},
+			"allowed": true
+		},
+		{
+			"why": "Argon2id at 1 GiB and ten passes",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 10,
+				"kdfMemory": 1048576
+			},
+			"allowed": true
+		},
+		{
+			"why": "Argon2id over 1 GiB",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": 1048577
+			},
+			"allowed": false
+		},
+		{
+			"why": "Argon2id with one pass",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 1,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "Argon2id with eleven passes",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 11,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "Argon2id without its memory",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 3
+			},
+			"allowed": false
+		},
+		{
+			"why": "Argon2id without its passes",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "Argon2id with no memory",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": null
+			},
+			"allowed": false
+		},
+		{
+			"why": "Argon2id with 3 PBKDF2 rounds",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "argon2id",
+				"kdfIterations": 3,
+				"kdfPasses": 3,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "PBKDF2 under 600,000 rounds",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "pbkdf2",
+				"kdfIterations": 599999,
+				"kdfPasses": null,
+				"kdfMemory": null
+			},
+			"allowed": false
+		},
+		{
+			"why": "PBKDF2 at 600,000 rounds",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "pbkdf2",
+				"kdfIterations": 600000,
+				"kdfPasses": null,
+				"kdfMemory": null
+			},
+			"allowed": true
+		},
+		{
+			"why": "PBKDF2 at 10,000,000 rounds",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "pbkdf2",
+				"kdfIterations": 10000000,
+				"kdfPasses": null,
+				"kdfMemory": null
+			},
+			"allowed": true
+		},
+		{
+			"why": "PBKDF2 over 10,000,000 rounds",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "pbkdf2",
+				"kdfIterations": 10000001,
+				"kdfPasses": null,
+				"kdfMemory": null
+			},
+			"allowed": false
+		},
+		{
+			"why": "PBKDF2 with passes",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "pbkdf2",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": null
+			},
+			"allowed": false
+		},
+		{
+			"why": "an account from before Argon2id, with no kdf",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdfIterations": 600000
+			},
+			"allowed": true
+		},
+		{
+			"why": "an account from before Argon2id, with 1,000 rounds",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdfIterations": 1000
+			},
+			"allowed": false
+		},
+		{
+			"why": "a salt of 15 bytes",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0O",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "a salt of 17 bytes",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODxA=",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "a salt that isn't base64",
+			"settings": {
+				"kdfSalt": "not base64!",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "no salt",
+			"settings": {
+				"kdfSalt": "",
+				"kdf": "argon2id",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		},
+		{
+			"why": "an algorithm vauly doesn't know",
+			"settings": {
+				"kdfSalt": "AAECAwQFBgcICQoLDA0ODw==",
+				"kdf": "scrypt",
+				"kdfIterations": 600000,
+				"kdfPasses": 3,
+				"kdfMemory": 65536
+			},
+			"allowed": false
+		}
+	],
 	"totp": [
 		{
 			"secret": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",

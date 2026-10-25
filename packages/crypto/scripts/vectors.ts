@@ -504,6 +504,139 @@ async function fileVector(
 	};
 }
 
+// What a server may ask the apps to derive with (vauly's limits), each case as a server
+// would send it, with whether the apps go on to use the password with it. The answers
+// are written out here, not computed, so both implementations are checked against them.
+const limitSalt = b64(run(0x00, 16));
+const argonAsked = (kdfMemory: number | null, kdfPasses: number | null) => ({
+	kdfSalt: limitSalt,
+	kdf: "argon2id",
+	kdfIterations: 600_000,
+	kdfPasses,
+	kdfMemory,
+});
+const pbkdf2Asked = (kdfIterations: number) => ({
+	kdfSalt: limitSalt,
+	kdf: "pbkdf2",
+	kdfIterations,
+	kdfPasses: null,
+	kdfMemory: null,
+});
+const { kdfMemory: _memory, ...argonWithoutMemory } = argonAsked(65_536, 3);
+const { kdfPasses: _passes, ...argonWithoutPasses } = argonAsked(65_536, 3);
+const kdfLimits = [
+	{
+		why: "Argon2id under 19 MiB",
+		settings: argonAsked(19_455, 2),
+		allowed: false,
+	},
+	{
+		why: "Argon2id at 19 MiB and two passes",
+		settings: argonAsked(19_456, 2),
+		allowed: true,
+	},
+	{
+		why: "Argon2id at 1 GiB and ten passes",
+		settings: argonAsked(1_048_576, 10),
+		allowed: true,
+	},
+	{
+		why: "Argon2id over 1 GiB",
+		settings: argonAsked(1_048_577, 3),
+		allowed: false,
+	},
+	{
+		why: "Argon2id with one pass",
+		settings: argonAsked(65_536, 1),
+		allowed: false,
+	},
+	{
+		why: "Argon2id with eleven passes",
+		settings: argonAsked(65_536, 11),
+		allowed: false,
+	},
+	{
+		why: "Argon2id without its memory",
+		settings: argonWithoutMemory,
+		allowed: false,
+	},
+	{
+		why: "Argon2id without its passes",
+		settings: argonWithoutPasses,
+		allowed: false,
+	},
+	{
+		why: "Argon2id with no memory",
+		settings: argonAsked(null, 3),
+		allowed: false,
+	},
+	{
+		why: "Argon2id with 3 PBKDF2 rounds",
+		settings: { ...argonAsked(65_536, 3), kdfIterations: 3 },
+		allowed: false,
+	},
+	{
+		why: "PBKDF2 under 600,000 rounds",
+		settings: pbkdf2Asked(599_999),
+		allowed: false,
+	},
+	{
+		why: "PBKDF2 at 600,000 rounds",
+		settings: pbkdf2Asked(600_000),
+		allowed: true,
+	},
+	{
+		why: "PBKDF2 at 10,000,000 rounds",
+		settings: pbkdf2Asked(10_000_000),
+		allowed: true,
+	},
+	{
+		why: "PBKDF2 over 10,000,000 rounds",
+		settings: pbkdf2Asked(10_000_001),
+		allowed: false,
+	},
+	{
+		why: "PBKDF2 with passes",
+		settings: { ...pbkdf2Asked(600_000), kdfPasses: 3 },
+		allowed: false,
+	},
+	{
+		why: "an account from before Argon2id, with no kdf",
+		settings: { kdfSalt: limitSalt, kdfIterations: 600_000 },
+		allowed: true,
+	},
+	{
+		why: "an account from before Argon2id, with 1,000 rounds",
+		settings: { kdfSalt: limitSalt, kdfIterations: 1_000 },
+		allowed: false,
+	},
+	{
+		why: "a salt of 15 bytes",
+		settings: { ...argonAsked(65_536, 3), kdfSalt: b64(run(0x00, 15)) },
+		allowed: false,
+	},
+	{
+		why: "a salt of 17 bytes",
+		settings: { ...argonAsked(65_536, 3), kdfSalt: b64(run(0x00, 17)) },
+		allowed: false,
+	},
+	{
+		why: "a salt that isn't base64",
+		settings: { ...argonAsked(65_536, 3), kdfSalt: "not base64!" },
+		allowed: false,
+	},
+	{
+		why: "no salt",
+		settings: { ...argonAsked(65_536, 3), kdfSalt: "" },
+		allowed: false,
+	},
+	{
+		why: "an algorithm vauly doesn't know",
+		settings: { ...argonAsked(65_536, 3), kdf: "scrypt" },
+		allowed: false,
+	},
+];
+
 const vectors = {
 	about:
 		"Test vectors for vauly's cryptography (packages/crypto). Every value is made up. Bytes are base64 (standard alphabet, padded) unless a field says hex. docs/security.md describes the formats; regenerate with `bun run vectors` in packages/crypto.",
@@ -678,6 +811,7 @@ const vectors = {
 			),
 		},
 	],
+	kdfLimits,
 	totp,
 	parseTotp: [
 		{
