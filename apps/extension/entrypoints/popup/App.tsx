@@ -67,6 +67,7 @@ import {
 	matchesPage,
 	matchOf,
 	saveLogin,
+	TooManyTriesError,
 	TwoStepError,
 	unlock,
 	updatePassword,
@@ -226,6 +227,11 @@ function SignIn({
 			if (err instanceof TwoStepError) {
 				setCode("");
 				setError(err.wrongCode ? err.message : "");
+				return;
+			}
+			// What was typed stays, for the next try.
+			if (err instanceof TooManyTriesError) {
+				setError(err.message);
 				return;
 			}
 			setPassword("");

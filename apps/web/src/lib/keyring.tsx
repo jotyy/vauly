@@ -196,6 +196,19 @@ export class TwoStepError extends Error {
 	}
 }
 
+/**
+ * The server asked to wait before the next try: after a few wrong codes, saying how long,
+ * or after many sign-ins from one address at once.
+ */
+export class TooManyTriesError extends Error {
+	constructor(message?: string) {
+		super(
+			message ||
+				"Too many sign-ins from here at once. Wait a few seconds, then try again.",
+		);
+	}
+}
+
 const privateVaultMeta = {
 	name: "Private",
 	description: "Only you can open this vault.",
@@ -425,11 +438,21 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			let { settings, keys, result } = await attempt();
 			// Another device may have moved the account to Argon2id since prelogin answered:
 			// if the settings changed, once more with the new ones.
-			if (result.error && !result.error.code?.startsWith("TWO_FACTOR")) {
+			if (
+				result.error &&
+				result.error.status !== 429 &&
+				!result.error.code?.startsWith("TWO_FACTOR")
+			) {
 				const fresh = await client.account.prelogin({ email });
 				if (fresh.kdfSalt !== settings.kdfSalt)
 					({ settings, keys, result } = await attempt());
 			}
+			if (result.error?.status === 429)
+				throw new TooManyTriesError(
+					result.error.code === "TOO_MANY_TRIES"
+						? result.error.message
+						: undefined,
+				);
 			if (result.error?.code === "TWO_FACTOR_REQUIRED")
 				throw new TwoStepError(false);
 			if (result.error?.code === "TWO_FACTOR_WRONG")

@@ -222,6 +222,38 @@ test("two-step login works in the app", async ({ browser, page }) => {
 	expect((await keychain(page)).token).toBeTruthy();
 });
 
+test("too many sign-ins say to wait, not that the app is offline", async ({
+	page,
+	request,
+}) => {
+	await asTheApp(page);
+	await connect(page);
+	// One made-up address, as Cloudflare gives it, for every sign-in here.
+	const group = () => Math.floor(Math.random() * 0x10000).toString(16);
+	const ip = `2001:db8:${group()}:${group()}::1`;
+	for (let i = 0; i < 10; i++) {
+		const wrong = await request.post(`${API_URL}/api/auth/sign-in/email`, {
+			headers: {
+				origin: `http://localhost:${WEB_PORT}`,
+				"cf-connecting-ip": ip,
+			},
+			data: { email: owner.email, password: "0".repeat(64) },
+		});
+		expect(wrong.status()).toBe(401);
+	}
+	await page.route(`${API_URL}/api/auth/sign-in/email`, (route) =>
+		route.continue({
+			headers: { ...route.request().headers(), "cf-connecting-ip": ip },
+		}),
+	);
+	await page.getByLabel("Email").fill(owner.email);
+	await page.getByLabel("Master password").fill(owner.password);
+	await page.getByRole("button", { name: "Sign in" }).click();
+	await expect(page.getByRole("alert")).toHaveText(
+		"Too many sign-ins from here at once. Wait a few seconds, then try again.",
+	);
+});
+
 test("the API lets the app in without credentials, and no other origin", async ({
 	request,
 }) => {

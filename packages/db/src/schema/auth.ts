@@ -87,6 +87,17 @@ export const verification = sqliteTable(
 	(table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+/**
+ * Better Auth's count of recent requests to its routes, per client address and path. It's
+ * in the database so every instance of the Worker counts the same requests.
+ */
+export const rateLimit = sqliteTable("rate_limit", {
+	id: text("id").primaryKey(),
+	key: text("key").notNull().unique(),
+	count: integer("count").notNull(),
+	lastRequest: integer("last_request").notNull(),
+});
+
 export const authRelations = defineRelationsPart(
 	{ user, session, account, verification },
 	(r) => ({

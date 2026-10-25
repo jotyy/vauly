@@ -105,17 +105,18 @@ export function ApprovalCard({
 				>
 					Deny
 				</Button>
+				{/* Approving wraps the item's key with the agent's, so it waits for both. */}
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={busy || !item}
+					disabled={busy || !item || !agent}
 					onClick={() => allow("once", "once")}
 				>
 					Allow once
 				</Button>
 				<Button
 					size="sm"
-					disabled={busy || !item}
+					disabled={busy || !item || !agent}
 					onClick={() => allow("hour", "for 1 hour")}
 				>
 					Allow for 1 hour
