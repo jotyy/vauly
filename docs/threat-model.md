@@ -76,7 +76,7 @@ With the extension installed, every site's page sits next to vauly's button and 
 
 ### Someone with your device
 
-- **While vauly is locked,** nothing decrypted is stored. They need the master password, or, where you turned on unlocking with a passkey, the device's own check while the session lasts and for 14 days at most. The [offline copy](security.md#offline-copy) is sealed, so it needs the master password too.
+- **While vauly is locked,** nothing decrypted is stored. They need the master password, or, where you turned on unlocking with a passkey, or with Face ID or Touch ID in the iPhone app, the device's own check while the session lasts and for 14 days at most ([Unlocking with Face ID in the app](security.md#unlocking-with-face-id-in-the-app)). The [offline copy](security.md#offline-copy) is sealed, so it needs the master password too.
 - **While it's unlocked,** they can read what you can, until it locks: on a reload, **Lock now**, or 15 idle minutes by default. The extension also locks when the browser closes.
 
 ### Someone who knows your master password
