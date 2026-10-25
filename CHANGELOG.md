@@ -18,6 +18,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 - On an iPhone, tapping a field no longer zooms the page in and leaves it zoomed: fields use 16px text on touch screens. The app fills the screen around the notch and the home indicator when it's installed.
 - When the device is online but vauly's server doesn't answer, messages name the server instead of saying you're offline, and an error page from in front of the server says so.
 - On a narrow screen, a notification about a long name keeps its first word whole, as in "Saved", and shortens the name instead. It used to cut both.
+- Allowing an agent's request right as the page opens waits until the page has the agent: the buttons stay greyed out for that moment, instead of failing with "Open the item's vault to approve this".
 
 ## 0.2.1 - 2026-10-25
 
