@@ -346,6 +346,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - run: swift test
         working-directory: native/VaulyKit
 

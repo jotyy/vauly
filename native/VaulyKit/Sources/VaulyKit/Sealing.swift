@@ -26,22 +26,30 @@ public func open(_ key: SymmetricKey, _ sealed: Sealed, additionalData: Data? = 
 	guard parts.count == 2 else { throw VaulyKitError.malformed("ciphertext") }
 	let iv = try Data(base64: String(parts[0]), "ciphertext")
 	let body = try Data(base64: String(parts[1]), "ciphertext")
-	guard body.count >= 16 else { throw VaulyKitError.malformed("ciphertext") }
+	// vauly writes 12-byte IVs only, and every tag is 16 bytes.
+	guard iv.count == 12, body.count >= 16 else { throw VaulyKitError.malformed("ciphertext") }
 	let box = try AES.GCM.SealedBox(
 		nonce: AES.GCM.Nonce(data: iv), ciphertext: body.dropLast(16), tag: body.suffix(16))
 	return try additionalData.map { try AES.GCM.open(box, using: key, authenticating: $0) }
 		?? AES.GCM.open(box, using: key)
 }
 
-/// JSON as the web app writes it: no escaped slashes.
+/// JSON as the web app writes it: no escaped slashes. JSONEncoder isn't JSON.stringify,
+/// though: it leaves out nil fields, writes a Date as seconds since 2001, and writes only
+/// the fields the model has. Seal models of strings, numbers and nested models, and open
+/// an item into a model with every field it can hold before sealing it again.
 public func sealJson<T: Encodable>(_ key: SymmetricKey, _ value: T) throws -> Sealed {
 	let encoder = JSONEncoder()
 	encoder.outputFormatting = .withoutEscapingSlashes
 	return try seal(key, encoder.encode(value))
 }
 
+/// Opens JSON the web app sealed. JSON with a key twice in one object is refused: the web
+/// app would read the last and JSONDecoder the first (refuseDuplicateKeys).
 public func openJson<T: Decodable>(_ type: T.Type, _ key: SymmetricKey, _ sealed: Sealed) throws -> T {
-	try JSONDecoder().decode(type, from: open(key, sealed))
+	let json = try open(key, sealed)
+	try refuseDuplicateKeys(json)
+	return try JSONDecoder().decode(type, from: json)
 }
 
 // --- Data keys (vault keys and item keys) ------------------------------------------

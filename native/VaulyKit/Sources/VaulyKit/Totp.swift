@@ -23,7 +23,9 @@ public struct TotpConfig: Codable, Equatable, Sendable {
 	}
 }
 
-/// Reads a base32 setup key or an otpauth:// link; nil when there's nothing to read.
+/// Reads a base32 setup key or an otpauth:// link; nil when there's nothing to read, or
+/// the link asks for what vauly doesn't make: 6 to 10 digits, a period of 1 to 300 seconds,
+/// and SHA-1, SHA-256 or SHA-512.
 public func parseTotp(_ input: String) -> TotpConfig? {
 	let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
 	if text.isEmpty { return nil }
@@ -32,15 +34,16 @@ public func parseTotp(_ input: String) -> TotpConfig? {
 		let secret = items.first(where: { $0.name == "secret" })?.value, !secret.isEmpty
 	else { return nil }
 	let value = { (name: String) in items.first(where: { $0.name == name })?.value }
-	guard let digits = Int(value("digits") ?? "6"), let period = Int(value("period") ?? "30") else {
-		return nil
+	guard let digits = Int(value("digits") ?? "6"), (6...10).contains(digits),
+		let period = Int(value("period") ?? "30"), (1...300).contains(period)
+	else { return nil }
+	let algorithm: TotpConfig.Algorithm
+	switch (value("algorithm") ?? "SHA1").uppercased() {
+	case "SHA1": algorithm = .sha1
+	case "SHA256": algorithm = .sha256
+	case "SHA512": algorithm = .sha512
+	default: return nil
 	}
-	let algorithm: TotpConfig.Algorithm =
-		switch (value("algorithm") ?? "SHA1").uppercased() {
-		case "SHA256": .sha256
-		case "SHA512": .sha512
-		default: .sha1
-		}
 	return TotpConfig(secret: secret, digits: digits, period: period, algorithm: algorithm)
 }
 
@@ -72,13 +75,16 @@ private func hmac(_ algorithm: TotpConfig.Algorithm, key: SymmetricKey, message:
 	}
 }
 
+/// The code at `now`. A stored item's settings may not have come through `parseTotp`, so
+/// they're checked again here.
 public func totpCode(_ config: TotpConfig, now: Date = Date()) throws -> String {
-	guard config.period > 0, (1...10).contains(config.digits) else {
-		throw VaulyKitError.malformed("one-time code settings")
-	}
-	let counter = UInt64(max(0, (now.timeIntervalSince1970 / Double(config.period)).rounded(.down)))
+	guard config.period > 0, (1...10).contains(config.digits),
+		let counter = UInt64(exactly: max(0, (now.timeIntervalSince1970 / Double(config.period)).rounded(.down)))
+	else { throw VaulyKitError.malformed("one-time code settings") }
+	let secret = try base32(config.secret)
+	guard !secret.isEmpty else { throw VaulyKitError.malformed("base32 secret") }
 	let message = withUnsafeBytes(of: counter.bigEndian) { Data($0) }
-	let mac = hmac(config.algorithm, key: SymmetricKey(data: try base32(config.secret)), message: message)
+	let mac = hmac(config.algorithm, key: SymmetricKey(data: secret), message: message)
 	let offset = Int(mac[mac.count - 1] & 0x0f)
 	let binary =
 		(UInt64(mac[offset] & 0x7f) << 24) | (UInt64(mac[offset + 1]) << 16)
@@ -89,7 +95,9 @@ public func totpCode(_ config: TotpConfig, now: Date = Date()) throws -> String 
 	return String(repeating: "0", count: config.digits - code.count) + code
 }
 
-/// Seconds until the current code changes.
+/// Seconds until the current code changes; 0 for settings `totpCode` refuses.
 public func totpSecondsLeft(_ config: TotpConfig, now: Date = Date()) -> Int {
-	config.period - Int(now.timeIntervalSince1970.rounded(.down)) % config.period
+	guard config.period > 0, let seconds = Int(exactly: now.timeIntervalSince1970.rounded(.down))
+	else { return 0 }
+	return config.period - (seconds % config.period + config.period) % config.period
 }

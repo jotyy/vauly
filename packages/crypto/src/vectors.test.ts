@@ -17,6 +17,8 @@ import {
 	fromBase64,
 	importPrivateKey,
 	type Kdf,
+	kdfAllowed,
+	kdfOf,
 	keyFromText,
 	keyToText,
 	open,
@@ -142,6 +144,12 @@ type Vectors = {
 		iv: string;
 		sealedMeta: string;
 	} & ({ plaintext: string } | { run: { start: number; length: number } }))[];
+	/** As a server would send them: fields can be missing, or not what vauly knows. */
+	kdfLimits: {
+		why: string;
+		settings: Parameters<typeof kdfOf>[0] & { kdfSalt: string };
+		allowed: boolean;
+	}[];
 	totp: (TotpConfig & { time: number; code: string })[];
 	parseTotp: { input: string; config: TotpConfig }[];
 };
@@ -150,6 +158,13 @@ const vectors: Vectors = JSON.parse(
 	readFileSync(new URL("../test-vectors.json", import.meta.url), "utf8"),
 );
 const encoder = new TextEncoder();
+
+test("every list of vectors has some", () => {
+	for (const [name, list] of Object.entries(vectors)) {
+		if (Array.isArray(list))
+			expect([name, list.length > 0]).toEqual([name, true]);
+	}
+});
 
 const aesKey = (base64: string) =>
 	crypto.subtle.importKey("raw", fromBase64(base64), "AES-GCM", true, [
@@ -460,6 +475,16 @@ test("agent tokens", async () => {
 test("one-time codes: RFC 6238", async () => {
 	for (const { time, code, ...config } of vectors.totp) {
 		expect(await totpCode(config, time * 1000)).toBe(code);
+	}
+});
+
+describe("key derivation limits", () => {
+	for (const { why, settings, allowed } of vectors.kdfLimits) {
+		test(`${allowed ? "allows" : "refuses"} ${why}`, () => {
+			expect(
+				kdfAllowed({ kdfSalt: settings.kdfSalt, ...kdfOf(settings) }),
+			).toBe(allowed);
+		});
 	}
 });
 

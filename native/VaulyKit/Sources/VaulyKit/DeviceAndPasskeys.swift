@@ -20,9 +20,12 @@ public struct DeviceCopyContext: Equatable, Sendable {
 
 /// The key that seals a device's copy of the private key: HKDF-SHA256 of the device's
 /// secret (a passkey's PRF output on the web), with the server's pepper for the session as
-/// salt. Neither alone opens the copy, and the pepper ends with the session.
-public func deviceKey(secret: Data, pepper: Data) -> SymmetricKey {
-	HKDF<SHA256>.deriveKey(
+/// salt. Neither alone opens the copy, and the pepper ends with the session. The secret is
+/// 32 bytes and the pepper at least 16; anything shorter is refused rather than stretched.
+public func deviceKey(secret: Data, pepper: Data) throws -> SymmetricKey {
+	guard secret.count == 32 else { throw VaulyKitError.malformed("device secret") }
+	guard pepper.count >= 16 else { throw VaulyKitError.malformed("pepper") }
+	return HKDF<SHA256>.deriveKey(
 		inputKeyMaterial: SymmetricKey(data: secret), salt: pepper, info: Data("vauly/device".utf8),
 		outputByteCount: 32)
 }

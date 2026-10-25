@@ -54,10 +54,15 @@ public func unwrapKey(from wrapped: String, privateKey: PrivateKey, ownPublicKey
 	return try unwrapKey(aes, String(parts[1]))
 }
 
-/// Opens the account's private key with an already derived wrap key. Fails on a wrong
-/// password, as CryptoKit's authentication failure.
-public func openPrivateKey(wrapKey: SymmetricKey, encryptedPrivateKey: Sealed) throws -> PrivateKey {
-	try importPrivateKey(pkcs8: open(wrapKey, encryptedPrivateKey))
+/// Opens the account's private key with an already derived wrap key, and checks that it's
+/// the key the account's public key belongs to. A wrong password fails as CryptoKit's
+/// authentication failure; a sealed key that opens but isn't the account's, as `anotherKey`.
+/// Keys derived from prelogin's settings fail here if the account has moved since: derive
+/// again with `keys.kdfSettings`.
+public func openPrivateKey(wrapKey: SymmetricKey, keys: AccountKeys) throws -> PrivateKey {
+	let privateKey = try importPrivateKey(pkcs8: open(wrapKey, keys.encryptedPrivateKey))
+	guard publicKeyOf(privateKey) == keys.publicKey else { throw VaulyKitError.anotherKey }
+	return privateKey
 }
 
 public struct UnlockedAccount: Sendable {
@@ -65,12 +70,14 @@ public struct UnlockedAccount: Sendable {
 	public let privateKey: PrivateKey
 }
 
-/// Derives with the account's own settings and opens its private key. The apps check the
-/// settings first, with `checkedMasterKeys`.
-public func unlockAccount(password: String, keys: AccountKeys) throws -> UnlockedAccount {
-	let master = try deriveMasterKeys(password: password, salt: keys.kdfSalt, kdf: keys.settings)
+/// Unlocks an account in one call: checks its settings (`checkKdf`), derives with them, and
+/// opens and checks its private key.
+public func unlockAccount(password: String, keys: AccountKeys, argon2idSeen: Bool, memoryLimit: Int)
+	throws -> UnlockedAccount
+{
+	let master = try checkedMasterKeys(
+		password: password, settings: keys.kdfSettings, argon2idSeen: argon2idSeen,
+		memoryLimit: memoryLimit)
 	return UnlockedAccount(
-		authKey: master.authKey,
-		privateKey: try openPrivateKey(
-			wrapKey: master.wrapKey, encryptedPrivateKey: keys.encryptedPrivateKey))
+		authKey: master.authKey, privateKey: try openPrivateKey(wrapKey: master.wrapKey, keys: keys))
 }

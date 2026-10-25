@@ -5,12 +5,15 @@ import Foundation
 public enum VaulyKitError: Error, Equatable {
 	/// The server asked for key derivation outside vauly's limits.
 	case kdfNotAllowed(String)
+	/// The account's Argon2id needs more memory than this process may use: the AutoFill
+	/// extension sends the person to the app.
+	case overMemoryLimit
 	/// Argon2id failed, usually for want of memory.
 	case argon2
 	case pbkdf2
 	/// Not in a format vauly writes.
 	case malformed(String)
-	/// A device copy opened, but holds another key than the account's.
+	/// A private key opened, but it's another key than the account's.
 	case anotherKey
 }
 
@@ -18,10 +21,12 @@ extension VaulyKitError: LocalizedError {
 	public var errorDescription: String? {
 		switch self {
 		case .kdfNotAllowed(let message): message
+		case .overMemoryLimit:
+			"Unlocking this account takes more memory than AutoFill can use. Open vauly to unlock it."
 		case .argon2: "Your master password couldn't be checked: this device ran out of memory."
 		case .pbkdf2: "Your master password couldn't be checked."
 		case .malformed(let what): "Malformed \(what)"
-		case .anotherKey: "This copy holds another key"
+		case .anotherKey: "This holds another key than the account's"
 		}
 	}
 }

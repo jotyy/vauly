@@ -119,24 +119,46 @@ private struct Vectors: Decodable {
 	let parseTotp: [ParseTotp]
 }
 
+private let vectorsURL = URL(fileURLWithPath: #filePath)
+	.deletingLastPathComponent()  // VaulyKitTests
+	.deletingLastPathComponent()  // Tests
+	.deletingLastPathComponent()  // VaulyKit
+	.deletingLastPathComponent()  // native
+	.deletingLastPathComponent()  // the repository
+	.appendingPathComponent("packages/crypto/test-vectors.json")
+
 /// packages/crypto/test-vectors.json, found from this file's place in the repository.
-private let vectors: Vectors = {
-	let url = URL(fileURLWithPath: #filePath)
-		.deletingLastPathComponent()  // VaulyKitTests
-		.deletingLastPathComponent()  // Tests
-		.deletingLastPathComponent()  // VaulyKit
-		.deletingLastPathComponent()  // native
-		.deletingLastPathComponent()  // the repository
-		.appendingPathComponent("packages/crypto/test-vectors.json")
-	return try! JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
-}()
+private let vectors = try! JSONDecoder().decode(Vectors.self, from: Data(contentsOf: vectorsURL))
+
+/// The same file as plain JSON, for what Vectors can't decode up front.
+let vectorsJson =
+	try! JSONSerialization.jsonObject(with: Data(contentsOf: vectorsURL)) as! [String: Any]
 
 private func key(_ base64: String) -> SymmetricKey { SymmetricKey(data: Data(base64Encoded: base64)!) }
 private func raw(_ key: SymmetricKey) -> String { key.withUnsafeBytes { Data($0).base64EncodedString() } }
 private func nonce(_ base64: String) -> AES.GCM.Nonce { try! AES.GCM.Nonce(data: Data(base64Encoded: base64)!) }
 private func data(_ base64: String) -> Data { Data(base64Encoded: base64)! }
 
+/// What an old account's vectors need: they're below vauly's limits, so the checked
+/// functions refuse them.
+private func uncheckedUnlock(password: String, keys: AccountKeys) throws -> UnlockedAccount {
+	let master = try deriveMasterKeys(password: password, salt: keys.kdfSalt, kdf: keys.settings)
+	return UnlockedAccount(
+		authKey: master.authKey, privateKey: try openPrivateKey(wrapKey: master.wrapKey, keys: keys))
+}
+
+private func unlock(password: String, keys: AccountKeys) throws -> UnlockedAccount {
+	try unlockAccount(password: password, keys: keys, argon2idSeen: false, memoryLimit: Argon2Memory.app)
+}
+
 final class VectorTests: XCTestCase {
+	/// A list left empty would pass every loop below without checking anything.
+	func testEveryListHasVectors() {
+		for (name, value) in vectorsJson {
+			if let list = value as? [Any] { XCTAssertFalse(list.isEmpty, name) }
+		}
+	}
+
 	func testMasterKeys() throws {
 		for vector in vectors.masterKeys {
 			let keys = try deriveMasterKeys(password: vector.password, salt: vector.salt, kdf: vector.kdf)
@@ -171,7 +193,8 @@ final class VectorTests: XCTestCase {
 			XCTAssertEqual(made, vector.sealed)
 			let item = try openJson(Item.self, key(vector.key), vector.sealed)
 			XCTAssertEqual(item, try JSONDecoder().decode(Item.self, from: Data(vector.json.utf8)))
-			// What VaulyKit seals, the web app reads back the same.
+			// What VaulyKit seals, it opens to the same. (Only a round trip in Swift: JSONEncoder
+			// and JSON.stringify differ for nil fields and dates, as sealJson says.)
 			let again = try openJson(Item.self, key(vector.key), sealJson(key(vector.key), item))
 			XCTAssertEqual(again, item)
 		}
@@ -203,7 +226,7 @@ final class VectorTests: XCTestCase {
 
 	func testAccountsUnlock() throws {
 		for vector in vectors.createAccount {
-			let unlocked = try unlockAccount(password: vector.password, keys: vector.keys)
+			let unlocked = try unlock(password: vector.password, keys: vector.keys)
 			XCTAssertEqual(unlocked.authKey, vector.authKey)
 			XCTAssertEqual(publicKeyOf(unlocked.privateKey), vector.keys.publicKey)
 			// The private key sealed the way createAccount seals it.
@@ -212,26 +235,35 @@ final class VectorTests: XCTestCase {
 			let sealed = try seal(
 				master.wrapKey, data(vector.privateKey), additionalData: nil, nonce: nonce(vector.iv))
 			XCTAssertEqual(sealed, vector.keys.encryptedPrivateKey)
-			XCTAssertNoThrow(try checkedMasterKeys(password: vector.password, keys: vector.keys))
+			// Signing in derives from prelogin's settings, before the keys come back.
+			let signIn = try checkedMasterKeys(
+				password: vector.password, settings: vector.keys.kdfSettings, argon2idSeen: true,
+				memoryLimit: Argon2Memory.app)
+			XCTAssertEqual(signIn.authKey, vector.authKey)
+			XCTAssertEqual(
+				publicKeyOf(try openPrivateKey(wrapKey: signIn.wrapKey, keys: vector.keys)), vector.keys.publicKey)
 		}
 		for vector in vectors.changeMasterPassword {
-			XCTAssertEqual(try unlockAccount(password: vector.current, keys: vector.keys).authKey, vector.currentAuthKey)
-			let next = try unlockAccount(password: vector.next, keys: vector.nextKeys)
+			XCTAssertEqual(try unlock(password: vector.current, keys: vector.keys).authKey, vector.currentAuthKey)
+			let next = try unlock(password: vector.next, keys: vector.nextKeys)
 			XCTAssertEqual(next.authKey, vector.authKey)
 			XCTAssertEqual(publicKeyOf(next.privateKey), vector.keys.publicKey)
-			XCTAssertThrowsError(try unlockAccount(password: vector.current, keys: vector.nextKeys))
+			XCTAssertThrowsError(try unlock(password: vector.current, keys: vector.nextKeys))
 		}
 		for vector in vectors.upgradeKdf {
-			XCTAssertEqual(try unlockAccount(password: vector.password, keys: vector.keys).authKey, vector.currentAuthKey)
-			XCTAssertEqual(try unlockAccount(password: vector.password, keys: vector.nextKeys).authKey, vector.authKey)
+			XCTAssertEqual(
+				try uncheckedUnlock(password: vector.password, keys: vector.keys).authKey, vector.currentAuthKey)
+			XCTAssertEqual(try unlock(password: vector.password, keys: vector.nextKeys).authKey, vector.authKey)
 			// The account from before the move derives too little to pass vauly's limits.
-			XCTAssertThrowsError(try checkedMasterKeys(password: vector.password, keys: vector.keys))
+			XCTAssertThrowsError(try unlock(password: vector.password, keys: vector.keys)) {
+				guard case .kdfNotAllowed = $0 as? VaulyKitError else { return XCTFail("\($0)") }
+			}
 		}
 	}
 
 	func testDeviceCopies() throws {
 		for vector in vectors.deviceKey {
-			let device = deviceKey(secret: data(vector.prfOutput), pepper: data(vector.pepper))
+			let device = try deviceKey(secret: data(vector.prfOutput), pepper: data(vector.pepper))
 			XCTAssertEqual(device.withUnsafeBytes { Data($0).hex }, vector.deviceKey)
 			let context = DeviceCopyContext(
 				accountId: vector.accountId, credentialId: vector.credentialId, publicKey: vector.publicKey)
@@ -240,7 +272,7 @@ final class VectorTests: XCTestCase {
 			XCTAssertEqual(made, vector.sealed)
 			XCTAssertEqual(publicKeyOf(try openDeviceCopy(device, vector.sealed, context: context)), vector.publicKey)
 			// Another session's pepper, or another context, doesn't open it.
-			let otherPepper = deviceKey(secret: data(vector.prfOutput), pepper: Data(count: 32))
+			let otherPepper = try deviceKey(secret: data(vector.prfOutput), pepper: Data(count: 32))
 			XCTAssertThrowsError(try openDeviceCopy(otherPepper, vector.sealed, context: context))
 			var other = context
 			other.accountId = "user_someone_else"
@@ -279,15 +311,15 @@ final class VectorTests: XCTestCase {
 		}
 	}
 
-	func testKdfLimits() {
-		let salt = "AAECAwQFBgcICQoLDA0ODw=="
-		XCTAssertTrue(kdfAllowed(.argon2id, salt: salt))
-		XCTAssertTrue(kdfAllowed(Kdf(kdf: .pbkdf2, kdfIterations: 600_000), salt: salt))
-		XCTAssertFalse(kdfAllowed(Kdf(kdf: .pbkdf2, kdfIterations: 1_000), salt: salt))
-		XCTAssertFalse(
-			kdfAllowed(Kdf(kdf: .argon2id, kdfIterations: 600_000, kdfPasses: 3, kdfMemory: 2 * 1024 * 1024), salt: salt))
-		XCTAssertFalse(kdfAllowed(.argon2id, salt: "AAEC"))
-		XCTAssertThrowsError(try refuseDowngrade(Kdf(kdf: .pbkdf2, kdfIterations: 600_000), argon2idSeen: true))
-		XCTAssertNoThrow(try refuseDowngrade(.argon2id, argon2idSeen: true))
+	/// The limits table, which packages/crypto is checked against too. A case Swift can't
+	/// decode (an algorithm it doesn't know, a field missing) counts as refused.
+	func testKdfLimits() throws {
+		let cases = try XCTUnwrap(vectorsJson["kdfLimits"] as? [[String: Any]])
+		for limit in cases {
+			let why = limit["why"] as! String
+			let json = try JSONSerialization.data(withJSONObject: limit["settings"]!)
+			let settings = try? JSONDecoder().decode(KdfSettings.self, from: json)
+			XCTAssertEqual(settings.map(kdfAllowed) ?? false, limit["allowed"] as! Bool, why)
+		}
 	}
 }
