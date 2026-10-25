@@ -17,21 +17,12 @@ public class SessionPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "clear", returnType: CAPPluginReturnPromise)
     ]
 
-    private static let installedKey = "app.vauly.installed"
+    // Gone after the app is deleted and installed again: Keychain.forgetAfterReinstall.
     private let item: [String: Any] = [
         kSecClass as String: kSecClassGenericPassword,
         kSecAttrService as String: "app.vauly.session",
         kSecAttrAccount as String: "session"
     ]
-
-    public override func load() {
-        // The Keychain outlives the app, so deleting vauly and installing it again would
-        // come back signed in. UserDefaults goes with the app: no mark, a fresh install.
-        if !UserDefaults.standard.bool(forKey: Self.installedKey) {
-            SecItemDelete(item as CFDictionary)
-            UserDefaults.standard.set(true, forKey: Self.installedKey)
-        }
-    }
 
     /// Resolves with `address`, `server` and `token`, each only if it's there. Rejects with
     /// LOCKED when the Keychain can't be read just now, as before the iPhone is unlocked.

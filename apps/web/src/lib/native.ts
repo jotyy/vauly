@@ -25,7 +25,37 @@ type Bridge = {
 			}): Promise<void>;
 			clear(): Promise<void>;
 		};
+		/**
+		 * The app's own plugin (apps/mobile): unlocking with Face ID or Touch ID. It rejects
+		 * with a `code`: CANCELLED, INVALIDATED (the faces or fingers changed), UNAVAILABLE
+		 * or BROKEN.
+		 */
+		VaulyUnlock?: {
+			biometry(): Promise<{
+				kind: "faceID" | "touchID" | "opticID" | "none";
+			}>;
+			copies(): Promise<{ copies: NativeCopy[] }>;
+			turnOn(
+				copy: NativeCopy & { pepper: string; privateKey: string },
+			): Promise<void>;
+			unlock(account: {
+				accountId: string;
+				publicKey: string;
+				pepper: string;
+			}): Promise<{ privateKey: string }>;
+			forget(which?: { accountId?: string }): Promise<void>;
+		};
 	};
+};
+
+/** What the app keeps besides the sealed key, which never leaves its native side. */
+export type NativeCopy = {
+	accountId: string;
+	publicKey: string;
+	sessionId: string;
+	issuedAt: number;
+	/** Made by the app for the copy's additional data, as a passkey's ID on the web. */
+	credentialId?: string;
 };
 
 const bridge = (globalThis as { Capacitor?: Bridge }).Capacitor;
@@ -45,6 +75,9 @@ export const isDebugApp =
 
 /** Where the app keeps which vauly it's connected to, and its session there. */
 export const sessionStore = bridge?.Plugins.VaulySession;
+
+/** The app's Face ID or Touch ID unlock; see lib/device-unlock.ts. */
+export const biometricUnlock = bridge?.Plugins.VaulyUnlock;
 
 /** Marks the page for the app's own styling (native.css), as `html[data-native="ios"]`. */
 export function markNativeApp() {

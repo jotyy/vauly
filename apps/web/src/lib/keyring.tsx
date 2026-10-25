@@ -35,13 +35,16 @@ import { argon2InWorker, prepareArgon2 } from "@/lib/argon2";
 import { argon2idSeen, rememberArgon2id } from "@/lib/argon2id-seen";
 import { authClient } from "@/lib/auth-client";
 import {
+	biometryChanged,
 	type DeviceUnlock,
+	deviceUnlockMethod,
 	type Enrolment,
 	expiresAt,
 	forgetDeviceUnlocks,
 	isCancel,
 	readDeviceUnlock,
 	startEnrolment,
+	type UnlockMethod,
 	unlockWithDevice,
 } from "@/lib/device-unlock";
 import {
@@ -117,6 +120,11 @@ type Keyring = {
 	/** With two-step login on, the second try carries the code. */
 	signIn: (email: string, password: string, code?: string) => Promise<void>;
 	unlock: (password: string) => Promise<void>;
+	/**
+	 * How this device unlocks without the master password: a passkey in a browser, Face ID
+	 * or Touch ID in the app. Null where it can't, or until that's known.
+	 */
+	deviceUnlockMethod: UnlockMethod | null;
 	/** Whether this device keeps a passkey-sealed copy of the private key for this account. */
 	deviceUnlock: boolean;
 	/** When that copy stops working and the master password is needed again. */
@@ -170,7 +178,9 @@ export class WrongPasswordError extends Error {
 
 /** Why a passkey didn't unlock: only "expired" and "broken" mean the copy is gone. */
 export class PasskeyUnlockError extends Error {
-	constructor(readonly reason: "cancelled" | "expired" | "offline" | "broken") {
+	constructor(
+		readonly reason: "cancelled" | "expired" | "offline" | "broken" | "changed",
+	) {
 		super(`Passkey unlock ${reason}`);
 	}
 }
@@ -204,6 +214,12 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 	const autoLockMs = autoLockMinutes * 60_000;
 	const privateKey = useRef<CryptoKey | null>(null);
 	const vaultKeys = useRef(new Map<string, Promise<CryptoKey>>());
+	const [deviceMethod, setDeviceMethod] = useState<UnlockMethod | null>(null);
+	useEffect(() => {
+		deviceUnlockMethod()
+			.then(setDeviceMethod)
+			.catch(() => setDeviceMethod(null));
+	}, []);
 	const [deviceRecord, setDeviceRecord] = useState<DeviceUnlock | null>(null);
 	const [deviceExpired, setDeviceExpired] = useState(false);
 	/** The current session's ID; undefined while it couldn't be checked. */
@@ -466,6 +482,11 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			// network leave the copy; a server that refuses it, or a copy that won't open,
 			// end it.
 			if (isCancel(err)) throw new PasskeyUnlockError("cancelled");
+			// In the app: a face or finger added or removed since; the app dropped the copy.
+			if (biometryChanged(err)) {
+				await forgetDevice(me.id);
+				throw new PasskeyUnlockError("changed");
+			}
 			if (err instanceof ORPCError && err.code === "FORBIDDEN") {
 				await forgetDevice(me.id);
 				setDeviceExpired(true);
@@ -771,6 +792,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			locksAt: status === "unlocked" ? lastActive + autoLockMs : null,
 			signIn,
 			unlock,
+			deviceUnlockMethod: deviceMethod,
 			deviceUnlock: deviceRecord !== null,
 			deviceUnlockUntil: deviceRecord ? expiresAt(deviceRecord) : null,
 			deviceUnlockExpired: deviceExpired,
@@ -804,6 +826,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			lastActive,
 			signIn,
 			unlock,
+			deviceMethod,
 			deviceRecord,
 			deviceExpired,
 			unlockWithPasskey,

@@ -1,4 +1,8 @@
-import { FingerprintIcon, WarningIcon } from "@phosphor-icons/react";
+import {
+	FingerprintIcon,
+	ScanSmileyIcon,
+	WarningIcon,
+} from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@vauly/ui/components/button";
 import { Checkbox } from "@vauly/ui/components/checkbox";
@@ -33,6 +37,7 @@ import {
 	DeviceUnlockUnavailable,
 	type Enrolment,
 	isCancel,
+	unlockName,
 } from "@/lib/device-unlock";
 import { fileSize, readFile, saveBlob, useFiles } from "@/lib/files";
 import { plural } from "@/lib/format";
@@ -174,7 +179,8 @@ export function ChangePasswordDialog({
 /**
  * Turns on unlocking with a passkey on this device: the master password, then a tap to
  * create the passkey, and on some devices one more to use it once. Each passkey prompt
- * starts right in its tap, which Safari insists on.
+ * starts right in its tap, which Safari insists on. In the app it's Face ID or Touch ID,
+ * asked for right after the master password, since it needs no tap of its own.
  */
 export function DeviceUnlockDialog({
 	open,
@@ -184,6 +190,8 @@ export function DeviceUnlockDialog({
 	onOpenChange: (open: boolean) => void;
 }) {
 	const keyring = useKeyring();
+	const name = unlockName(keyring.deviceUnlockMethod);
+	const passkey = name === "passkey";
 	const [step, setStep] = useState<"password" | "create" | "confirm">(
 		"password",
 	);
@@ -205,7 +213,9 @@ export function DeviceUnlockDialog({
 
 	const done = () => {
 		notify.success(
-			"This device unlocks with a passkey now",
+			passkey
+				? "This device unlocks with a passkey now"
+				: `vauly unlocks with ${name} now`,
 			"For 14 days at a time. Signing in still needs your master password.",
 		);
 		onOpenChange(false);
@@ -214,7 +224,9 @@ export function DeviceUnlockDialog({
 	const failed = (err: unknown) => {
 		if (isCancel(err)) {
 			setError(
-				"The passkey didn't go through. Try again, and confirm with Face ID, Touch ID, Windows Hello or your device's PIN.",
+				passkey
+					? "The passkey didn't go through. Try again, and confirm with Face ID, Touch ID, Windows Hello or your device's PIN."
+					: `${name} didn't go through. Try again.`,
 			);
 			return;
 		}
@@ -236,6 +248,19 @@ export function DeviceUnlockDialog({
 			.finally(() => setBusy(false));
 	};
 
+	/** The step after the master password: create the passkey, or confirm it once. */
+	const proceed = async () => {
+		const current = enrolment.current;
+		if (!current) return;
+		if (step === "confirm") {
+			await current.confirm();
+			return done();
+		}
+		const next = await current.create();
+		if (next === "done") done();
+		else setStep("confirm");
+	};
+
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		setError("");
@@ -250,9 +275,11 @@ export function DeviceUnlockDialog({
 					? "That's not your master password."
 					: errorMessage(err),
 			);
+			return;
 		} finally {
 			setBusy(false);
 		}
+		if (!passkey) act(proceed);
 	};
 
 	const close = (
@@ -265,13 +292,17 @@ export function DeviceUnlockDialog({
 		<FormDialog
 			open={open}
 			onOpenChange={(next) => !busy && onOpenChange(next)}
-			title="Unlock with this device"
+			title={passkey ? "Unlock with this device" : `Unlock with ${name}`}
 			description={
-				step === "password"
-					? "Enter your master password. Then your device asks for Face ID, Touch ID, Windows Hello or its PIN."
-					: step === "create"
-						? "Now create the passkey. vauly keeps a copy of your keys on this device that only it opens, for 14 days at a time."
-						: "Use the new passkey once, so vauly can seal the copy of your keys with it."
+				!passkey
+					? step === "password"
+						? `Enter your master password. Then confirm with ${name}.`
+						: `Confirm with ${name}. vauly keeps a copy of your keys on this iPhone that only it opens, for 14 days at a time.`
+					: step === "password"
+						? "Enter your master password. Then your device asks for Face ID, Touch ID, Windows Hello or its PIN."
+						: step === "create"
+							? "Now create the passkey. vauly keeps a copy of your keys on this device that only it opens, for 14 days at a time."
+							: "Use the new passkey once, so vauly can seal the copy of your keys with it."
 			}
 			onSubmit={submit}
 			footer={
@@ -285,29 +316,21 @@ export function DeviceUnlockDialog({
 				) : (
 					<>
 						{close}
-						<Button
-							type="button"
-							disabled={busy}
-							onClick={() =>
-								act(async () => {
-									const current = enrolment.current;
-									if (!current) return;
-									if (step === "confirm") {
-										await current.confirm();
-										return done();
-									}
-									const next = await current.create();
-									if (next === "done") done();
-									else setStep("confirm");
-								})
-							}
-						>
-							<FingerprintIcon data-icon="inline-start" />
-							{busy
-								? "Waiting for your passkey…"
-								: step === "create"
-									? "Create passkey"
-									: "Confirm with passkey"}
+						<Button type="button" disabled={busy} onClick={() => act(proceed)}>
+							{name === "Face ID" || name === "Optic ID" ? (
+								<ScanSmileyIcon data-icon="inline-start" />
+							) : (
+								<FingerprintIcon data-icon="inline-start" />
+							)}
+							{!passkey
+								? busy
+									? `Waiting for ${name}…`
+									: `Use ${name}`
+								: busy
+									? "Waiting for your passkey…"
+									: step === "create"
+										? "Create passkey"
+										: "Confirm with passkey"}
 						</Button>
 					</>
 				)

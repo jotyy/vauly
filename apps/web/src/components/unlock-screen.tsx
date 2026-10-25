@@ -1,9 +1,10 @@
-import { FingerprintIcon } from "@phosphor-icons/react";
+import { FingerprintIcon, ScanSmileyIcon } from "@phosphor-icons/react";
 import { Avatar, AvatarFallback } from "@vauly/ui/components/avatar";
 import { Button } from "@vauly/ui/components/button";
 import { useState } from "react";
 
 import { demoAccount } from "@/env.public";
+import { type UnlockMethod, unlockName } from "@/lib/device-unlock";
 import { initials } from "@/lib/format";
 import {
 	PasskeyUnlockError,
@@ -20,19 +21,38 @@ import {
 	SubmitButton,
 } from "./auth-layout";
 
-const passkeyErrors: Record<PasskeyUnlockError["reason"], string> = {
-	cancelled:
-		"The passkey didn't unlock vauly. Try again, or use your master password. If you removed the passkey, turn passkey unlock off in Settings.",
-	expired:
-		"Unlocking with a passkey lasts 14 days at a time. Use your master password, then turn it on again in Settings.",
-	offline: "Couldn't reach vauly. Check your connection and try again.",
-	broken:
-		"The passkey copy on this device didn't open, so vauly removed it. Use your master password, and turn passkey unlock on again in Settings.",
-};
+const offline = "Couldn't reach vauly. Check your connection and try again.";
+const passkeyBroken =
+	"The passkey copy on this device didn't open, so vauly removed it. Use your master password, and turn passkey unlock on again in Settings.";
+
+/** Why unlocking that way didn't work, in the words for the way it is. */
+function unlockErrors(
+	name: UnlockMethod,
+): Record<PasskeyUnlockError["reason"], string> {
+	if (name === "passkey") {
+		return {
+			cancelled:
+				"The passkey didn't unlock vauly. Try again, or use your master password. If you removed the passkey, turn passkey unlock off in Settings.",
+			expired:
+				"Unlocking with a passkey lasts 14 days at a time. Use your master password, then turn it on again in Settings.",
+			offline,
+			broken: passkeyBroken,
+			changed: passkeyBroken,
+		};
+	}
+	return {
+		cancelled: `${name} didn't unlock vauly. Try again, or use your master password.`,
+		expired: `Unlocking with ${name} lasts 14 days at a time. Use your master password, then turn it on again in Settings.`,
+		offline,
+		broken: `The copy of your keys on this iPhone didn't open, so vauly removed it. Use your master password, and turn on ${name} again in Settings.`,
+		changed: `${name} changed on this iPhone, so vauly stopped unlocking with it. Use your master password, and turn it on again in Settings.`,
+	};
+}
 
 export function UnlockScreen() {
 	const keyring = useKeyring();
 	const workspace = useWorkspace();
+	const name = unlockName(keyring.deviceUnlockMethod);
 	const [password, setPassword] = useState(demoAccount?.password ?? "");
 	const [error, setError] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -45,7 +65,7 @@ export function UnlockScreen() {
 			await keyring.unlockWithPasskey();
 		} catch (err) {
 			const reason = err instanceof PasskeyUnlockError ? err.reason : "broken";
-			setError(passkeyErrors[reason]);
+			setError(unlockErrors(name)[reason]);
 		} finally {
 			setWaiting(false);
 		}
@@ -90,8 +110,18 @@ export function UnlockScreen() {
 						disabled={waiting}
 						onClick={unlockWithPasskey}
 					>
-						<FingerprintIcon data-icon="inline-start" />
-						{waiting ? "Waiting for your passkey…" : "Unlock with passkey"}
+						{name === "Face ID" || name === "Optic ID" ? (
+							<ScanSmileyIcon data-icon="inline-start" />
+						) : (
+							<FingerprintIcon data-icon="inline-start" />
+						)}
+						{name === "passkey"
+							? waiting
+								? "Waiting for your passkey…"
+								: "Unlock with passkey"
+							: waiting
+								? `Waiting for ${name}…`
+								: `Unlock with ${name}`}
 					</Button>
 					<p className="text-caption text-fg-subtle flex items-center gap-3">
 						<span className="bg-line h-px flex-1" />
@@ -138,8 +168,7 @@ export function UnlockScreen() {
 				</Field>
 				{keyring.deviceUnlockExpired && !keyring.deviceUnlock && !error && (
 					<p className="text-caption text-fg-muted text-pretty">
-						Unlocking with a passkey lasts 14 days at a time. Use your master
-						password, then turn it on again in Settings.
+						{unlockErrors(name).expired}
 					</p>
 				)}
 				<FormError>{error}</FormError>
