@@ -16,6 +16,7 @@ import {
 	disconnectApp,
 } from "@/lib/app-session";
 import { AddressError, addressOf, checkAddress } from "@/lib/connect";
+import { forgetDeviceUnlocks } from "@/lib/device-unlock";
 import { isDebugApp, isNativeApp } from "@/lib/native";
 import { errorMessage } from "@/lib/vault-data";
 
@@ -96,8 +97,12 @@ export function ConnectScreen() {
 	);
 }
 
-/** Forgets the vauly the app is connected to, and starts over at the connect screen. */
+/**
+ * Forgets the vauly the app is connected to, and its Face ID copies with it, and starts
+ * over at the connect screen.
+ */
 export async function switchVauly() {
+	await forgetDeviceUnlocks().catch(() => undefined);
 	await disconnectApp();
 	window.location.replace("/");
 }

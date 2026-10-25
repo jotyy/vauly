@@ -38,6 +38,8 @@ function unlockErrors(
 			offline,
 			broken: passkeyBroken,
 			changed: passkeyBroken,
+			locked: passkeyBroken,
+			unavailable: passkeyBroken,
 		};
 	}
 	return {
@@ -46,6 +48,8 @@ function unlockErrors(
 		offline,
 		broken: `The copy of your keys on this iPhone didn't open, so vauly removed it. Use your master password, and turn on ${name} again in Settings.`,
 		changed: `${name} changed on this iPhone, so vauly stopped unlocking with it. Use your master password, and turn it on again in Settings.`,
+		locked: `${name} is locked after too many tries. Use your master password; entering your iPhone's passcode turns ${name} back on.`,
+		unavailable: `${name} can't be used right now. Use your master password. If ${name} is off for apps in your iPhone's settings, turn it back on there.`,
 	};
 }
 

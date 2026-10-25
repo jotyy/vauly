@@ -56,6 +56,17 @@ export const isCancel = (err: unknown) =>
 export const biometryChanged = (err: unknown) =>
 	nativeCode(err) === "INVALIDATED";
 
+/** In the app: Face ID locked after too many tries, until the iPhone's passcode is entered. */
+export const biometryLockedOut = (err: unknown) =>
+	nativeCode(err) === "LOCKED_OUT";
+
+/** In the app: Face ID can't be used just now, as when it's off for apps. The copy stays. */
+export const biometryUnavailable = (err: unknown) =>
+	nativeCode(err) === "UNAVAILABLE";
+
+/** In the app: a copy past DEVICE_UNLOCK_DAYS, which the app has deleted. */
+export const copyExpired = (err: unknown) => nativeCode(err) === "EXPIRED";
+
 const nativeCode = (err: unknown) =>
 	isNativeApp && err && typeof err === "object" && "code" in err
 		? err.code
@@ -140,10 +151,14 @@ export async function readDeviceUnlock(
  * Deletes this device's copies, every one or those `which` picks, and tells the passkey
  * provider their passkeys are no longer used.
  */
+const every = () => true;
+
 export async function forgetDeviceUnlocks(
-	which: (record: DeviceUnlock) => boolean = () => true,
+	which: (record: DeviceUnlock) => boolean = every,
 ) {
 	if (isNativeApp) {
+		// Every one: the app deletes them all, even any that no longer read.
+		if (which === every) return biometricUnlock?.forget();
 		const records = await nativeRecords().catch(() => []);
 		for (const record of records.filter(which)) {
 			await biometricUnlock?.forget({ accountId: record.accountId });
@@ -324,7 +339,12 @@ export async function unlockWithDevice(
 			publicKey: account.publicKey,
 			pepper,
 		});
-		return importPrivateKey(fromBase64(privateKey));
+		const pkcs8 = fromBase64(privateKey);
+		try {
+			return await importPrivateKey(pkcs8);
+		} finally {
+			pkcs8.fill(0);
+		}
 	}
 	// The passkey first, so its prompt starts right in the tap.
 	const output = await prfOutput(

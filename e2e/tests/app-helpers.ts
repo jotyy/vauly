@@ -85,6 +85,8 @@ export async function asTheApp(
 					const outcome = next();
 					if (!copy) throw refuse("BROKEN");
 					if (outcome === "cancel") throw refuse("CANCELLED");
+					if (outcome === "locked out") throw refuse("LOCKED_OUT");
+					if (outcome === "unavailable") throw refuse("UNAVAILABLE");
 					const drop = () => keep(copies().filter((kept) => kept !== copy));
 					if (outcome === "new face") {
 						drop();
@@ -142,8 +144,11 @@ export const faceIdCopies = (page: Page) =>
 		() => JSON.parse(sessionStorage.getItem("e2e.faceid") ?? "[]") as Copy[],
 	);
 
-/** How the next Face ID goes: turned down, or after a new face was added. */
-export const nextFaceId = (page: Page, outcome: "cancel" | "new face") =>
+/** How the next Face ID goes: turned down, locked out, off for now, or after a new face. */
+export const nextFaceId = (
+	page: Page,
+	outcome: "cancel" | "locked out" | "unavailable" | "new face",
+) =>
 	page.evaluate(
 		(outcome) => sessionStorage.setItem("e2e.faceid.next", outcome),
 		outcome,

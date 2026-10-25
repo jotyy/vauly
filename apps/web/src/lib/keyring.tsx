@@ -36,6 +36,9 @@ import { argon2idSeen, rememberArgon2id } from "@/lib/argon2id-seen";
 import { authClient } from "@/lib/auth-client";
 import {
 	biometryChanged,
+	biometryLockedOut,
+	biometryUnavailable,
+	copyExpired,
 	type DeviceUnlock,
 	deviceUnlockMethod,
 	type Enrolment,
@@ -179,7 +182,14 @@ export class WrongPasswordError extends Error {
 /** Why a passkey didn't unlock: only "expired" and "broken" mean the copy is gone. */
 export class PasskeyUnlockError extends Error {
 	constructor(
-		readonly reason: "cancelled" | "expired" | "offline" | "broken" | "changed",
+		readonly reason:
+			| "cancelled"
+			| "expired"
+			| "offline"
+			| "broken"
+			| "changed"
+			| "locked"
+			| "unavailable",
 	) {
 		super(`Passkey unlock ${reason}`);
 	}
@@ -505,12 +515,18 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			// network leave the copy; a server that refuses it, or a copy that won't open,
 			// end it.
 			if (isCancel(err)) throw new PasskeyUnlockError("cancelled");
+			// In the app, Face ID locked out or off for now leaves the copy for later.
+			if (biometryLockedOut(err)) throw new PasskeyUnlockError("locked");
+			if (biometryUnavailable(err)) throw new PasskeyUnlockError("unavailable");
 			// In the app: a face or finger added or removed since; the app dropped the copy.
 			if (biometryChanged(err)) {
 				await forgetDevice(me.id);
 				throw new PasskeyUnlockError("changed");
 			}
-			if (err instanceof ORPCError && err.code === "FORBIDDEN") {
+			if (
+				(err instanceof ORPCError && err.code === "FORBIDDEN") ||
+				copyExpired(err)
+			) {
 				await forgetDevice(me.id);
 				setDeviceExpired(true);
 				throw new PasskeyUnlockError("expired");

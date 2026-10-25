@@ -87,6 +87,35 @@ test("a turned-down Face ID keeps it, and asks again", async ({ page }) => {
 	await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
 });
 
+test("Face ID locked out, or off for now, keeps it and says why", async ({
+	page,
+}) => {
+	await turnOnFaceId(page);
+	await page.reload();
+	await nextFaceId(page, "locked out");
+	await faceIdButton(page).click();
+	await expect(page.getByRole("alert")).toHaveText(
+		"Face ID is locked after too many tries. Use your master password; entering your iPhone's passcode turns Face ID back on.",
+	);
+	await nextFaceId(page, "unavailable");
+	await faceIdButton(page).click();
+	await expect(page.getByRole("alert")).toContainText(
+		"Face ID can't be used right now.",
+	);
+	expect(await faceIdCopies(page)).toHaveLength(1);
+	await faceIdButton(page).click();
+	await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
+});
+
+test("using another vauly deletes it", async ({ page }) => {
+	await turnOnFaceId(page);
+	await page.getByRole("button", { name: "Use another vauly" }).click();
+	await expect(
+		page.getByRole("heading", { name: "Connect to your vauly" }),
+	).toBeVisible();
+	expect(await faceIdCopies(page)).toEqual([]);
+});
+
 test("a new face ends it, and the master password unlocks", async ({
 	page,
 }) => {
