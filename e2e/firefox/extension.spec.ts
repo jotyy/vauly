@@ -30,6 +30,7 @@ import {
 	owner,
 	resetWorkspace,
 } from "../tests/helpers";
+import { hidingTricks } from "../tests/hiding-tricks";
 
 // The browser extension's Firefox build, installed into Firefox, against the e2e stack.
 // Playwright can't load extensions into Firefox, so Puppeteer drives it over WebDriver
@@ -672,6 +673,91 @@ test("a frame of vauly's menu that the page script didn't make gets nothing", as
 	// The menu the page script made still fills.
 	await press(menu, fill);
 	await expect.poll(() => inputValue(page, "#email")).toBe(login.username);
+	await page.close();
+});
+
+test("a page's styles can't fade, hide or move vauly's button and menu", async () => {
+	const page = await newTab(`${site}/`);
+	const menu = await openMenu(page, "#email");
+	await page.evaluate(() => {
+		const sheet = document.createElement("style");
+		sheet.textContent =
+			"vauly-frame, vauly-button { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; transform: translateX(-9999px) !important; }";
+		document.head.append(sheet);
+		for (const host of document.querySelectorAll<HTMLElement>(
+			"vauly-frame, vauly-button",
+		)) {
+			host.style.setProperty("opacity", "0", "important");
+			host.setAttribute("inert", "");
+		}
+	});
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				[
+					...document.querySelectorAll<HTMLElement>(
+						"vauly-frame, vauly-button",
+					),
+				].map((host) => {
+					const style = getComputedStyle(host);
+					return [
+						style.opacity,
+						style.visibility,
+						style.pointerEvents,
+						style.transform,
+						host.hasAttribute("inert"),
+					].join(" ");
+				}),
+			),
+		)
+		.toEqual(["1 visible auto none false", "1 visible auto none false"]);
+	await press(menu, `Fill ${login.name}, ${login.username}`);
+	await expect.poll(() => inputValue(page, "#email")).toBe(login.username);
+	await page.close();
+});
+
+/** Waits until the menu's button for this login can be clicked, or can't. */
+const fillButton = (menu: Frame, disabled: boolean) =>
+	menu.waitForFunction(
+		(name, disabled) =>
+			[...document.querySelectorAll("button")].some(
+				(button) =>
+					button.getAttribute("aria-label") === name &&
+					button.disabled === disabled,
+			),
+		{ timeout: 15_000, polling: 100 },
+		`Fill ${login.name}, ${login.username}`,
+		disabled,
+	);
+
+for (const [trick, play] of Object.entries(hidingTricks)) {
+	test(`the menu closes, without filling, when the page ${trick}`, async () => {
+		const page = await newTab(`${site}/`);
+		const menu = await openMenu(page, "#email");
+		await fillButton(menu, false);
+		await page.evaluate(play);
+		await expect
+			.poll(() => page.$$("vauly-frame").then((f) => f.length))
+			.toBe(0);
+		expect(await inputValue(page, "#password")).toBe("");
+		await page.close();
+	});
+}
+
+test("a menu opened on a page that hides it says so, and fills nothing", async () => {
+	const page = await newTab(`${site}/`);
+	await page.evaluate(() => {
+		document.documentElement.style.setProperty(
+			"mask-image",
+			"linear-gradient(black 40%, transparent 40%)",
+		);
+	});
+	const menu = await openMenu(page, "#email");
+	await see(
+		menu,
+		"vauly doesn't fill while this page hides or covers its menu.",
+	);
+	await fillButton(menu, true);
 	await page.close();
 });
 

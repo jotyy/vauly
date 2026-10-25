@@ -19,6 +19,7 @@ import {
 
 import type { Card } from "@vauly/ui/lib/cards";
 import type { Identity } from "@vauly/ui/lib/identity";
+import { parse } from "tldts";
 
 import { readPasskey, type StoredPasskey } from "./passkey";
 import type { Connection, Unlocked } from "./storage";
@@ -367,24 +368,57 @@ export async function updatePassword(
 }
 
 /**
- * True when the item belongs to the page: one of its websites has the page's host, or the
- * page is on a subdomain of it.
+ * How an item belongs to a page. "host" when one of its websites is the page's host, as
+ * `hostOf` gives it: the same name and port. "site" when it's another host of the same
+ * site: the registrable domain, by the Public Suffix List, so one github.io site isn't
+ * another, and an IP address or a name like localhost is only ever itself. A website saved
+ * with https never belongs to an http page. `host` is the item's website that matched.
  */
-export function matchesPage(entry: Entry, pageUrl: string | undefined) {
-	const page = hostOf(pageUrl);
-	if (!page) return false;
-	return (entry.urls.length ? entry.urls : [entry.url]).some((url) => {
-		const item = hostOf(url);
-		return Boolean(item) && (page === item || page.endsWith(`.${item}`));
-	});
+export function matchOf(
+	entry: Entry,
+	pageUrl: string | undefined,
+): { kind: "host" | "site"; host: string } | null {
+	const page = siteOf(pageUrl);
+	if (!page) return null;
+	let found: { kind: "site"; host: string } | null = null;
+	for (const url of entry.urls.length ? entry.urls : [entry.url]) {
+		const item = siteOf(url);
+		if (!item || (item.secure && !page.secure)) continue;
+		if (item.host === page.host) return { kind: "host", host: item.host };
+		if (item.domain && item.domain === page.domain)
+			found ??= { kind: "site", host: item.host };
+	}
+	return found;
 }
 
+/** True when the item belongs to the page, on its host or another host of its site. */
+export function matchesPage(entry: Entry, pageUrl: string | undefined) {
+	return matchOf(entry, pageUrl) !== null;
+}
+
+const PSL = { allowPrivateDomains: true };
+
+function siteOf(url: string | undefined) {
+	const host = hostOf(url);
+	if (!host || !url) return null;
+	const { protocol, hostname } = new URL(url);
+	const { domain, isIp } = parse(hostname, PSL);
+	return { host, secure: protocol === "https:", domain: isIp ? null : domain };
+}
+
+/**
+ * A website's host as vauly names and matches it: the name, without a www. in front when
+ * what's left is a site of its own, and the port when it isn't the scheme's usual one.
+ */
 export function hostOf(url: string | undefined) {
 	if (!url) return "";
 	try {
-		const { protocol, hostname } = new URL(url);
+		const { protocol, hostname, port } = new URL(url);
 		if (protocol !== "http:" && protocol !== "https:") return "";
-		return hostname.replace(/^www\./, "");
+		const bare = hostname.slice(4);
+		const name =
+			hostname.startsWith("www.") && parse(bare, PSL).domain ? bare : hostname;
+		return port ? `${name}:${port}` : name;
 	} catch {
 		return "";
 	}

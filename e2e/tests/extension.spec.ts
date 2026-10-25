@@ -20,6 +20,7 @@ import {
 	resetWorkspace,
 	teammate,
 } from "./helpers";
+import { hidingTricks } from "./hiding-tricks";
 
 // The browser extension, built and loaded into Chromium, against the e2e stack. A made-up
 // site serves a login form so Fill has something to fill.
@@ -254,11 +255,12 @@ test("a login's one-time code can be copied from the popup", async () => {
 });
 
 test("search finds items, and other sites get nothing to fill", async () => {
-	const page = await context.newPage();
-	await page.goto("https://elsewhere.example.test/");
-	const popup: Page = await openPopup(
-		await tabIdOf("https://elsewhere.example.test"),
+	await context.route("https://elsewhere.test/**", (route) =>
+		route.fulfill({ contentType: "text/html", body: loginPage }),
 	);
+	const page = await context.newPage();
+	await page.goto("https://elsewhere.test/");
+	const popup: Page = await openPopup(await tabIdOf("https://elsewhere.test"));
 	await expect(popup.getByText("Nothing saved for this site.")).toBeVisible();
 	await popup.getByLabel("Search items").fill("example");
 	const results = popup.getByRole("list", { name: "Results" });
@@ -267,6 +269,161 @@ test("search finds items, and other sites get nothing to fill", async () => {
 		results.getByRole("button", { name: `Fill ${login.name}` }),
 	).toHaveCount(0);
 	await popup.close();
+	await page.close();
+});
+
+test("a login fills in the page only on its own host; the popup names the rest of its site", async () => {
+	const other = "https://account.example.test";
+	const page = await context.newPage();
+	await page.goto(`${other}/`);
+	const menu = await openMenu(page, "Email");
+	await expect(
+		menu.getByText("Nothing saved for account.example.test yet"),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+
+	// The popup offers it, and says which host it was saved for.
+	const popup = await openPopup(await tabIdOf(other));
+	const here = popup.getByRole("list", { name: "On account.example.test" });
+	await expect(here.getByText("for login.example.test")).toBeVisible();
+	await here.getByRole("button", { name: `Fill ${login.name}` }).click();
+	await expect(page.getByLabel("Email")).toHaveValue(login.username);
+	await page.close();
+});
+
+test("a login saved with https isn't offered on an http page", async () => {
+	await context.route("http://login.example.test/**", (route) =>
+		route.fulfill({ contentType: "text/html", body: loginPage }),
+	);
+	const page = await context.newPage();
+	await page.goto("http://login.example.test/");
+	const menu = await openMenu(page, "Email");
+	await expect(
+		menu.getByText("Nothing saved for login.example.test yet"),
+	).toBeVisible();
+	await page.keyboard.press("Escape");
+	const popup = await openPopup(await tabIdOf("http://login.example.test"));
+	await expect(popup.getByText("Nothing saved for this site.")).toBeVisible();
+	await popup.close();
+	await page.close();
+});
+
+test("a page's styles can't fade, hide or move vauly's button and menu", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	const menu = await openMenu(page, "Email");
+	await page.evaluate(() => {
+		const sheet = document.createElement("style");
+		sheet.textContent =
+			"vauly-frame, vauly-button { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; transform: translateX(-9999px) !important; }";
+		document.head.append(sheet);
+		for (const host of document.querySelectorAll<HTMLElement>(
+			"vauly-frame, vauly-button",
+		)) {
+			host.style.setProperty("opacity", "0", "important");
+			host.setAttribute("inert", "");
+		}
+	});
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				[
+					...document.querySelectorAll<HTMLElement>(
+						"vauly-frame, vauly-button",
+					),
+				].map((host) => {
+					const style = getComputedStyle(host);
+					return [
+						style.opacity,
+						style.visibility,
+						style.pointerEvents,
+						style.transform,
+						host.hasAttribute("inert"),
+					].join(" ");
+				}),
+			),
+		)
+		.toEqual(["1 visible auto none false", "1 visible auto none false"]);
+	await menu
+		.getByRole("button", { name: `Fill ${login.name}, ${login.username}` })
+		.click();
+	await expect(page.getByLabel("Email")).toHaveValue(login.username);
+	await page.close();
+});
+
+for (const [trick, play] of Object.entries(hidingTricks)) {
+	test(`the menu closes, without filling, when the page ${trick}`, async () => {
+		const page = await context.newPage();
+		await page.goto(`${site}/`);
+		const menu = await openMenu(page, "Email");
+		await expect(
+			menu.getByRole("button", {
+				name: `Fill ${login.name}, ${login.username}`,
+			}),
+		).toBeEnabled();
+		await page.evaluate(play);
+		await expect(page.locator("vauly-frame")).toHaveCount(0);
+		await expect(page.getByLabel("Password")).toHaveValue("");
+		await page.close();
+	});
+}
+
+test("a menu opened on a page that hides it says so, and fills nothing", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	await page.evaluate(() => {
+		document.documentElement.style.setProperty(
+			"mask-image",
+			"linear-gradient(black 40%, transparent 40%)",
+		);
+	});
+	const menu = await openMenu(page, "Email");
+	await expect(
+		menu.getByText(
+			"vauly doesn't fill while this page hides or covers its menu.",
+		),
+	).toBeVisible();
+	await expect(
+		menu.getByRole("button", {
+			name: `Fill ${login.name}, ${login.username}`,
+		}),
+	).toBeDisabled();
+	await page.close();
+});
+
+test("Chrome's word that something covers the menu holds it back until it has shown for a moment", async () => {
+	const page = await context.newPage();
+	await page.goto(`${site}/`);
+	const menu = await openMenu(page, "Email");
+	const fill = menu.getByRole("button", {
+		name: `Fill ${login.name}, ${login.username}`,
+	});
+	await expect(fill).toBeEnabled();
+	// A cover the page script can't find: in the top layer, from inside a closed shadow root.
+	await page.evaluate(() => {
+		const holder = document.createElement("div");
+		const cover = document.createElement("div");
+		cover.popover = "manual";
+		cover.style.cssText =
+			"inset: 0; width: 100vw; height: 100vh; background: white; pointer-events: none;";
+		holder.attachShadow({ mode: "closed" }).append(cover);
+		document.body.append(holder);
+		cover.showPopover();
+		(window as unknown as { uncover: () => void }).uncover = () =>
+			cover.hidePopover();
+	});
+	await expect(
+		menu.getByText(
+			"vauly doesn't fill while this page hides or covers its menu.",
+		),
+	).toBeVisible();
+	await expect(fill).toBeDisabled();
+	await page.evaluate(() =>
+		(window as unknown as { uncover: () => void }).uncover(),
+	);
+	await expect(fill).toBeEnabled();
+	await fill.click();
+	await expect(page.getByLabel("Email")).toHaveValue(login.username);
 	await page.close();
 });
 

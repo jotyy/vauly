@@ -65,6 +65,7 @@ import {
 	hostOf,
 	loadVault,
 	matchesPage,
+	matchOf,
 	saveLogin,
 	TwoStepError,
 	unlock,
@@ -377,6 +378,11 @@ function Items({
 		entry.kind === "card" || entry.kind === "identity"
 			? Boolean(host)
 			: matchesPage(entry, tab.url);
+	/** The website a login is for, when it's another host of this site: say which. */
+	const otherHost = (entry: Entry) => {
+		const match = matchOf(entry, tab.url);
+		return match?.kind === "site" ? match.host : undefined;
+	};
 	const q = query.trim().toLowerCase();
 	const results = q
 		? (entries ?? []).filter(
@@ -419,7 +425,7 @@ function Items({
 	 * Fills the page's checkout or address form with a card or an identity. Only what forms
 	 * ask for goes to the page: never a PIN, a tax number or a registration number.
 	 */
-	const fillDetails = async (entry: Entry, tabId: number) => {
+	const fillDetails = async (entry: Entry, tabId: number, origin: string) => {
 		await touch();
 		const { pin: _, ...card } = entry.card ?? {};
 		const {
@@ -431,12 +437,12 @@ function Items({
 			? await browser.scripting.executeScript({
 					target: { tabId },
 					func: fillCardForm,
-					args: [card],
+					args: [card, origin],
 				})
 			: await browser.scripting.executeScript({
 					target: { tabId },
 					func: fillAddressForm,
-					args: [identity],
+					args: [identity, origin],
 				});
 		const { filled = 0 } = (result?.result as { filled?: number }) ?? {};
 		if (filled === 0) {
@@ -458,9 +464,11 @@ function Items({
 	};
 
 	const fill = async (entry: Entry) => {
-		if (tab.id === undefined) return;
+		if (tab.id === undefined || !tab.url) return;
+		// The page the popup opened on: if the tab goes elsewhere meanwhile, nothing fills.
+		const origin = new URL(tab.url).origin;
 		if (entry.kind === "card" || entry.kind === "identity") {
-			return fillDetails(entry, tab.id);
+			return fillDetails(entry, tab.id, origin);
 		}
 		// The next page usually asks for the one-time code: copy it now, while the click
 		// still counts as the person's action, so it's ready to paste.
@@ -470,7 +478,7 @@ function Items({
 		const [result] = await browser.scripting.executeScript({
 			target: { tabId: tab.id },
 			func: fillLoginForm,
-			args: [entry.username ?? "", entry.secret ?? ""],
+			args: [entry.username ?? "", entry.secret ?? "", origin],
 		});
 		const filled = result?.result as { password: boolean } | undefined;
 		if (!filled?.password) {
@@ -600,6 +608,7 @@ function Items({
 											key={entry.id}
 											logos={logos}
 											entry={entry}
+											site={otherHost(entry)}
 											canFill={fillsHere(entry)}
 											onFill={fill}
 											onCopy={copy}
@@ -620,6 +629,7 @@ function Items({
 													key={entry.id}
 													logos={logos}
 													entry={entry}
+													site={otherHost(entry)}
 													canFill
 													onFill={fill}
 													onCopy={copy}
@@ -818,12 +828,15 @@ function subtitleOf(entry: Entry) {
 function Row({
 	entry,
 	logos,
+	site,
 	canFill,
 	onFill,
 	onCopy,
 }: {
 	entry: Entry;
 	logos: LogoSettings | null;
+	/** Another host of the page's site that the login was saved for. */
+	site?: string;
 	canFill: boolean;
 	onFill: (entry: Entry) => void;
 	onCopy: (entry: Entry, field: CopyField) => void;
@@ -838,6 +851,7 @@ function Row({
 				<span className="text-body-sm text-fg truncate">{entry.name}</span>
 				<span className="text-caption text-fg-subtle truncate">
 					{subtitleOf(entry) || entry.vault}
+					{site && ` · for ${site}`}
 				</span>
 			</div>
 			{entry.username && (
