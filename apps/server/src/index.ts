@@ -40,12 +40,14 @@ const webCors =
 		credentials: true,
 	});
 app.use("/*", async (c, next) => {
-	if (!APP_ORIGINS.includes(c.req.header("origin") ?? "")) {
+	// Origins compare case-insensitively, as Better Auth compares them.
+	const origin = c.req.header("origin")?.toLowerCase() ?? "";
+	if (!APP_ORIGINS.includes(origin)) {
 		return webCors ? webCors(c, next) : next();
 	}
 	// Every Capacitor app on a phone has this origin, and vauly's never sends a cookie.
-	// One that does is another app, using a session someone opened inside it: refused,
-	// as Better Auth trusts the origin.
+	// One that does is another app, using a session someone opened inside it: refused
+	// here, for the API, and not trusted by Better Auth either.
 	if (c.req.header("cookie")) {
 		return c.json({ message: "The vauly app sends no cookies" }, 403);
 	}

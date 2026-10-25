@@ -41,13 +41,16 @@ export function createAuth(
 			provider: "sqlite",
 			schema,
 		}),
-		// The browser extension signs in from its own origin, which differs per install.
-		trustedOrigins: [
+		// The browser extension signs in from its own origin, which differs per install. Every
+		// Capacitor app on a phone shares the iPhone app's origin, and the app never sends a
+		// cookie, so it's trusted only for a request with none: never with a session cookie,
+		// and never as where a callback goes, which Better Auth checks with no request.
+		trustedOrigins: (request) => [
 			env.CORS_ORIGIN,
 			"chrome-extension://",
 			"moz-extension://",
-			...APP_ORIGINS,
 			...desktopOrigins,
+			...(request && !request.headers.has("cookie") ? APP_ORIGINS : []),
 		],
 		// The "password" is the auth key derived from the master password on the device;
 		// the master password itself never reaches the server.
