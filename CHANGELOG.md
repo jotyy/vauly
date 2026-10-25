@@ -2,6 +2,23 @@
 
 Notable changes to vauly. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.2.1 - 2026-10-25
+
+Changes to the browser extension, mostly to where and when it fills. The server has no migrations in this release. Update the extension along with the server; [Updating vauly](docs/updating.md#updating-from-020) says what people may notice.
+
+### Added
+
+- **The browser extension works in Firefox**, 153 or later, on a computer. It fills logins, cards and identities, offers to save logins, and saves and signs in with passkeys, as it does in Chrome. For now, build it with `bun run --cwd apps/extension build:firefox` and load it from `about:debugging`; [Browser extension](docs/browser-extension.md#firefox) has the steps. In Firefox, website logos are off until you turn them on in the extension's settings, which asks you first, and the window offering to save a login takes the focus when it opens. Firefox for Android isn't supported yet.
+
+### Changed
+
+- **The extension fills only on the site a login was saved for.** The menu inside a page offers a login on the address it was saved for: the same name and port, with or without `www.`. The extension's popup also offers it on other addresses of the same site and names the address. Sites are told apart as the Public Suffix List draws them, and a login saved with `https://` isn't offered on an `http://` page. A password typed on another address of the site is offered as a new login, not as an update. A login in the menu can be chosen a moment after the menu opens, and the menu closes if the page fades, covers or moves it.
+- **An open fill menu hears when vauly locks.** It stops listing logins at once, rather than when a fill fails. In Firefox it no longer asks every second until vauly unlocks.
+
+### Fixed
+
+- A file over the size limit, chosen just as its item opens, is turned away with "is too big" before it's sent, as at any other time. It used to start the upload and end with "Couldn't attach" and the server's reason.
+
 ## 0.2.0 - 2026-10-24
 
 Files on items, two-step login that a workspace can require, backups protected with a password, and imports that bring files and open protected exports and KeePass databases. If you run 0.1.0, read [Updating vauly](docs/updating.md#updating-from-010). The migrations run on their own; update the CLI and the browser extension along with the server.
