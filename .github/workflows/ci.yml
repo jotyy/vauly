@@ -67,6 +67,7 @@ jobs:
               - "e2e/firefox.config.ts"
               - "e2e/playwright.config.ts"
               - "e2e/tests/helpers.ts"
+              - "e2e/tests/hiding-tricks.ts"
               - "e2e/package.json"
               - "package.json"
               - "bun.lock"
