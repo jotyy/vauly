@@ -1,6 +1,6 @@
 # Chrome Web Store listing
 
-Everything the Chrome Web Store dashboard asks for, ready to paste. The images next to this file are made by `bun run store` in `e2e/`; the package to upload comes from `bun run --cwd apps/extension zip`.
+Everything the Chrome Web Store dashboard asks for, ready to paste. The images next to this file are made by `bun run store` in `e2e/`; the package to upload comes from `bun run --cwd apps/extension zip`. After the first version, releases upload it themselves: see [Publishing from a release](#publishing-from-a-release).
 
 ## Store listing
 
@@ -105,3 +105,26 @@ On the demo, changing the master password, two-step login and a few other accoun
 - Turn on 2-Step Verification for the Google account: publishing requires it.
 - Verify the contact email address.
 - Trader or non-trader (EU Digital Services Act): decide for yourself. A free, non-commercial open-source project is usually non-trader. A trader has to publish a legal name, address and phone number.
+
+## Publishing from a release
+
+Pushing a version tag (`v0.3.0`) runs the **Extension** workflow (`.github/workflows/extension.yml`). It builds the Chrome zip from the tag, uploads it to the item `hjjbfdlkdnnbgaempacaeihooaopoock` and submits it for review, and the store publishes it once the review passes. It uses the [Chrome Web Store API v2](https://developer.chrome.com/docs/webstore/using-api) with a [service account](https://developer.chrome.com/docs/webstore/service-accounts), which needs no browser sign-in and no token that expires. Google planned to keep the old v1.1 API only [until 15 October 2026](https://developer.chrome.com/blog/cws-api-v2).
+
+Until the two secrets below exist, the workflow says so in its summary and does nothing. To set it up, once:
+1. **A Google Cloud project.** In the [Google Cloud console](https://console.cloud.google.com/), create a project, such as `vauly-releases`.
+2. **The API.** In that project, search for **Chrome Web Store API** and enable it.
+3. **A service account.** Under **IAM & Admin › Service Accounts**, create one, such as `chrome-web-store`. It needs no roles or permissions.
+4. **Its key.** Open the service account, then **Keys › Add key › Create new key › JSON**. A JSON file downloads. It's a credential that can publish the extension: keep it out of the repository, and delete it after step 7.
+5. **Access to the store.** In the [developer dashboard](https://chrome.google.com/webstore/devconsole), under **Account**, add the service account's email address (`chrome-web-store@<project>.iam.gserviceaccount.com`). A publisher can have only one service account.
+6. **The publisher ID.** It's under **Publisher › Settings** in the dashboard.
+7. **The secrets.** In the repository's **Settings › Environments**, create the environment `chrome-web-store`. Under **Deployment branches and tags**, choose **Selected branches and tags** and add the tag rule `v*`, so only a version tag gets its secrets. Add two environment secrets:
+   - `CWS_SERVICE_ACCOUNT_KEY`: the whole JSON file from step 4.
+   - `CWS_PUBLISHER_ID`: the ID from step 6.
+
+What the workflow does at each tag:
+- A pre-release tag (`v0.3.0-rc.1`) isn't sent. A tag that doesn't match `apps/extension/package.json`'s version fails the build.
+- If the store already has this version, published or in review, it stops there, so running it again is safe.
+- If an earlier version is still in review, it stops with an error rather than replacing it. Wait for that review, or [cancel it](https://developer.chrome.com/docs/webstore/cancel-review) in the dashboard, then re-run the job.
+- The item keeps the visibility set in the dashboard. After changing the visibility there, publish once from the dashboard: until then, the API can't publish.
+
+To stop it, delete the key under the service account's **Keys**, or remove the service account from the dashboard.
