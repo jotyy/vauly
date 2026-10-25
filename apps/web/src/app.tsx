@@ -3,7 +3,7 @@ import { createRouter, RouterProvider } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 
 import Loader from "./components/loader";
-import { markNativeApp } from "./lib/native";
+import { isNativeApp, markNativeApp } from "./lib/native";
 import { OPEN_PAGE } from "./lib/notifications";
 import { routeTree } from "./routeTree.gen";
 import { orpc, queryClient } from "./utils/orpc";
@@ -14,6 +14,9 @@ const router = createRouter({
 	routeTree,
 	defaultPreload: "intent",
 	scrollRestoration: true,
+	// In the app, each page and each open item is a screen of its own, so it opens at its
+	// top rather than wherever the last one was scrolled to.
+	scrollToTopSelectors: isNativeApp ? ["[data-slot=app-main]"] : undefined,
 	defaultPendingComponent: () => <Loader />,
 	context: { orpc, queryClient },
 	Wrap: function WrapComponent({ children }: { children: React.ReactNode }) {

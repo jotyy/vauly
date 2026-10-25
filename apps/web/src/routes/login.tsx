@@ -160,8 +160,15 @@ function SignIn() {
 						<Field
 							label="Master password"
 							hint={
-								demoAccount &&
-								`The demo's master password is ${demoAccount.password}.`
+								demoAccount && (
+									<>
+										The demo's master password is{" "}
+										<span className="whitespace-nowrap">
+											{demoAccount.password}
+										</span>
+										.
+									</>
+								)
 							}
 						>
 							<PasswordInput

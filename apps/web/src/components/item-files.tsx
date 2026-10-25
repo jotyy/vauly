@@ -132,8 +132,16 @@ export function ItemFiles({
 			{list.length === 0 && !uploading ? (
 				<p className="text-caption text-fg-subtle">
 					Attach key files, certificates or PDFs
-					{usage.data ? `, up to ${fileSize(usage.data.maxFile)} each` : ""}.
-					They're encrypted on this device first.
+					{usage.data && (
+						<>
+							, up to{" "}
+							<span className="whitespace-nowrap">
+								{fileSize(usage.data.maxFile)}
+							</span>{" "}
+							each
+						</>
+					)}
+					. They're encrypted on this device first.
 				</p>
 			) : (
 				<ul className="flex flex-col gap-1">

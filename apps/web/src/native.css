@@ -1,0 +1,905 @@
+/*
+ * The vauly app for iPhone (lib/native.ts sets html[data-native="ios"]). Everything here
+ * is scoped to it, so the website and the desktop app never see it. It sits outside the
+ * cascade layers, so it outranks the app's Tailwind utilities.
+ *
+ * Type: SF for everything that's read, and Spline Sans, vauly's own face, for the titles.
+ * SF comes through WebKit's Dynamic Type keywords (-apple-system-body and the rest), so
+ * text follows the person's text size: at the default Body is 17px, at XXL 21px. WebKit
+ * draws them exactly as UIKit draws the system font, size-specific tracking included, so
+ * SF's letter-spacing stays normal.
+ */
+
+/* ── Surfaces: an iPhone's grouped background, with white groups on it ───────────── */
+
+html[data-native="ios"] {
+	--frame: #f2f2f7;
+	--canvas: #f2f2f7;
+	--background: #f2f2f7;
+	--surface: #ffffff;
+	--surface-sunken: #f2f2f7;
+	--fg: #000000;
+	--fg-emphasis: #1c1c1e;
+	--fg-muted: #3a3a3c;
+	--fg-subtle: #6c6c70;
+	--fg-faint: #aeaeb2;
+	--line: rgb(60 60 67 / 0.17);
+	--line-subtle: rgb(60 60 67 / 0.12);
+	--line-strong: rgb(60 60 67 / 0.29);
+	--round-window: 22px;
+	--round-shell: 22px;
+	--round-panel: 22px;
+	--native-material: rgb(242 242 247 / 0.82);
+	--native-bar: rgb(255 255 255 / 0.72);
+	--native-menu: rgb(255 255 255 / 0.84);
+	--native-press: rgb(0 0 0 / 0.06);
+	--native-fill: rgb(118 118 128 / 0.12);
+	--native-orange: #ff9500;
+	--native-red: #ff3b30;
+	background-color: var(--frame);
+}
+
+html.dark[data-native="ios"] {
+	--frame: #000000;
+	--canvas: #000000;
+	--background: #000000;
+	--surface: #1c1c1e;
+	--surface-sunken: #2c2c2e;
+	--fg: #ffffff;
+	--fg-emphasis: #f2f2f7;
+	--fg-muted: #d1d1d6;
+	--fg-subtle: #98989f;
+	--fg-faint: #636366;
+	--line: rgb(84 84 88 / 0.62);
+	--line-subtle: rgb(84 84 88 / 0.42);
+	--line-strong: rgb(84 84 88 / 0.8);
+	--native-material: rgb(0 0 0 / 0.78);
+	--native-bar: rgb(37 37 40 / 0.72);
+	--native-menu: rgb(37 37 40 / 0.84);
+	--native-press: rgb(255 255 255 / 0.08);
+	--native-fill: rgb(118 118 128 / 0.24);
+	--native-orange: #ff9f0a;
+	--native-red: #ff453a;
+}
+
+/* ── Type ──────────────────────────────────────────────────────────────────────── */
+
+html[data-native="ios"] {
+	--font-text: -apple-system, system-ui, sans-serif;
+	--font-display: "Spline Sans Variable", -apple-system, system-ui, sans-serif;
+	--font-code: ui-monospace, "SF Mono", Menlo, monospace;
+	/*
+	 * Apple's text styles. They're WebKit's system-font keywords, which name the face and
+	 * size together: no family list, so no generic family to fall back on, and none needed.
+	 */
+	--type-title1: -apple-system-title1;
+	--type-title2: -apple-system-title2;
+	--type-title3: -apple-system-title3;
+	--type-headline: -apple-system-headline;
+	--type-body: -apple-system-body;
+	--type-subheadline: -apple-system-subheadline;
+	--type-footnote: -apple-system-footnote;
+	--type-caption: -apple-system-caption1;
+	/* Tab bar labels stay at 10px whatever the text size, as UIKit's do. */
+	--type-tab: 600 10px / 1.2 var(--font-text);
+	/* Apple's line heights for each style. */
+	--lh-title1: 1.214;
+	--lh-title2: 1.273;
+	--lh-title3: 1.25;
+	--lh-body: 1.294;
+	--lh-sub: 1.333;
+	--lh-foot: 1.385;
+	--lh-cap: 1.333;
+	--track-label: 0.03em;
+	/*
+	 * The titles, a step under Apple's: page titles at Title 1 (28px), the item's name and
+	 * sheet titles at Title 2 (22px). Spline runs wider and darker than SF, so it sits at
+	 * 610 and a little tighter, to keep the same colour as the SF around it.
+	 */
+	--display-weight: 610;
+	--track-large: -0.024em;
+	--track-display: -0.016em;
+	--code-weight: 600;
+	--track-code: 0.04em;
+}
+
+/*
+ * The app's semantic sizes, mapped onto Apple's styles. `font` also resets weight,
+ * figures and face, so each element's own get their say again after it. :where() keeps
+ * all of this below the component rules further down; unlayered, it still outranks the
+ * utilities. SF's tracking is built in, so the utilities' letter-spacing goes.
+ */
+html[data-native="ios"] {
+	& body {
+		font: var(--type-body);
+		line-height: var(--lh-body);
+	}
+	/* Fields read at Body, which they need anyway: under 16px, iOS zooms in on them. */
+	&
+		:where(
+			.text-body,
+			.text-field,
+			input:not(
+				[type="checkbox"],
+				[type="radio"],
+				[type="range"],
+				[type="file"]
+			),
+			textarea,
+			select
+		) {
+		font: var(--type-body);
+		line-height: var(--lh-body);
+		letter-spacing: normal;
+	}
+	/* The app's running text, rows that read as sentences, gets Subheadline. */
+	& :where(.text-body-sm) {
+		font: var(--type-subheadline);
+		line-height: var(--lh-sub);
+		letter-spacing: normal;
+	}
+	& :where(.text-caption) {
+		font: var(--type-footnote);
+		line-height: var(--lh-foot);
+		letter-spacing: normal;
+	}
+	& :where(.text-micro) {
+		font: var(--type-caption);
+		line-height: var(--lh-cap);
+		letter-spacing: normal;
+	}
+	& :where(.text-h5) {
+		font: var(--type-title3);
+		font-weight: 600;
+		line-height: var(--lh-title3);
+		letter-spacing: normal;
+	}
+	& :where(.text-h4, .text-stat) {
+		font: var(--type-title2);
+		font-weight: 700;
+		line-height: var(--lh-title2);
+		letter-spacing: normal;
+	}
+	& :where(.text-h3) {
+		font: var(--type-title1);
+		font-weight: 700;
+		line-height: var(--lh-title1);
+		letter-spacing: normal;
+	}
+	& :where(.font-medium) {
+		font-weight: 500;
+	}
+	& :where(.font-semibold, .font-bold) {
+		font-weight: 600;
+	}
+	& :where(.tabular-nums) {
+		font-variant-numeric: tabular-nums;
+	}
+	& :where(.font-mono) {
+		font-family: var(--font-code);
+	}
+	& :where(.italic) {
+		font-style: italic;
+	}
+}
+
+/* ── The shell: no top bar or sidebar; a tab bar instead ────────────────────────── */
+
+html[data-native="ios"] {
+	& [data-slot="topbar"] {
+		display: none;
+	}
+	/* Room under the content for the floating tab bar. */
+	& [data-slot="app-main"] {
+		padding-bottom: calc(env(safe-area-inset-bottom) + 72px);
+	}
+}
+
+html[data-native="ios"] [data-slot="tab-bar-dock"] {
+	position: fixed;
+	right: 0;
+	bottom: max(calc(env(safe-area-inset-bottom) - 12px), 12px);
+	left: 0;
+	z-index: 40;
+	display: flex;
+	gap: 10px;
+	padding: 0 calc(16px + env(safe-area-inset-right)) 0
+		calc(16px + env(safe-area-inset-left));
+	pointer-events: none;
+
+	& > * {
+		pointer-events: auto;
+		background: var(--native-bar);
+		backdrop-filter: blur(24px) saturate(1.8);
+		box-shadow:
+			0 0 0 0.5px var(--line),
+			0 8px 28px rgb(0 0 0 / 0.12);
+	}
+}
+
+html[data-native="ios"] [data-slot="tab-bar"] {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	height: 62px;
+	padding: 4px;
+	border-radius: 31px;
+}
+
+html[data-native="ios"] [data-slot="tab"] {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	height: 54px;
+	border-radius: 27px;
+	font: var(--type-tab);
+	color: var(--fg-muted);
+	transition:
+		scale 160ms ease-out,
+		background-color 160ms ease-out;
+
+	& svg {
+		width: 25px;
+		height: 25px;
+	}
+
+	&[aria-current="page"] {
+		color: var(--brand);
+		background: color-mix(in srgb, var(--brand) 12%, transparent);
+	}
+
+	&:active {
+		scale: 0.96;
+	}
+}
+
+html[data-native="ios"] [data-slot="tab-search"] {
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 62px;
+	height: 62px;
+	border-radius: 31px;
+	color: var(--fg);
+	transition: scale 160ms ease-out;
+
+	& svg {
+		width: 23px;
+		height: 23px;
+	}
+
+	&:active {
+		scale: 0.96;
+	}
+}
+
+/* ── Pages: a large title under a nav bar that takes it over as it scrolls away ──── */
+
+html[data-native="ios"] [data-slot="page"] {
+	padding: 0 16px;
+}
+
+/* The nav bars, a page's and an open item's: clear at rest, frosted once content
+   scrolls under them, when they show the title small. */
+html[data-native="ios"] :is([data-slot="nav-bar"], [data-slot="item-nav"]) {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	height: 44px;
+	margin: 0 -16px;
+	transition:
+		background-color 200ms ease-out,
+		box-shadow 200ms ease-out;
+
+	&[data-collapsed] {
+		background: var(--native-material);
+		backdrop-filter: blur(20px) saturate(1.8);
+		box-shadow: 0 0.5px 0 var(--line);
+	}
+}
+
+html[data-native="ios"] [data-slot="nav-bar"] {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0 56px;
+}
+
+html[data-native="ios"]
+	:where([data-slot="nav-bar"] > span, [data-slot="item-nav-title"]) {
+	overflow: hidden;
+	font: var(--type-headline);
+	color: var(--fg);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	opacity: 0;
+	translate: 0 4px;
+	transition:
+		opacity 200ms ease-out,
+		translate 200ms ease-out;
+
+	[data-collapsed] > & {
+		opacity: 1;
+		translate: 0 0;
+	}
+}
+
+/* The large title, at Title 1 in Spline. */
+html[data-native="ios"] [data-slot="page-header"] {
+	align-items: flex-start;
+	gap: 4px;
+	margin: 0 0 16px;
+	padding: 0 4px;
+	text-align: start;
+
+	& h1 {
+		font: var(--type-title1);
+		font-family: var(--font-display);
+		font-weight: var(--display-weight);
+		line-height: 1.15;
+		letter-spacing: var(--track-large);
+		text-wrap: balance;
+	}
+
+	& p {
+		font: var(--type-subheadline);
+		line-height: var(--lh-sub);
+		color: var(--fg-subtle);
+		text-wrap: pretty;
+	}
+}
+
+/* Section titles over grouped lists: a small uppercase label. */
+html[data-native="ios"] [data-slot="section-title"] {
+	margin-bottom: 6px;
+	padding: 0 16px;
+
+	& h2 {
+		font: var(--type-footnote);
+		letter-spacing: var(--track-label);
+		text-transform: uppercase;
+		color: var(--fg-subtle);
+	}
+}
+
+/* Settings rows: the label at Body, its hint as small print. */
+html[data-native="ios"] [data-slot="row-label"] {
+	font: var(--type-body);
+}
+
+html[data-native="ios"] [data-slot="row-hint"] {
+	font: var(--type-footnote);
+	color: var(--fg-subtle);
+	text-wrap: pretty;
+}
+
+/* Buttons a step under Body, medium, so a row's label stays the loudest thing in it.
+   They give a little under the finger. */
+html[data-native="ios"] [data-slot="button"] {
+	font: var(--type-subheadline);
+	font-weight: 500;
+	transition-property: scale, color, background-color, box-shadow;
+	transition-duration: 160ms;
+	transition-timing-function: ease-out;
+
+	&:active:not(:disabled) {
+		scale: 0.96;
+	}
+}
+
+/* Short paragraphs end on more than one word. */
+html[data-native="ios"] :where(p) {
+	text-wrap: pretty;
+}
+
+/* Cards become inset groups: flat on the grouped background, no shadow. */
+html[data-native="ios"] .rounded-window.shadow-card {
+	border-radius: 22px;
+	box-shadow: none;
+}
+
+/* ── Search: a filled field, as iOS draws one ──────────────────────────────────── */
+
+html[data-native="ios"] [data-slot="page-toolbar"] {
+	gap: 10px;
+	margin-bottom: 16px;
+
+	& [data-slot="input-group"] {
+		height: 40px;
+		border: 0;
+		border-radius: 20px;
+		background: var(--native-fill);
+		box-shadow: none;
+	}
+}
+
+/* Overview's search, first under the title: the field, and its matches in a group. */
+html[data-native="ios"] [data-slot="search-card"] {
+	margin-bottom: 24px;
+	background: none;
+
+	& > :first-child {
+		height: 40px;
+		padding: 0 8px 0 12px;
+		gap: 8px;
+		border-radius: 20px;
+		background: var(--native-fill);
+	}
+
+	& > :where(:first-child) svg {
+		width: 18px;
+		height: 18px;
+	}
+
+	& > :nth-child(2) {
+		margin-top: 8px;
+		border: 0;
+		border-radius: 22px;
+		background: var(--surface);
+	}
+}
+
+/* ── Items: an inset-grouped list, and an item pushed on top of it ─────────────── */
+
+html[data-native="ios"] [data-slot="item-list"] {
+	gap: 0;
+	padding: 0;
+	overflow: hidden;
+}
+
+html[data-native="ios"] [data-slot="item-row"] {
+	position: relative;
+	gap: 12px;
+	min-height: 62px;
+	padding: 10px 34px 10px 16px;
+	border-radius: 0;
+	background: none;
+	transition: background-color 120ms ease-out;
+
+	/* The disclosure chevron. */
+	&::after {
+		content: "";
+		position: absolute;
+		top: 50%;
+		right: 16px;
+		width: 8px;
+		height: 13px;
+		translate: 0 -50%;
+		background: var(--fg-faint);
+		mask:
+			url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 13'%3E%3Cpath d='M1.5 1.5 6.5 6.5l-5 5' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+			center / contain no-repeat;
+	}
+
+	&:active {
+		background: var(--native-press);
+	}
+}
+
+/* A separator between rows, from the text's edge to the right, as in iOS lists. */
+html[data-native="ios"]
+	[data-slot="swipe-row"]
+	+ [data-slot="swipe-row"]
+	[data-slot="item-row"]::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 64px;
+	height: 0.5px;
+	background: var(--line);
+}
+
+html[data-native="ios"] [data-slot="item-name"] {
+	font: var(--type-body);
+	font-weight: 500;
+}
+
+html[data-native="ios"] [data-slot="item-subtitle"] {
+	font: var(--type-subheadline);
+	color: var(--fg-subtle);
+}
+
+/* Rows slide left to show their actions (swipe-row.tsx). Each action is 74px wide. */
+html[data-native="ios"] [data-slot="swipe-row"] {
+	position: relative;
+	overflow: hidden;
+	touch-action: pan-y;
+}
+
+html[data-native="ios"] [data-slot="swipe-actions"] {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+}
+
+html[data-native="ios"] [data-slot="swipe-action"] {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	width: 74px;
+	font: var(--type-footnote);
+	font-weight: 500;
+	color: #ffffff;
+
+	& svg {
+		width: 22px;
+		height: 22px;
+	}
+
+	&[data-tone="favorite"] {
+		background: var(--native-orange);
+	}
+
+	&[data-tone="danger"] {
+		background: var(--native-red);
+	}
+}
+
+html[data-native="ios"] [data-slot="swipe-content"] {
+	position: relative;
+	background: var(--surface);
+	transition: translate 320ms cubic-bezier(0.32, 0.72, 0, 1);
+
+	[data-dragging] > & {
+		transition: none;
+	}
+}
+
+/* An open item replaces the list, the way a pushed screen does. */
+html[data-native="ios"]
+	[data-slot="page"]:has([data-slot="item-browser"][data-open])
+	:is(
+		[data-slot="nav-bar"],
+		[data-slot="page-header"],
+		[data-slot="page-toolbar"]
+	) {
+	display: none;
+}
+
+/* The open item's nav bar: back on the left, the name in the middle once it scrolls
+   away, Edit and ⋯ on the right. */
+html[data-native="ios"] [data-slot="item-nav"] {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+	align-items: center;
+	padding: 0 8px;
+}
+
+html[data-native="ios"] [data-slot="item-nav-title"] {
+	max-width: 46vw;
+}
+
+html[data-native="ios"] [data-slot="item-nav-back"] {
+	display: flex;
+	align-items: center;
+	justify-self: start;
+	max-width: 100%;
+	height: 44px;
+	padding-right: 8px;
+	font: var(--type-body);
+	color: var(--brand);
+
+	& svg {
+		flex: none;
+		width: 22px;
+		height: 22px;
+	}
+
+	& span {
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+}
+
+html[data-native="ios"] [data-slot="item-nav-actions"] {
+	display: flex;
+	align-items: center;
+	justify-self: end;
+}
+
+html[data-native="ios"] [data-slot="nav-text-button"] {
+	height: 44px;
+	padding: 0 8px;
+	font: var(--type-body);
+	color: var(--brand);
+}
+
+html[data-native="ios"] [data-slot="nav-icon-button"] {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 44px;
+	height: 44px;
+	color: var(--brand);
+
+	& svg {
+		width: 26px;
+		height: 26px;
+	}
+}
+
+html[data-native="ios"]
+	:is(
+		[data-slot="nav-text-button"],
+		[data-slot="nav-icon-button"],
+		[data-slot="item-nav-back"]
+	):active {
+	opacity: 0.4;
+}
+
+/* The item's header: tile on top, the name across the full width under it, so a long
+   name wraps in whole lines. */
+html[data-native="ios"] [data-slot="item-header"] {
+	flex-wrap: wrap;
+	align-items: center;
+	row-gap: 14px;
+	border-bottom: 0;
+
+	& > [data-slot="item-heading"] {
+		flex-basis: 100%;
+	}
+}
+
+html[data-native="ios"] [data-slot="item-title"] {
+	overflow: visible;
+	text-overflow: clip;
+	font: var(--type-title2);
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	line-height: 1.2;
+	letter-spacing: var(--track-display);
+	white-space: normal;
+	text-wrap: balance;
+}
+
+/* The sign-in pages' title, in the display face. */
+html[data-native="ios"] [data-slot="auth-title"] {
+	font: var(--type-title2);
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	line-height: 1.2;
+	letter-spacing: var(--track-display);
+	text-wrap: balance;
+}
+
+/* Fields: a small label over its value, the way the Passwords app shows them. */
+html[data-native="ios"] [data-slot="field"] {
+	flex-direction: column;
+	align-items: stretch;
+	gap: 2px;
+	min-height: 64px;
+	padding: 11px 0;
+
+	& > dt {
+		width: auto;
+		font: var(--type-footnote);
+		color: var(--fg-subtle);
+	}
+
+	& > dd {
+		font: var(--type-body);
+	}
+
+	/* Secrets in mono; one-time codes keep their own style, below. */
+	& .font-mono:not([data-slot="one-time-code"]) {
+		font: var(--type-body);
+		font-family: var(--font-code);
+	}
+
+	/* The copy and reveal buttons: a finger's worth to hit. */
+	& [data-slot="button"] {
+		min-width: 44px;
+		min-height: 44px;
+	}
+}
+
+/* One-time codes: tabular, so the digits don't jump as the code changes. */
+html[data-native="ios"] [data-slot="one-time-code"] {
+	font: var(--type-title2);
+	font-weight: var(--code-weight);
+	letter-spacing: var(--track-code);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Menus: a frosted list of full-width rows, icons trailing, as iOS draws them ─── */
+
+html[data-native="ios"] [data-slot="dropdown-menu-content"] {
+	min-width: 250px;
+	padding: 6px 0;
+	border-radius: 18px;
+	background: var(--native-menu);
+	backdrop-filter: blur(30px) saturate(1.8);
+	box-shadow:
+		0 0 0 0.5px var(--line),
+		0 12px 40px rgb(0 0 0 / 0.18);
+}
+
+html[data-native="ios"] [data-slot="dropdown-menu-item"] {
+	flex-direction: row-reverse;
+	justify-content: space-between;
+	gap: 12px;
+	min-height: 44px;
+	padding: 0 16px;
+	border-radius: 0;
+	font: var(--type-body);
+	color: var(--fg);
+
+	& svg {
+		width: 20px;
+		height: 20px;
+	}
+
+	&[data-variant="destructive"] {
+		color: var(--native-red);
+	}
+}
+
+html[data-native="ios"] [data-slot="dropdown-menu-label"] {
+	padding: 8px 16px 4px;
+	font: var(--type-footnote);
+	color: var(--fg-subtle);
+}
+
+/* ── Sheets: dialogs rise from the bottom ───────────────────────────────────────── */
+
+@keyframes native-sheet-in {
+	from {
+		translate: 0 100%;
+	}
+}
+
+@keyframes native-sheet-out {
+	to {
+		translate: 0 100%;
+	}
+}
+
+@keyframes native-bar-edge {
+	to {
+		box-shadow: 0 0.5px 0 var(--line);
+	}
+}
+
+html[data-native="ios"] [data-slot="dialog-content"] {
+	top: auto;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+	max-width: none;
+	/* dvh follows the keyboard, so a sheet with a field open stays under the status bar. */
+	max-height: calc(100dvh - env(safe-area-inset-top) - 12px);
+	padding: 28px 20px calc(20px + env(safe-area-inset-bottom));
+	border-radius: 28px 28px 0 0;
+	translate: none;
+	animation: native-sheet-in 360ms cubic-bezier(0.32, 0.72, 0, 1);
+
+	/* The grabber. */
+	&::before {
+		content: "";
+		position: absolute;
+		top: 7px;
+		left: 50%;
+		z-index: 3;
+		width: 36px;
+		height: 5px;
+		translate: -50% 0;
+		border-radius: 3px;
+		background: var(--line-strong);
+	}
+
+	&[data-closed] {
+		animation: native-sheet-out 200ms ease-out forwards;
+	}
+}
+
+html[data-native="ios"] [data-slot="dialog-title"] {
+	font: var(--type-title2);
+	font-family: var(--font-display);
+	font-weight: var(--display-weight);
+	line-height: 1.2;
+	letter-spacing: var(--track-display);
+	text-wrap: balance;
+}
+
+/*
+ * A sheet with one or two buttons puts them in a bar across its top, as iOS does: Cancel
+ * on the left, the main button on the right, the title under them. display: contents
+ * flattens only the boxes around the footer, so its buttons stay in their form and still
+ * submit it, and the bar stays put while the sheet scrolls. Three buttons stay stacked
+ * along the bottom.
+ */
+html[data-native="ios"]
+	[data-slot="dialog-content"]:has(
+		[data-slot="dialog-footer"] > :last-child:nth-child(-n + 2)
+	) {
+	display: flex;
+	flex-direction: column;
+	padding-top: 0;
+
+	& :not([data-slot="dialog-footer"]):has([data-slot="dialog-footer"]) {
+		display: contents;
+	}
+
+	/* What's in the sheet keeps its height; the sheet scrolls instead. */
+	& > *,
+	& :not([data-slot="dialog-footer"]):has([data-slot="dialog-footer"]) > * {
+		flex-shrink: 0;
+	}
+
+	/* Cancel, in the bar, closes it. */
+	& > [data-slot="dialog-close"] {
+		display: none;
+	}
+
+	& [data-slot="dialog-footer"] {
+		position: sticky;
+		top: 0;
+		z-index: 2;
+		order: -1;
+		flex: none;
+		flex-direction: row;
+		align-items: center;
+		height: 56px;
+		margin: 0 -20px;
+		padding: 6px 8px 0;
+		border: 0;
+		border-radius: 28px 28px 0 0;
+		background: var(--popover);
+
+		/* A hairline under the bar once the sheet scrolls under it. */
+		@supports (animation-timeline: scroll()) {
+			animation: native-bar-edge linear both;
+			animation-timeline: scroll(nearest);
+			animation-range: 0 16px;
+		}
+
+		& [data-slot="button"] {
+			height: 44px;
+			padding: 0 12px;
+			border: 0;
+			background: none;
+			box-shadow: none;
+			font: var(--type-body);
+			color: var(--brand);
+
+			&:last-child {
+				margin-left: auto;
+				font-weight: 600;
+			}
+
+			&[data-variant="destructive"] {
+				color: var(--native-red);
+			}
+
+			&:disabled {
+				color: var(--fg-faint);
+				opacity: 1;
+			}
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html[data-native="ios"] [data-slot="dialog-content"] {
+		animation: none;
+
+		&[data-closed] {
+			animation: none;
+		}
+	}
+
+	html[data-native="ios"] [data-slot="swipe-content"] {
+		transition: none;
+	}
+}

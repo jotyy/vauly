@@ -36,6 +36,7 @@ import { filesSeen, useFiles } from "@/lib/files";
 import { ago, plural } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
 import { logoDomain } from "@/lib/logos";
+import { isNativeApp } from "@/lib/native";
 import { useLookup } from "@/lib/use-lookup";
 import {
 	type AccessRequest,
@@ -73,8 +74,10 @@ function Overview() {
 					: `Hi ${firstName}. Nothing needs you right now.`
 			}
 		>
+			{/* In the app, search comes first, under the title, as on an iPhone. */}
+			{isNativeApp && <QuickFind />}
 			<GetStarted />
-			<QuickFind />
+			{!isNativeApp && <QuickFind />}
 
 			<div className="mt-8">
 				<SectionTitle>

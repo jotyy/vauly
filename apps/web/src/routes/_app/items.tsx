@@ -4,6 +4,7 @@ import {
 	MagnifyingGlassIcon,
 	PlusIcon,
 	StarIcon,
+	TrashIcon,
 	UploadSimpleIcon,
 	WarningIcon,
 } from "@phosphor-icons/react";
@@ -17,22 +18,25 @@ import {
 import { Skeleton } from "@vauly/ui/components/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@vauly/ui/components/tabs";
 import { cn } from "@vauly/ui/lib/utils";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useRef } from "react";
 import { z } from "zod";
 import { ImportDialog } from "@/components/import-dialog";
-import { ItemDetail } from "@/components/item-detail";
+import { ItemDetail, useDeleteItem } from "@/components/item-detail";
 import { ItemDialog } from "@/components/item-dialog";
 import { ItemTile } from "@/components/item-tile";
 import { Page } from "@/components/page";
+import { SwipeRow } from "@/components/swipe-row";
 import { timesSeen, useBreached } from "@/lib/breaches";
 import { plural, toneDot } from "@/lib/format";
 import { logoDomain } from "@/lib/logos";
+import { isNativeApp } from "@/lib/native";
 import {
 	canEdit,
 	type Item,
 	type ItemKind,
 	itemMatches,
 	itemSubtitle,
+	useActions,
 	useExposed,
 	useItems,
 	useVaults,
@@ -86,6 +90,8 @@ function Items() {
 	const vaults = useVaults();
 	const { exposed } = useExposed();
 	const breached = useBreached();
+	const actions = useActions();
+	const deleteItem = useDeleteItem();
 	const vault = vaults.data?.find((v) => v.id === search.vault);
 	// In a vault this person can only view, there's nothing to add.
 	const adding = !vault || canEdit(vault);
@@ -121,6 +127,20 @@ function Items() {
 	};
 	const selected =
 		visible.find((item) => item.id === search.id) ?? visible[0] ?? null;
+	const listName = vault ? vault.name : "All items";
+	// In the app, an open item opens at its top (app.tsx); the list comes back where it
+	// was left.
+	const listScroll = useRef(0);
+	const main = () =>
+		document.querySelector<HTMLElement>("[data-slot=app-main]");
+	const back = () =>
+		navigate({ search: (prev) => ({ ...prev, id: undefined }) }).then(() => {
+			if (isNativeApp) {
+				requestAnimationFrame(() =>
+					main()?.scrollTo({ top: listScroll.current }),
+				);
+			}
+		});
 	const setNew = (open: boolean) =>
 		navigate({ search: (prev) => ({ ...prev, new: open || undefined }) });
 	const setImporting = (open: boolean) =>
@@ -138,7 +158,10 @@ function Items() {
 			title={vault ? vault.name : "All items"}
 			description={description}
 		>
-			<div className="mb-3 flex flex-wrap-reverse items-center justify-between gap-3">
+			<div
+				data-slot="page-toolbar"
+				className="mb-3 flex flex-wrap-reverse items-center justify-between gap-3"
+			>
 				<Tabs
 					className="max-md:w-full max-md:overflow-x-auto"
 					value={search.kind ?? "all"}
@@ -213,8 +236,13 @@ function Items() {
 				/>
 			) : (
 				// On phones the list and the open item take turns: picking an item shows it alone.
-				<div className="grid grid-cols-1 items-start gap-3 md:grid-cols-5">
+				<div
+					data-slot="item-browser"
+					data-open={search.id ? "true" : undefined}
+					className="grid grid-cols-1 items-start gap-3 md:grid-cols-5"
+				>
 					<section
+						data-slot="item-list"
 						aria-label="Items"
 						className={cn(
 							"rounded-window bg-surface shadow-card flex flex-col gap-0.5 p-1.5 md:col-span-2",
@@ -251,38 +279,69 @@ function Items() {
 							const itemVault = vaults.data?.find((v) => v.id === item.vaultId);
 							const active = selected?.id === item.id;
 							return (
-								<Link
+								<SwipeRow
 									key={item.id}
-									to="/items"
-									search={(prev) => ({ ...prev, id: item.id })}
-									aria-current={active ? "true" : undefined}
-									className={cn(
-										"flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors",
-										active ? "bg-tint/6" : "hover:bg-tint/3",
-									)}
+									actions={[
+										{
+											label: item.favorite ? "Unfavorite" : "Favorite",
+											icon: StarIcon,
+											tone: "favorite",
+											onSelect: () => actions.toggleFavorite(item),
+										},
+										...(canEdit(itemVault)
+											? [
+													{
+														label: "Delete",
+														icon: TrashIcon,
+														tone: "danger" as const,
+														onSelect: () => deleteItem(item),
+													},
+												]
+											: []),
+									]}
 								>
-									<ItemTile kind={item.kind} logo={logoDomain(item)} />
-									<div className="flex min-w-0 flex-1 flex-col">
-										<span className="text-body-sm text-fg flex items-center gap-1 truncate">
-											{item.name}
-											{item.favorite && (
-												<StarIcon
-													weight="fill"
-													className="text-chart-3 size-3 shrink-0"
-												/>
-											)}
-										</span>
-										<span className="text-caption text-fg-subtle truncate">
-											{note(item)}
-										</span>
-									</div>
-									{!vault && itemVault && (
-										<span
-											title={itemVault.name}
-											className={`size-1.5 shrink-0 rounded-full ${toneDot[itemVault.tone]}`}
-										/>
-									)}
-								</Link>
+									<Link
+										to="/items"
+										search={(prev) => ({ ...prev, id: item.id })}
+										onClick={() => {
+											listScroll.current = main()?.scrollTop ?? 0;
+										}}
+										aria-current={active ? "true" : undefined}
+										data-slot="item-row"
+										className={cn(
+											"flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors",
+											active ? "bg-tint/6" : "hover:bg-tint/3",
+										)}
+									>
+										<ItemTile kind={item.kind} logo={logoDomain(item)} />
+										<div className="flex min-w-0 flex-1 flex-col">
+											<span
+												data-slot="item-name"
+												className="text-body-sm text-fg flex items-center gap-1 truncate"
+											>
+												{item.name}
+												{item.favorite && (
+													<StarIcon
+														weight="fill"
+														className="text-chart-3 size-3 shrink-0"
+													/>
+												)}
+											</span>
+											<span
+												data-slot="item-subtitle"
+												className="text-caption text-fg-subtle truncate"
+											>
+												{note(item)}
+											</span>
+										</div>
+										{!vault && itemVault && (
+											<span
+												title={itemVault.name}
+												className={`size-1.5 shrink-0 rounded-full ${toneDot[itemVault.tone]}`}
+											/>
+										)}
+									</Link>
+								</SwipeRow>
 							);
 						})}
 					</section>
@@ -292,19 +351,26 @@ function Items() {
 							!search.id && "max-md:hidden",
 						)}
 					>
-						<Button
-							variant="ghost"
-							size="sm"
-							className="w-fit md:hidden"
-							onClick={() =>
-								navigate({ search: (prev) => ({ ...prev, id: undefined }) })
-							}
-						>
-							<CaretLeftIcon data-icon="inline-start" />
-							{vault ? vault.name : "All items"}
-						</Button>
+						{!isNativeApp && (
+							<Button
+								data-slot="item-back"
+								variant="ghost"
+								size="sm"
+								className="w-fit md:hidden"
+								onClick={back}
+							>
+								<CaretLeftIcon data-icon="inline-start" />
+								{listName}
+							</Button>
+						)}
 						{selected ? (
-							<ItemDetail key={selected.id} item={selected} />
+							<ItemDetail
+								key={selected.id}
+								item={selected}
+								back={
+									isNativeApp ? { label: listName, onBack: back } : undefined
+								}
+							/>
 						) : (
 							<div className="rounded-window border-line text-caption text-fg-subtle flex h-60 items-center justify-center border border-dashed">
 								Select an item to see it here.

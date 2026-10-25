@@ -20,7 +20,7 @@ export function Field({
 	children: ReactNode;
 }) {
 	return (
-		<div className="flex min-h-11 items-center gap-4 py-2">
+		<div data-slot="field" className="flex min-h-11 items-center gap-4 py-2">
 			<dt className="text-caption text-fg-subtle w-28 shrink-0">{label}</dt>
 			<dd className="flex min-w-0 flex-1 items-center gap-1">{children}</dd>
 		</div>

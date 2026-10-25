@@ -54,7 +54,9 @@ export function AuthLayout({
 					<div className="rounded-panel shadow-float animate-in fade-in slide-in-from-bottom-2 fill-mode-both relative bg-white/15 p-1.5 ring-1 ring-white/30 backdrop-blur-md duration-500 motion-reduce:animate-none">
 						<main className="bg-surface rounded-window shadow-pill flex flex-col px-6 py-8 sm:px-8">
 							<div className="mb-6 flex flex-col items-center gap-1.5 text-center">
-								<h1 className="text-h5 text-fg">{title}</h1>
+								<h1 data-slot="auth-title" className="text-h5 text-fg">
+									{title}
+								</h1>
 								{description && (
 									<p className="text-body-sm text-fg-muted text-balance">
 										{description}

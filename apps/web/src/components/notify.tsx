@@ -10,9 +10,11 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { haptic } from "@/lib/native";
+
 // Every notification in vauly is one dark pill at the bottom center, close to the content
 // the person is working in. Copies of secrets replace each other (there is only one
-// clipboard) and show when the clipboard clears.
+// clipboard) and show when the clipboard clears. In the iPhone app, each is felt too.
 
 const CLEAR_AFTER = 90;
 
@@ -72,11 +74,13 @@ const icons = {
 };
 
 function show(kind: keyof typeof icons, title: string, detail?: string) {
+	if (kind !== "info") haptic(kind);
 	toast.custom(
 		() => (
 			<Pill>
 				{icons[kind]}
-				<span className="truncate">{title}</span>
+				{/* The verb stays whole; only what it's about shortens. */}
+				<span className={cn("truncate", detail && "shrink-0")}>{title}</span>
 				{detail && <span className="truncate opacity-60">{detail}</span>}
 			</Pill>
 		),
@@ -90,6 +94,7 @@ export const notify = {
 	info: (title: string, detail?: string) => show("info", title, detail),
 	/** A success with a way back, kept up a little longer so there's time to use it. */
 	undo(title: string, onUndo: () => void) {
+		haptic("success");
 		const id = toast.custom(
 			() => (
 				<Pill className="pr-1.5">
@@ -140,6 +145,7 @@ export async function copyToClipboard(
 		notify.error("Couldn't copy", "Click the page and try again");
 		return false;
 	}
+	haptic("light");
 	clearTimeout(clearTimer);
 	if (secret) clearTimer = setTimeout(clearClipboard, CLEAR_AFTER * 1000);
 	toast.custom(
