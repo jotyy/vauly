@@ -5,7 +5,9 @@ import Security
 enum Keychain {
     /// The access group the app shares with its AutoFill extension, from Info.plist, where
     /// the build fills in the team. A build without a team, as for the simulator, has no
-    /// group to share, and the items stay in the app's own.
+    /// group to share, and the items stay in the app's own. Only items that name it go there:
+    /// the app's own group comes first in App.entitlements, so it's the default, and the
+    /// session, which names none, stays the app's alone.
     static let sharedGroup: String? = {
         guard let group = Bundle.main.object(forInfoDictionaryKey: "VaulyKeychainGroup") as? String,
               group.contains("."), !group.hasPrefix("app.vauly")

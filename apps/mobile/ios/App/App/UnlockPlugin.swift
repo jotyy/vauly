@@ -24,6 +24,9 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static let secretService = "app.vauly.unlock.secret"
     private static let copyService = "app.vauly.unlock.copy"
+    /// The server stops handing out the pepper after this; the copy is refused here too, as
+    /// the AutoFill extension will have to.
+    private static let days = 14.0
 
     /// What the device's copy keeps besides the secret. Only `sealed` is secret, and sealed.
     private struct Copy: Codable {
@@ -33,6 +36,8 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
         var sessionId: String
         var issuedAt: Double
         var sealed: Sealed
+        /// Which faces or fingers were enrolled when it was made, as iOS's opaque value.
+        var enrolled: String?
 
         var summary: [String: Any] {
             ["accountId": accountId, "credentialId": credentialId, "publicKey": publicKey,
@@ -71,7 +76,7 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
               let pepper = call.getString("pepper").flatMap({ Data(base64Encoded: $0) }),
               var privateKey = call.getString("privateKey").flatMap({ Data(base64Encoded: $0) })
         else { return call.reject("Something is missing", "BROKEN") }
-        let context = LAContext()
+        let context = Self.context()
         context.evaluatePolicy(
             .deviceOwnerAuthenticationWithBiometrics, localizedReason: "Turn on unlocking vauly this way"
         ) { passed, error in
@@ -101,7 +106,8 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
                 try self.keepSecret(secret, for: accountId)
                 try self.keep(Copy(
                     accountId: accountId, credentialId: copyContext.credentialId, publicKey: publicKey,
-                    sessionId: sessionId, issuedAt: issuedAt, sealed: sealed))
+                    sessionId: sessionId, issuedAt: issuedAt, sealed: sealed,
+                    enrolled: Self.enrolled(context)?.base64EncodedString()))
                 call.resolve()
             } catch {
                 self.forgetCopy(accountId)
@@ -113,17 +119,22 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
     /**
      Asks for Face ID and opens the copy. Takes `accountId` and `publicKey`, the server's,
      and `pepper` (base64); resolves with `privateKey`, PKCS#8 in base64. Rejects with
-     CANCELLED, or INVALIDATED when the face or finger set changed since: the copy is gone.
+     CANCELLED or LOCKED_OUT, keeping the copy; or, after deleting it, with INVALIDATED when
+     the enrolled faces or fingers changed since, or EXPIRED after 14 days.
      */
     @objc func unlock(_ call: CAPPluginCall) {
         guard let accountId = call.getString("accountId"), let publicKey = call.getString("publicKey"),
               let pepper = call.getString("pepper").flatMap({ Data(base64Encoded: $0) })
         else { return call.reject("Something is missing", "BROKEN") }
         guard let copy = loadCopy(accountId) else { return call.reject("No copy", "BROKEN") }
+        if Date().timeIntervalSince1970 * 1000 - copy.issuedAt > Self.days * 86_400_000 {
+            forgetCopy(accountId)
+            return call.reject("The copy is too old", "EXPIRED")
+        }
         // Face ID first, and the Keychain read with the same context, so it asks once. The
         // Keychain also holds the secret to .biometryCurrentSet itself, which the
         // simulator doesn't enforce.
-        let context = LAContext()
+        let context = Self.context()
         context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Unlock vauly") {
             passed, error in
             guard passed else {
@@ -133,6 +144,12 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
                     return call.reject("Face ID changed", "INVALIDATED")
                 }
                 return self.reject(call, error)
+            }
+            // The enrolled set, compared here as well as by the Keychain: a face or finger
+            // added or removed since ends the copy.
+            if let enrolled = copy.enrolled, enrolled != Self.enrolled(context)?.base64EncodedString() {
+                self.forgetCopy(accountId)
+                return call.reject("Face ID changed", "INVALIDATED")
             }
             var query = Keychain.item(service: Self.secretService, account: accountId)
             query[kSecReturnData as String] = true
@@ -167,27 +184,53 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    /// Deletes the copy for `accountId`, or every copy when it's left out.
+    /// Deletes the copy for `accountId`, or every secret and copy when it's left out, even
+    /// ones that no longer read.
     @objc func forget(_ call: CAPPluginCall) {
         if let accountId = call.getString("accountId") {
             forgetCopy(accountId)
         } else {
-            for copy in allCopies() { forgetCopy(copy.accountId) }
+            for service in [Self.secretService, Self.copyService] {
+                var query: [String: Any] = [
+                    kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service
+                ]
+                if let group = Keychain.sharedGroup { query[kSecAttrAccessGroup as String] = group }
+                SecItemDelete(query as CFDictionary)
+            }
         }
         call.resolve()
     }
 
-    // MARK: - The Keychain
+    // MARK: - Face ID
+
+    /// A context for one Face ID check. Its fallback button, after a failed try, leads back
+    /// to the master password in the app.
+    private static func context() -> LAContext {
+        let context = LAContext()
+        context.localizedFallbackTitle = "Use Master Password"
+        return context
+    }
+
+    /// Which faces or fingers are enrolled, as an opaque value that changes when they do. Read
+    /// once the context has checked.
+    private static func enrolled(_ context: LAContext) -> Data? {
+        if #available(iOS 18.0, *) { return context.domainState.biometry.stateHash }
+        return context.evaluatedPolicyDomainState
+    }
 
     /// A Face ID turned down, failed or locked out leaves the copy, to try again.
     private func reject(_ call: CAPPluginCall, _ error: Error?) {
         switch (error as? LAError)?.code {
-        case .userCancel, .systemCancel, .appCancel, .userFallback, .authenticationFailed, .biometryLockout:
+        case .userCancel, .systemCancel, .appCancel, .userFallback, .authenticationFailed:
             call.reject("Face ID didn't pass", "CANCELLED")
+        case .biometryLockout:
+            call.reject("Face ID is locked", "LOCKED_OUT")
         default:
             call.reject("Face ID isn't available", "UNAVAILABLE")
         }
     }
+
+    // MARK: - The Keychain
 
     /// Only a face or finger enrolled now releases it, and only while the iPhone has a passcode.
     private func keepSecret(_ secret: Data, for accountId: String) throws {
@@ -200,6 +243,19 @@ public class UnlockPlugin: CAPPlugin, CAPBridgedPlugin {
         item[kSecAttrAccessControl as String] = access
         let status = SecItemAdd(item as CFDictionary, nil)
         guard status == errSecSuccess else { throw VaulyKitError.malformed("keychain (\(status))") }
+        #if !targetEnvironment(simulator)
+        // It must not read without Face ID: without one, and no asking, the Keychain refuses.
+        // The simulator doesn't enforce access control, so this holds only on a device.
+        let check = LAContext()
+        check.interactionNotAllowed = true
+        var query = Keychain.item(service: Self.secretService, account: accountId)
+        query[kSecReturnData as String] = true
+        query[kSecUseAuthenticationContext as String] = check
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecInteractionNotAllowed else {
+            throw VaulyKitError.malformed("access control")
+        }
+        #endif
     }
 
     private func keep(_ copy: Copy) throws {
