@@ -1,4 +1,5 @@
 import type { Context as ApiContext } from "@vauly/api/context";
+import { withoutCookie } from "@vauly/api/same-origin";
 import type { Context as HonoContext } from "hono";
 
 import { isDemo } from "./demo";
@@ -7,6 +8,8 @@ import { createAuth, getDb, notifier, prepare } from "./services";
 
 export type CreateContextOptions = {
 	context: HonoContext;
+	/** Whether the request may use its session cookie (packages/api/src/same-origin.ts). */
+	cookie: boolean;
 };
 
 const MB = 1024 * 1024;
@@ -34,13 +37,16 @@ const fileLimits = () =>
 
 export async function createContext({
 	context,
+	cookie,
 }: CreateContextOptions): Promise<ApiContext> {
 	const db = getDb();
 	const origin = new URL(context.req.url).origin;
 	const waitUntil = (promise: Promise<unknown>) =>
 		context.executionCtx.waitUntil(promise);
 	const auth = await createAuth(origin, db, waitUntil);
-	const headers = context.req.raw.headers;
+	const headers = cookie
+		? context.req.raw.headers
+		: withoutCookie(context.req.raw.headers);
 	const session = await auth.api.getSession({ headers });
 	return {
 		db,

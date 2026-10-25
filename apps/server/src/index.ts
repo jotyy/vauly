@@ -4,6 +4,7 @@ import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@vauly/api/routers/index";
+import { fromOwnPages, ownOrigins } from "@vauly/api/same-origin";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -12,6 +13,7 @@ import { createContext } from "./context";
 import { demoGuard, isDemo, mountDemo, restore } from "./demo";
 import { resetDatabase } from "./e2e-reset";
 import { ENV } from "./env.server";
+
 import { createAuth, getDb, prepare } from "./services";
 
 const app = new Hono();
@@ -94,7 +96,15 @@ export const rpcHandler = new RPCHandler(appRouter, {
 });
 
 app.use("/*", async (c, next) => {
-	const context = await createContext({ context: c });
+	// The API uses the session cookie only for the web app's own pages, since the browser
+	// sends it with other sites' requests too (packages/api/src/same-origin.ts).
+	const context = await createContext({
+		context: c,
+		cookie: fromOwnPages(
+			c.req.raw,
+			ownOrigins(c.req.url, ENV.CORS_ORIGIN, ENV.BETTER_AUTH_URL),
+		),
+	});
 
 	const rpcResult = await rpcHandler.handle(c.req.raw, {
 		prefix: "/rpc",
