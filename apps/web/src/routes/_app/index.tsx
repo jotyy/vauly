@@ -343,10 +343,11 @@ function useNeeds() {
 						>
 							Deny
 						</Button>
+						{/* Approving wraps the item's key with the agent's, so it waits for both. */}
 						<Button
 							variant="outline"
 							size="sm"
-							disabled={busy === id || !item}
+							disabled={busy === id || !item || !agent}
 							onClick={() =>
 								run(
 									id,

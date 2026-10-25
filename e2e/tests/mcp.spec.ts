@@ -87,7 +87,6 @@ function mcp() {
 }
 
 async function approveOnce(page: Page, forWhat: string) {
-	await signIn(page, owner);
 	const needs = page.getByRole("region", { name: "Needs you" });
 	await expect(needs.getByText(`for ${forWhat}`)).toBeVisible();
 	await needs.getByRole("button", { name: "Allow once" }).click();
@@ -163,6 +162,7 @@ test("a run waits for a person, then the command gets the value and the agent do
 	const command = `test "$DATABASE_URL" = "${SECRET}" && echo MATCH; echo "value: $DATABASE_URL"`;
 	const run = client.call("run_with_secrets", { command });
 
+	await signIn(page, owner);
 	await approveOnce(page, command.slice(0, 40));
 	const result = await run;
 	expect(result?.isError).toBeUndefined();
@@ -191,6 +191,20 @@ test("an agent can ask ahead, with a reason the person reads", async ({
 		{ status: "waiting_for_approval" },
 	]);
 
+	// The agents' list comes last here, on purpose. Until it has, the app can't wrap the
+	// item's key for the agent, so the request shows but can't be allowed yet.
+	await page.route("**/rpc/agents/list", async (route) => {
+		await new Promise((resolve) => setTimeout(resolve, 1_500));
+		await route.continue();
+	});
+	await signIn(page, owner);
+	const needs = page.getByRole("region", { name: "Needs you" });
+	await expect(
+		needs.getByText("An agent wants Postgres staging"),
+	).toBeVisible();
+	await expect(
+		needs.getByRole("button", { name: "Allow once" }),
+	).toBeDisabled();
 	await approveOnce(page, "Run the database migrations");
 	const secrets = await client.call("list_secrets");
 	expect(secrets?.structuredContent?.secrets).toMatchObject([
