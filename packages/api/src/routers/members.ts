@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { noWrongTries } from "@vauly/auth/pace";
 import { session, user } from "@vauly/db/schema/auth";
 import {
 	invite,
@@ -215,6 +216,7 @@ export const membersRouter = {
 						totpPending: null,
 						totpStep: null,
 						recoveryCodes: null,
+						...noWrongTries,
 					})
 					.where(eq(member.userId, input.userId)),
 				// Their sessions end with it, so one opened by whoever set it up in their
