@@ -51,6 +51,7 @@ export default defineConfig({
 					label: "Trust",
 					items: [
 						{ label: "Security", slug: "docs/security" },
+						{ label: "Threat model", slug: "docs/threat-model" },
 						{ label: "Security policy", slug: "docs/security-policy" },
 						{ label: "Privacy policy", slug: "docs/privacy" },
 					],

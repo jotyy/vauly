@@ -6,6 +6,7 @@ const docs = [
 	"/docs/browser-extension/",
 	"/docs/agents/",
 	"/docs/security/",
+	"/docs/threat-model/",
 	"/docs/compare/",
 	"/docs/import/",
 	"/docs/security-policy/",

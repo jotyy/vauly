@@ -90,6 +90,7 @@ vauly deploys to your own Cloudflare account as one Worker, for the web app and 
 
 - [Self-hosting](docs/self-hosting.md): deploy, configure and upgrade your instance
 - [Security](docs/security.md): the encryption design and its limits
+- [Threat model](docs/threat-model.md): what vauly protects, from whom, and what it doesn't defend against
 - [Browser extension](docs/browser-extension.md): install it and fill logins
 - [Agents and scripts](docs/agents.md): `vauly run` and approvals
 - [Contributing](CONTRIBUTING.md): set up a development environment and send a change

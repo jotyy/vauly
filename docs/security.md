@@ -1,6 +1,6 @@
 # Security
 
-vauly is built so that the server holding your data can't read it. This page describes how, what the server can still see, and where the model stops protecting you. To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+vauly is built so that the server holding your data can't read it. This page describes how, what the server can still see, and where the model stops protecting you. [Threat model](threat-model.md) lists who vauly protects against and where its parts trust each other. To report a vulnerability, see [SECURITY.md](../SECURITY.md).
 
 ## Goals
 
