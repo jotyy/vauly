@@ -18,6 +18,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		69A09CEC71B0DD280E01395F /* SessionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67AC1C1DE8BD00653F38E63F /* SessionPlugin.swift */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
+		9E450D3A6EA2C68920B3BDC7 /* CopyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CEB444F10E3B3DF12963008 /* CopyPlugin.swift */; };
 		B7C9E214024AFAA365193777 /* Keychain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 718A8A13C955AB570A9270CC /* Keychain.swift */; };
 		C17E069304B1CDF42587713C /* AppViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9641F640F8B807610BC507A2 /* AppViewController.swift */; };
 		D8B95D83EBE2B2F5F6C90B8B /* VaulyKit in Frameworks */ = {isa = PBXBuildFile; productRef = ACC96221F9FBACDC9C9D650E /* VaulyKit */; };
@@ -25,6 +26,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		1CEB444F10E3B3DF12963008 /* CopyPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CopyPlugin.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -92,6 +94,7 @@
 				718A8A13C955AB570A9270CC /* Keychain.swift */,
 				E0F1CD1C7D295F16E0ACF0A8 /* UnlockPlugin.swift */,
 				6EBFCE1D31BD31421B9B0534 /* App.entitlements */,
+				1CEB444F10E3B3DF12963008 /* CopyPlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -186,6 +189,7 @@
 				0EF0CFD3FC9E1CEA6C7A834A /* RefusedPlugins.swift in Sources */,
 				B7C9E214024AFAA365193777 /* Keychain.swift in Sources */,
 				F4C1B012FE95B66860E9E2EC /* UnlockPlugin.swift in Sources */,
+				9E450D3A6EA2C68920B3BDC7 /* CopyPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

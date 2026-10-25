@@ -5,6 +5,7 @@ import { client } from "@/utils/orpc";
 
 import { isOfflineError } from "./connection";
 import { objectStore } from "./idb";
+import { sharedCopies } from "./native";
 import {
 	type Contents,
 	type FileRow,
@@ -23,7 +24,8 @@ export { OFFLINE_DAYS } from "./snapshot";
 // The whole copy is sealed with a key wrapped to the account's own public key, so even
 // its IDs and timestamps need the master password; only what unlocking needs stays
 // readable. Like the passkey copy, it belongs to the session it was made in, and it's
-// used for at most OFFLINE_DAYS.
+// used for at most OFFLINE_DAYS. Inside the iPhone app the same sealed copy is also kept
+// where the AutoFill extension can read it, and goes whenever this one goes.
 
 // --- Storage ---------------------------------------------------------------------------
 
@@ -37,15 +39,26 @@ async function allSnapshots(): Promise<Snapshot[]> {
 	}
 }
 
-/** Deletes copies: every one, or those `which` picks. */
+/** What deciding which copies go takes; the app's copies tell only this much. */
+type CopyInfo = Pick<Snapshot, "accountId" | "sessionId" | "syncedAt">;
+
+/** Deletes copies, the app's shared ones too: every one, or those `which` picks. */
 export async function forgetSnapshots(
-	which: (snapshot: Snapshot) => boolean = () => true,
+	which: (snapshot: CopyInfo) => boolean = () => true,
 ) {
 	const doomed = (await allSnapshots()).filter(which);
 	for (const snapshot of doomed) {
 		await request("readwrite", (store) =>
 			store.delete(snapshot.accountId),
 		).catch(() => undefined);
+	}
+	if (sharedCopies) {
+		const shared = await sharedCopies.list().catch(() => ({ copies: [] }));
+		for (const copy of shared.copies.filter(which)) {
+			await sharedCopies
+				.forget({ accountId: copy.accountId })
+				.catch(() => undefined);
+		}
 	}
 	if (doomed.some((snapshot) => snapshot.syncedAt === state.syncedAt)) {
 		update({ syncedAt: null });
@@ -156,6 +169,9 @@ async function save() {
 			items,
 			...(files && { files }),
 		});
+		await sharedCopies
+			?.keep({ snapshot: JSON.stringify(snapshot) })
+			.catch(() => undefined);
 		await request("readwrite", (store) => store.put(snapshot));
 		update({ syncedAt: snapshot.syncedAt });
 	} catch {

@@ -23,6 +23,8 @@ The app asks which vauly to connect to when it starts. For one on this computer,
 - `ios/App/App/` is Capacitor's iOS project, with vauly's own Swift:
   - `AppViewController.swift` adds vauly's plugins to Capacitor's bridge, and in a debug build serves `debug.html`.
   - `SessionPlugin.swift` is `VaulySession`: the vauly the app is connected to, its API's address, and the session token, in the Keychain.
+  - `UnlockPlugin.swift` is `VaulyUnlock`: unlocking with Face ID or Touch ID, with a secret in the Keychain and VaulyKit's `deviceKey`.
+  - `CopyPlugin.swift` is `VaulyCopy`: the offline copy, sealed as the web app made it, in the App Group container the AutoFill extension will share.
   - `RefusedPlugins.swift` takes the place of Capacitor's HTTP and WebView plugins, which Capacitor registers in every app, under their names and their class names, and refuses every call.
 - The Haptics, Keyboard and Status Bar plugins come from npm. Capacitor itself comes as a Swift package, so there's no CocoaPods.
 
