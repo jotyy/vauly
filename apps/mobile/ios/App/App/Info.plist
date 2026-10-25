@@ -6,6 +6,8 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>vauly unlocks with Face ID instead of your master password, once you turn it on in Settings.</string>
+	<key>VaulyAppGroup</key>
+	<string>group.app.vauly</string>
 	<key>VaulyKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)app.vauly.shared</string>
 	<key>CFBundleDevelopmentRegion</key>

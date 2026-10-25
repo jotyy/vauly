@@ -7,6 +7,7 @@ class AppViewController: CAPBridgeViewController {
         Keychain.forgetAfterReinstall()
         bridge?.registerPluginInstance(SessionPlugin())
         bridge?.registerPluginInstance(UnlockPlugin())
+        bridge?.registerPluginInstance(CopyPlugin())
         // These take the place of two plugins Capacitor always registers; see RefusedPlugins.
         for name in ["CapacitorHttp", "CAPHttpPlugin"] {
             bridge?.registerPluginInstance(RefusedHttpPlugin(jsName: name))

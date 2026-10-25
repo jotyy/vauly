@@ -1,9 +1,24 @@
 /// <reference types="bun" />
 
 import { describe, expect, test } from "bun:test";
-import { createAccount, type Kdf } from "@vauly/crypto";
+import { readFileSync } from "node:fs";
+import {
+	createAccount,
+	fromBase64,
+	importPrivateKey,
+	type Kdf,
+	openJson,
+	unwrapKey,
+	unwrapKeyFrom,
+} from "@vauly/crypto";
 
-import { type Contents, isFresh, openSnapshot, sealSnapshot } from "./snapshot";
+import {
+	type Contents,
+	isFresh,
+	openSnapshot,
+	type Snapshot,
+	sealSnapshot,
+} from "./snapshot";
 
 // Made-up rows in the API's shape; only their round trip and their secrecy matter here.
 const contents = {
@@ -89,5 +104,45 @@ describe("the offline copy", () => {
 		expect(await at(now - 29 * day)).toBe(true);
 		expect(await at(now - 31 * day)).toBe(false);
 		expect(await at(now + day)).toBe(false);
+	});
+});
+
+describe("the offline copy's format", () => {
+	// The vector the native readers are checked against too (VaulyKit's VectorTests).
+	const [vector] = JSON.parse(
+		readFileSync(
+			new URL("../../../../packages/crypto/test-vectors.json", import.meta.url),
+			"utf8",
+		),
+	).snapshot as {
+		privateKey: string;
+		snapshot: Snapshot;
+		contents: Contents & {
+			vaults: { wrappedKey: string; encryptedMeta: string }[];
+			items: { data: string; wrappedKey: string }[];
+		};
+		vaultMeta: unknown;
+		item: unknown;
+	}[];
+
+	test("opens test-vectors.json's copy, down to its item", async () => {
+		if (!vector) throw new Error("no snapshot vector");
+		const privateKey = await importPrivateKey(fromBase64(vector.privateKey));
+		const contents = await openSnapshot(vector.snapshot, privateKey);
+		expect(contents).toEqual(vector.contents);
+
+		const [vault] = vector.contents.vaults;
+		const [item] = vector.contents.items;
+		if (!vault || !item) throw new Error("no vault or item in the vector");
+		const vaultKey = await unwrapKeyFrom(
+			privateKey,
+			vector.snapshot.keys.publicKey,
+			vault.wrappedKey,
+		);
+		expect(await openJson(vaultKey, vault.encryptedMeta)).toEqual(
+			vector.vaultMeta,
+		);
+		const itemKey = await unwrapKey(vaultKey, item.wrappedKey);
+		expect(await openJson(itemKey, item.data)).toEqual(vector.item);
 	});
 });

@@ -45,6 +45,14 @@ type Bridge = {
 			}): Promise<{ privateKey: string }>;
 			forget(which?: { accountId?: string }): Promise<void>;
 		};
+		/** The app's own plugin (apps/mobile): the offline copy, where the AutoFill extension reads it. */
+		VaulyCopy?: {
+			keep(copy: { snapshot: string }): Promise<void>;
+			list(): Promise<{
+				copies: { accountId: string; sessionId: string; syncedAt: number }[];
+			}>;
+			forget(which?: { accountId?: string }): Promise<void>;
+		};
 	};
 };
 
@@ -78,6 +86,9 @@ export const sessionStore = bridge?.Plugins.VaulySession;
 
 /** The app's Face ID or Touch ID unlock; see lib/device-unlock.ts. */
 export const biometricUnlock = bridge?.Plugins.VaulyUnlock;
+
+/** Where the app keeps the offline copy for its AutoFill extension; see lib/offline.ts. */
+export const sharedCopies = bridge?.Plugins.VaulyCopy;
 
 /** Marks the page for the app's own styling (native.css), as `html[data-native="ios"]`. */
 export function markNativeApp() {

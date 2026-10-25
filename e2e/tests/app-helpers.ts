@@ -117,6 +117,30 @@ export async function asTheApp(
 							clear: async () => sessionStorage.removeItem("e2e.keychain"),
 						},
 						...(faceId && { VaulyUnlock: unlock }),
+						// Where the app keeps the offline copy for its AutoFill extension.
+						VaulyCopy: {
+							keep: async ({ snapshot }: { snapshot: string }) => {
+								const copy = JSON.parse(snapshot);
+								write("e2e.copies", {
+									...read<Record<string, unknown>>("e2e.copies", {}),
+									[copy.accountId]: snapshot,
+								});
+							},
+							list: async () => ({
+								copies: Object.values(
+									read<Record<string, string>>("e2e.copies", {}),
+								).map((snapshot) => {
+									const { accountId, sessionId, syncedAt } =
+										JSON.parse(snapshot);
+									return { accountId, sessionId, syncedAt };
+								}),
+							}),
+							forget: async (which?: { accountId?: string }) => {
+								const copies = read<Record<string, string>>("e2e.copies", {});
+								if (which?.accountId) delete copies[which.accountId];
+								write("e2e.copies", which?.accountId ? copies : {});
+							},
+						},
 					},
 				},
 			});
@@ -170,3 +194,12 @@ export async function signInToTheApp(page: Page, code?: () => Promise<string>) {
 	}
 	await expect(page.getByRole("navigation", { name: "Main" })).toBeVisible();
 }
+
+/** The offline copies the app keeps for its AutoFill extension, as stored. */
+export const sharedCopies = (page: Page) =>
+	page.evaluate(
+		() =>
+			Object.values(
+				JSON.parse(sessionStorage.getItem("e2e.copies") ?? "{}"),
+			) as string[],
+	);
