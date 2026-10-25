@@ -97,6 +97,19 @@ export class TwoStepError extends Error {
 	}
 }
 
+/**
+ * The server asked to wait before the next try: after a few wrong codes, saying how long,
+ * or after many sign-ins from one address at once.
+ */
+export class TooManyTriesError extends Error {
+	constructor(message?: string) {
+		super(
+			message ||
+				"Too many sign-ins from here at once. Wait a few seconds, then try again.",
+		);
+	}
+}
+
 export function apiClient(server: string, token?: string): AppRouterClient {
 	const link = new RPCLink({
 		url: `${server}/rpc`,
@@ -200,13 +213,18 @@ async function signIn(
 	if (!response.ok) {
 		const error = (await response.json().catch(() => ({}))) as {
 			code?: string;
+			message?: string;
 		};
+		if (response.status === 429)
+			throw new TooManyTriesError(
+				error.code === "TOO_MANY_TRIES" ? error.message : undefined,
+			);
 		if (error.code === "TWO_FACTOR_REQUIRED") throw new TwoStepError(false);
 		if (error.code === "TWO_FACTOR_WRONG") throw new TwoStepError(true);
 		throw new WrongPasswordError();
 	}
-	const body = (await response.json()) as { token?: string };
-	const token = response.headers.get("set-auth-token") ?? body.token;
+	// The token with its signature: the server takes no other.
+	const token = response.headers.get("set-auth-token");
 	if (!token) throw new Error("The server didn't start a session");
 	return token;
 }

@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { noWrongTries, paced, tryAgainIn, type Wait } from "@vauly/auth/pace";
 import {
 	hashRecoveryCode,
 	matchCode,
@@ -14,7 +15,7 @@ import {
 	vault,
 	vaultAccess,
 } from "@vauly/db/schema/vault";
-import { and, count, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, count, eq, gt, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Context } from "../context";
 import { describeDevice } from "../device";
@@ -26,7 +27,7 @@ import {
 	twoStepPolicy,
 } from "../index";
 import { signOutOthersAfter, swapKeys } from "../key-swap";
-import { hashToken, logEvent, newId } from "../lib";
+import { hashToken, logEvent, logEventIf, newId } from "../lib";
 import {
 	liveDevices,
 	ownTwoStepNotice,
@@ -119,19 +120,26 @@ async function checkAuthKey(
 				eq(account.providerId, "credential"),
 			),
 		);
-	const valid =
-		credential?.password &&
-		(await auth.password.verify({
-			hash: credential.password,
-			password: authKey,
-		}));
-	if (!credential || !valid) {
+	const hash = credential?.password;
+	const result = hash
+		? await paced(context.db, context.userId, "session", () =>
+				auth.password.verify({ hash, password: authKey }),
+			)
+		: "wrong";
+	if (typeof result === "object") throw tooSoon(result);
+	if (!credential || result === "wrong") {
 		throw new ORPCError("FORBIDDEN", {
 			message: "The current master password is wrong",
 		});
 	}
 	return credential;
 }
+
+/** A code or master password given too soon after a few wrong ones (pace.ts). */
+const tooSoon = (wait: Wait) =>
+	new ORPCError("TOO_MANY_REQUESTS", {
+		message: `Too many wrong tries. ${tryAgainIn(wait)}`,
+	});
 
 export const accountRouter = {
 	/** Whether the workspace has an owner yet; the first person to register becomes it. */
@@ -408,6 +416,16 @@ export const accountRouter = {
 					sessionId: context.session.session.id,
 					kdfSalt: input.keys.kdfSalt,
 				}),
+				// Whoever kept the next sign-in waiting with the old master password can't now.
+				db
+					.update(member)
+					.set(noWrongTries)
+					.where(
+						and(
+							eq(member.userId, userId),
+							eq(member.kdfSalt, input.keys.kdfSalt),
+						),
+					),
 			]);
 			if (swapped.length === 0) throw changedElsewhere();
 			await logEvent(db, {
@@ -550,7 +568,13 @@ export const accountRouter = {
 			if (!pending) {
 				throw new ORPCError("BAD_REQUEST", { message: "Start again" });
 			}
-			const step = await matchCode(pending, input.code);
+			const matched: { step: number | null } = { step: null };
+			const result = await paced(db, me.userId, "session", async () => {
+				matched.step = await matchCode(pending, input.code);
+				return matched.step !== null;
+			});
+			if (typeof result === "object") throw tooSoon(result);
+			const { step } = matched;
 			if (step === null) {
 				throw new ORPCError("BAD_REQUEST", {
 					message: "That code didn't work. Check the time on your phone.",
@@ -634,32 +658,51 @@ export const accountRouter = {
 						"Your workspace requires two-step login, so it can't be turned off. An admin can reset it if you've lost your phone.",
 				});
 			}
-			const matched =
-				(await matchCode(me.totpSecret, input.code, me.totpStep ?? -1)) !==
-					null ||
-				(me.recoveryCodes ?? []).includes(await hashRecoveryCode(input.code));
-			if (!matched) {
+			const secret = me.totpSecret;
+			const result = await paced(db, me.userId, "session", async () => {
+				const step = await matchCode(secret, input.code, me.totpStep ?? -1);
+				const recovery = me.recoveryCodes ?? [];
+				if (
+					step === null &&
+					!recovery.includes(await hashRecoveryCode(input.code))
+				)
+					return false;
+				// Only if two-step login is still on with this code unused: a sign-in, or an
+				// admin's reset, at the same moment may have got there first. The event goes
+				// first, on the same condition, so it's written exactly when the change is.
+				const still = and(
+					eq(member.userId, me.userId),
+					eq(member.totpSecret, secret),
+					step === null
+						? eq(member.recoveryCodes, recovery)
+						: or(isNull(member.totpStep), lt(member.totpStep, step)),
+				);
+				const [, off] = await db.batch([
+					logEventIf(db, me.userId, still, {
+						actorType: "member",
+						actorId: me.userId,
+						action: "updated",
+						detail: "two-step login off",
+					}),
+					db
+						.update(member)
+						.set({
+							totpSecret: null,
+							totpPending: null,
+							totpStep: null,
+							recoveryCodes: null,
+						})
+						.where(still)
+						.returning({ userId: member.userId }),
+				]);
+				return off.length > 0;
+			});
+			if (typeof result === "object") throw tooSoon(result);
+			if (result === "wrong") {
 				throw new ORPCError("BAD_REQUEST", {
 					message: "That code didn't work",
 				});
 			}
-			await db.batch([
-				db
-					.update(member)
-					.set({
-						totpSecret: null,
-						totpPending: null,
-						totpStep: null,
-						recoveryCodes: null,
-					})
-					.where(eq(member.userId, me.userId)),
-				logEvent(db, {
-					actorType: "member",
-					actorId: me.userId,
-					action: "updated",
-					detail: "two-step login off",
-				}),
-			]);
 			return { ok: true };
 		}),
 

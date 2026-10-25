@@ -1,7 +1,9 @@
 import { newTotpSecret, sha256Hex, verifyTotp } from "@vauly/crypto";
 import type { Database } from "@vauly/db";
 import { member } from "@vauly/db/schema/vault";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
+
+import { paced, type Wait } from "./pace";
 
 // Two-step login: after the master password checks out, a member who turned it on must
 // also give a code from their authenticator app, or one of their recovery codes. The
@@ -10,7 +12,7 @@ import { eq } from "drizzle-orm";
 
 export const CODE_HEADER = "x-vauly-code";
 
-export type SecondStep = "not-needed" | "ok" | "missing" | "wrong";
+export type SecondStep = "not-needed" | "ok" | "missing" | "wrong" | Wait;
 
 // 32 characters, so each random byte maps evenly; no i, l or o to mistake for 1 or 0.
 const RECOVERY_ALPHABET = "abcdefghjkmnpqrstuvwxyz023456789";
@@ -37,8 +39,28 @@ export const hashRecoveryCode = (code: string) =>
 	sha256Hex(code.toLowerCase().replace(/[^a-z0-9]/g, ""));
 
 /**
+ * Spends a code from the app: the account takes its time step only if no earlier request
+ * took it, or a later one, since. Of two tries at once with one code, one gets it.
+ */
+function spendStep(db: Database, userId: string, secret: string, step: number) {
+	return db
+		.update(member)
+		.set({ totpStep: step })
+		.where(
+			and(
+				eq(member.userId, userId),
+				eq(member.totpSecret, secret),
+				or(isNull(member.totpStep), lt(member.totpStep, step)),
+			),
+		)
+		.returning({ userId: member.userId });
+}
+
+/**
  * Checks the second step for a member, and uses the code up: a time step can't be used
- * again, and a recovery code is gone once it worked.
+ * again, and a recovery code is gone once it worked, even with tries at once. Codes are
+ * checked at a pace (./pace.ts): too soon after a few wrong ones, the answer is how long
+ * to wait.
  */
 export async function checkSecondStep(
 	db: Database,
@@ -55,23 +77,22 @@ export async function checkSecondStep(
 		.where(eq(member.userId, userId));
 	if (!row?.secret) return "not-needed";
 	if (!code?.trim()) return "missing";
+	const secret = row.secret;
 
-	const step = await verifyTotp(row.secret, code, { after: row.step ?? -1 });
-	if (step !== null) {
-		await db
+	const result = await paced(db, userId, "sign-in", async () => {
+		const step = await verifyTotp(secret, code, { after: row.step ?? -1 });
+		if (step !== null)
+			return (await spendStep(db, userId, secret, step)).length > 0;
+		const hash = await hashRecoveryCode(code);
+		const recovery = row.recovery;
+		if (!recovery?.includes(hash)) return false;
+		// Only if the codes are still the ones read, as another try may have used this one.
+		const spent = await db
 			.update(member)
-			.set({ totpStep: step })
-			.where(eq(member.userId, userId));
-		return "ok";
-	}
-
-	const hash = await hashRecoveryCode(code);
-	if (row.recovery?.includes(hash)) {
-		await db
-			.update(member)
-			.set({ recoveryCodes: row.recovery.filter((h) => h !== hash) })
-			.where(eq(member.userId, userId));
-		return "ok";
-	}
-	return "wrong";
+			.set({ recoveryCodes: recovery.filter((h) => h !== hash) })
+			.where(and(eq(member.userId, userId), eq(member.recoveryCodes, recovery)))
+			.returning({ userId: member.userId });
+		return spent.length > 0;
+	});
+	return result === "right" ? "ok" : result;
 }

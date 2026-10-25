@@ -113,11 +113,42 @@ test("signing in asks for the code once the password is right", async ({
 	await expectSignedIn(page);
 });
 
+test("after a few wrong codes the next try waits, and a right one works once it's over", async ({
+	page,
+}) => {
+	await signInWithCode(page, "111111");
+	await expect(page.getByRole("alert")).toContainText("That code didn't work");
+	for (const code of ["222222", "333333"]) {
+		await page.getByLabel("Code from your authenticator app").fill(code);
+		await page.getByRole("button", { name: "Continue" }).click();
+		await expect(page.getByRole("alert")).toContainText(
+			"That code didn't work",
+		);
+	}
+	await page.getByLabel("Code from your authenticator app").fill("444444");
+	await page.getByRole("button", { name: "Continue" }).click();
+	const alert = page.getByRole("alert");
+	await expect(alert).toContainText(
+		/Too many wrong codes\. Try again in \d seconds?\./,
+	);
+	const wait = Number(
+		/in (\d+) second/.exec((await alert.textContent()) ?? "")?.[1],
+	);
+
+	// The code that comes once the wait is over is checked again.
+	await page.waitForTimeout(wait * 1000);
+	await page.getByRole("button", { name: "Use a recovery code" }).click();
+	await page.getByLabel("Recovery code").fill(recoveryCodes[3] ?? "");
+	await page.getByRole("button", { name: "Continue" }).click();
+	await expectSignedIn(page);
+});
+
 test("a recovery code signs in once", async ({ page }) => {
 	await signInWithCode(page, recoveryCodes[0] ?? "", true);
 	await expectSignedIn(page);
 	await openSettings(page);
-	await expect(page.getByText("9 recovery codes left")).toBeVisible();
+	// The test before used one too.
+	await expect(page.getByText("8 recovery codes left")).toBeVisible();
 
 	await openUserMenu(page);
 	await page.getByRole("menuitem", { name: "Sign out" }).click();
