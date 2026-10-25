@@ -85,4 +85,9 @@ export const migrations: readonly {
 		hash: "5b421a789c3c6519bf691f701c2c983eb18a1416d8d203d2674a9a4e022c017a",
 		sql: "-- An agent acts for the person who made it, so it may only use items in vaults they can\n-- open. Moving an item didn't re-check that before, so grants and open requests of agents\n-- whose owner can't open the item's vault are deleted.\nDELETE FROM `agent_grant` WHERE NOT EXISTS (\n\tSELECT 1 FROM `agent`\n\tJOIN `item` ON `item`.`id` = `agent_grant`.`item_id`\n\tJOIN `vault_access` ON `vault_access`.`vault_id` = `item`.`vault_id` AND `vault_access`.`user_id` = `agent`.`owner_id`\n\tWHERE `agent`.`id` = `agent_grant`.`agent_id`\n);--> statement-breakpoint\nDELETE FROM `access_request` WHERE `status` = 'pending' AND NOT EXISTS (\n\tSELECT 1 FROM `agent`\n\tJOIN `item` ON `item`.`id` = `access_request`.`item_id`\n\tJOIN `vault_access` ON `vault_access`.`vault_id` = `item`.`vault_id` AND `vault_access`.`user_id` = `agent`.`owner_id`\n\tWHERE `agent`.`id` = `access_request`.`agent_id`\n);\n",
 	},
+	{
+		name: "20261025095358_sign_in_limits",
+		hash: "0ae749c696ea59ac5ba0811d13e4c4547edf5f8e9ed10d490ecfc2d7e33523c3",
+		sql: "CREATE TABLE `rate_limit` (\n\t`id` text PRIMARY KEY,\n\t`key` text NOT NULL UNIQUE,\n\t`count` integer NOT NULL,\n\t`last_request` integer NOT NULL\n);\n--> statement-breakpoint\nALTER TABLE `member` ADD `wrong_tries` integer DEFAULT 0 NOT NULL;--> statement-breakpoint\nALTER TABLE `member` ADD `next_try_at` integer;",
+	},
 ];

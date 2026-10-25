@@ -1,4 +1,5 @@
 import { ORPCError } from "@orpc/server";
+import { paced, tryAgainIn, type Wait } from "@vauly/auth/pace";
 import {
 	hashRecoveryCode,
 	matchCode,
@@ -119,19 +120,26 @@ async function checkAuthKey(
 				eq(account.providerId, "credential"),
 			),
 		);
-	const valid =
-		credential?.password &&
-		(await auth.password.verify({
-			hash: credential.password,
-			password: authKey,
-		}));
-	if (!credential || !valid) {
+	const hash = credential?.password;
+	const result = hash
+		? await paced(context.db, context.userId, () =>
+				auth.password.verify({ hash, password: authKey }),
+			)
+		: "wrong";
+	if (typeof result === "object") throw tooSoon(result);
+	if (!credential || result === "wrong") {
 		throw new ORPCError("FORBIDDEN", {
 			message: "The current master password is wrong",
 		});
 	}
 	return credential;
 }
+
+/** A code or master password given too soon after a few wrong ones (pace.ts). */
+const tooSoon = (wait: Wait) =>
+	new ORPCError("TOO_MANY_REQUESTS", {
+		message: `Too many wrong tries. ${tryAgainIn(wait)}`,
+	});
 
 export const accountRouter = {
 	/** Whether the workspace has an owner yet; the first person to register becomes it. */
@@ -550,7 +558,13 @@ export const accountRouter = {
 			if (!pending) {
 				throw new ORPCError("BAD_REQUEST", { message: "Start again" });
 			}
-			const step = await matchCode(pending, input.code);
+			const matched: { step: number | null } = { step: null };
+			const result = await paced(db, me.userId, async () => {
+				matched.step = await matchCode(pending, input.code);
+				return matched.step !== null;
+			});
+			if (typeof result === "object") throw tooSoon(result);
+			const { step } = matched;
 			if (step === null) {
 				throw new ORPCError("BAD_REQUEST", {
 					message: "That code didn't work. Check the time on your phone.",
@@ -634,11 +648,16 @@ export const accountRouter = {
 						"Your workspace requires two-step login, so it can't be turned off. An admin can reset it if you've lost your phone.",
 				});
 			}
-			const matched =
-				(await matchCode(me.totpSecret, input.code, me.totpStep ?? -1)) !==
-					null ||
-				(me.recoveryCodes ?? []).includes(await hashRecoveryCode(input.code));
-			if (!matched) {
+			const secret = me.totpSecret;
+			const result = await paced(
+				db,
+				me.userId,
+				async () =>
+					(await matchCode(secret, input.code, me.totpStep ?? -1)) !== null ||
+					(me.recoveryCodes ?? []).includes(await hashRecoveryCode(input.code)),
+			);
+			if (typeof result === "object") throw tooSoon(result);
+			if (result === "wrong") {
 				throw new ORPCError("BAD_REQUEST", {
 					message: "That code didn't work",
 				});

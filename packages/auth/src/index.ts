@@ -1,3 +1,4 @@
+import { getIP } from "@better-auth/core/utils/ip";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import type { Database } from "@vauly/db";
 import * as schema from "@vauly/db/schema/auth";
@@ -5,6 +6,7 @@ import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { bearer } from "better-auth/plugins";
 
+import { tryAgainIn } from "./pace";
 import { CODE_HEADER, checkSecondStep } from "./two-step";
 
 export type AuthConfig = {
@@ -22,6 +24,23 @@ export type AuthOptions = {
 		userAgent: string | null;
 	}) => void;
 };
+
+/** Cloudflare gives every request its client's address, and a client can't set it. */
+const ipAddress = { ipAddressHeaders: ["cf-connecting-ip"] };
+const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/i;
+
+/**
+ * Whose requests Better Auth counts: each client's by its own address, never in one bucket
+ * that everyone without an address would share, so nobody can use up anyone else's tries.
+ * Only a request that didn't come through Cloudflare, as in local development, has no
+ * address, or this machine's, and it isn't counted.
+ */
+function counted(request: Request) {
+	if (getIP(request, { advanced: { ipAddress } }) === null) return false;
+	// Before Better Auth groups IPv6 addresses by /64, which hides ::1.
+	const address = request.headers.get("cf-connecting-ip")?.trim() ?? "";
+	return !LOOPBACK.test(address);
+}
 
 export function createAuth(
 	env: AuthConfig,
@@ -54,6 +73,17 @@ export function createAuth(
 		disabledPaths: ["/change-password", "/update-user"],
 		secret: env.BETTER_AUTH_SECRET,
 		baseURL: env.BETTER_AUTH_URL,
+		// Better Auth's own limits per client address: three sign-ins in ten seconds, and a
+		// hundred requests in ten seconds to any of its other routes. It turns them on only
+		// where NODE_ENV says production, which a Worker doesn't, so they're on here. They
+		// count in the database, which every instance of the Worker shares.
+		rateLimit: {
+			enabled: true,
+			storage: "database",
+			customRules: {
+				"/**": (request, rule) => (counted(request) ? rule : false),
+			},
+		},
 		hooks: {
 			// Accounts are created through `account.register`, which checks the invite and
 			// stores the encrypted keys in the same step. Direct sign-up over HTTP is closed.
@@ -76,6 +106,15 @@ export function createAuth(
 					created.user.id,
 					ctx.headers?.get(CODE_HEADER) ?? null,
 				);
+				if (typeof result === "object") {
+					await ctx.context.internalAdapter.deleteSession(
+						created.session.token,
+					);
+					throw new APIError("TOO_MANY_REQUESTS", {
+						code: "TOO_MANY_TRIES",
+						message: `Too many wrong codes. ${tryAgainIn(result)}`,
+					});
+				}
 				if (result === "ok" || result === "not-needed") {
 					// The sign-in has passed; nothing the hook does can undo that.
 					try {
@@ -101,6 +140,7 @@ export function createAuth(
 			}),
 		},
 		advanced: {
+			ipAddress,
 			defaultCookieAttributes: {
 				sameSite: "none",
 				secure: true,
@@ -108,8 +148,10 @@ export function createAuth(
 			},
 		},
 		// The extension can't rely on cookies across sites, so it sends the session token
-		// as a bearer token; the web app keeps using its cookie.
-		plugins: [bearer()],
+		// as a bearer token; the web app keeps using its cookie. Like the cookie, the token
+		// must carry its signature with the secret, as sign-in gives it in `set-auth-token`:
+		// the bare token, as the database stores it, opens no session.
+		plugins: [bearer({ requireSignature: true })],
 	});
 }
 

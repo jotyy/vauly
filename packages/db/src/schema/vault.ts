@@ -53,6 +53,12 @@ export const member = sqliteTable("member", {
 	totpPending: text("totp_pending"),
 	totpStep: integer("totp_step"),
 	recoveryCodes: text("recovery_codes", { mode: "json" }).$type<string[]>(),
+	/**
+	 * Wrong codes and master passwords given in a row, and the moment the next try is
+	 * checked again (packages/auth/src/pace.ts).
+	 */
+	wrongTries: integer("wrong_tries").notNull().default(0),
+	nextTryAt: integer("next_try_at", { mode: "timestamp_ms" }),
 	lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
 	createdAt: createdAt(),
 });

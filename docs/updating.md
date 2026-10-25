@@ -57,6 +57,10 @@ Until October 24, 2026, vauly's main branch had changes that weren't released ye
 
 A copy on 0.1.0 then moves to the latest release. A copy that already took main after 0.1.0 stays where it is, because its database may have changes that 0.1.x doesn't. It moves on once a release has everything it has, and until then **Settings › About** says it runs a development version.
 
+### Updating from 0.2
+
+**Limits on tries:** nothing to do. A migration adds a table that counts recent sign-ins by address, and two columns that count each account's wrong codes and master passwords in a row ([Security](security.md#keys) has the limits). Everyone stays signed in, the browser extension too. Going back to 0.2 is safe: it leaves the table and the columns alone.
+
 ### Updating from 0.1.0
 
 Everything people had carries over. They stay signed in, and two-step login, unlocking with a passkey and agents' tokens keep working. A tab left open picks up the new version when it's reloaded. An agent's 0.1.0 CLI still gets values. Nobody has to use two-step login until an owner or admin requires it, in **Settings › Workspace**.

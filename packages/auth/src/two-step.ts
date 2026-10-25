@@ -3,6 +3,8 @@ import type { Database } from "@vauly/db";
 import { member } from "@vauly/db/schema/vault";
 import { eq } from "drizzle-orm";
 
+import { paced, type Wait } from "./pace";
+
 // Two-step login: after the master password checks out, a member who turned it on must
 // also give a code from their authenticator app, or one of their recovery codes. The
 // code travels in the `x-vauly-code` header, so the web app and the extension sign in
@@ -10,7 +12,7 @@ import { eq } from "drizzle-orm";
 
 export const CODE_HEADER = "x-vauly-code";
 
-export type SecondStep = "not-needed" | "ok" | "missing" | "wrong";
+export type SecondStep = "not-needed" | "ok" | "missing" | "wrong" | Wait;
 
 // 32 characters, so each random byte maps evenly; no i, l or o to mistake for 1 or 0.
 const RECOVERY_ALPHABET = "abcdefghjkmnpqrstuvwxyz023456789";
@@ -38,7 +40,8 @@ export const hashRecoveryCode = (code: string) =>
 
 /**
  * Checks the second step for a member, and uses the code up: a time step can't be used
- * again, and a recovery code is gone once it worked.
+ * again, and a recovery code is gone once it worked. Codes are checked at a pace
+ * (./pace.ts): too soon after a few wrong ones, the answer is how long to wait.
  */
 export async function checkSecondStep(
 	db: Database,
@@ -55,23 +58,26 @@ export async function checkSecondStep(
 		.where(eq(member.userId, userId));
 	if (!row?.secret) return "not-needed";
 	if (!code?.trim()) return "missing";
+	const secret = row.secret;
 
-	const step = await verifyTotp(row.secret, code, { after: row.step ?? -1 });
-	if (step !== null) {
-		await db
-			.update(member)
-			.set({ totpStep: step })
-			.where(eq(member.userId, userId));
-		return "ok";
-	}
-
-	const hash = await hashRecoveryCode(code);
-	if (row.recovery?.includes(hash)) {
-		await db
-			.update(member)
-			.set({ recoveryCodes: row.recovery.filter((h) => h !== hash) })
-			.where(eq(member.userId, userId));
-		return "ok";
-	}
-	return "wrong";
+	const result = await paced(db, userId, async () => {
+		const step = await verifyTotp(secret, code, { after: row.step ?? -1 });
+		if (step !== null) {
+			await db
+				.update(member)
+				.set({ totpStep: step })
+				.where(eq(member.userId, userId));
+			return true;
+		}
+		const hash = await hashRecoveryCode(code);
+		if (row.recovery?.includes(hash)) {
+			await db
+				.update(member)
+				.set({ recoveryCodes: row.recovery.filter((h) => h !== hash) })
+				.where(eq(member.userId, userId));
+			return true;
+		}
+		return false;
+	});
+	return result === "right" ? "ok" : result;
 }
