@@ -134,9 +134,23 @@ final class AutoFillUITests: XCTestCase {
 		sleep(1)
 		let item = web.links.matching(NSPredicate(format: "label CONTAINS 'AWS root'")).firstMatch
 		XCTAssertTrue(item.waitForExistence(timeout: 10))
+		// A row slides left to show its actions; a tap on it closes them again.
+		item.swipeLeft()
+		sleep(1)
+		shot("\(prefix)5b-swipe")
+		item.tap()
+		sleep(1)
 		item.tap()
 		sleep(3)
 		shot("\(prefix)6-item")
+		web.swipeUp(velocity: .slow)
+		sleep(2)
+		shot("\(prefix)6b-item-scrolled")
+		tap("More actions")
+		sleep(1)
+		shot("\(prefix)6c-item-menu")
+		web.coordinate(withNormalizedOffset: CGVector(dx: 0.05, dy: 0.6)).tap()
+		sleep(1)
 		tap("Settings")
 		sleep(2)
 		shot("\(prefix)7-settings")
@@ -169,6 +183,9 @@ final class AutoFillUITests: XCTestCase {
 		rename(to: "AWS root")
 
 		tap("Vaults")
+		web.swipeDown(velocity: .fast)
+		sleep(1)
+		shot("\(prefix)10-vaults")
 		web.swipeUp(velocity: .fast)
 		sleep(1)
 		let vaultName = "Customer support escalations"
@@ -184,6 +201,6 @@ final class AutoFillUITests: XCTestCase {
 			field.typeText(vaultName + "\n")
 		}
 		sleep(3)
-		shot("\(prefix)10-vault-long-name")
+		shot("\(prefix)11-vault-long-name")
 	}
 }
