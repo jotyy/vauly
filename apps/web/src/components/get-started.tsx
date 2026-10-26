@@ -20,8 +20,9 @@ import {
 
 import { notify } from "./notify";
 
-const EXTENSION_DOCS =
-	"https://github.com/jotyy/vauly/blob/main/docs/browser-extension.md";
+/** The extension's page on the Chrome Web Store; docs/browser-extension.md covers Firefox. */
+const EXTENSION_STORE =
+	"https://chromewebstore.google.com/detail/vauly-password-manager-fo/hjjbfdlkdnnbgaempacaeihooaopoock";
 
 type Step = {
 	id: string;
@@ -104,12 +105,12 @@ export function GetStarted() {
 			),
 			action: (
 				<a
-					href={EXTENSION_DOCS}
+					href={EXTENSION_STORE}
 					target="_blank"
 					rel="noreferrer"
 					className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
 				>
-					How to install
+					Get the extension
 					<ArrowUpRightIcon data-icon="inline-end" />
 				</a>
 			),
