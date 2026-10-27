@@ -13,7 +13,6 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 ### Changed
 
 - **The browser extension is on the [Chrome Web Store](https://chromewebstore.google.com/detail/vauly-password-manager-fo/hjjbfdlkdnnbgaempacaeihooaopoock).** [Browser extension](docs/browser-extension.md) and the Get started checklist link to it; building it yourself stays documented for development, and for Firefox.
-- **The API uses the web app's session cookie only for the web app's own pages.** The browser sends the cookie with other sites' requests too, and the API's procedures now handle those as though no one were signed in. A request counts as the web app's when the browser's Fetch Metadata says it's same-origin, or its `Origin` is the API's own address, `CORS_ORIGIN` or `BETTER_AUTH_URL`; a request with neither must come from the address bar, or from a browser that sends no Fetch Metadata, and anything but a GET must send JSON. The browser extension, the app for iPhone and agents sign in with their own tokens and aren't affected.
 
 ### Fixed
 
@@ -21,6 +20,14 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 - When the device is online but vauly's server doesn't answer, messages name the server instead of saying you're offline, and an error page from in front of the server says so.
 - On a narrow screen, a notification about a long name keeps its first word whole, as in "Saved", and shortens the name instead. It used to cut both.
 - Allowing an agent's request right as the page opens waits until the page has the agent: the buttons stay greyed out for that moment, instead of failing with "Open the item's vault to approve this".
+
+## 0.2.3 - 2026-10-25
+
+The API's procedures use the web app's session cookie only for requests from the web app's own pages. No migrations; nothing to do but update.
+
+### Security
+
+- **The API uses the web app's session cookie only for the web app's own pages.** The browser sends the cookie with other sites' requests too, and the API's procedures now handle those as though no one were signed in. A request counts as the web app's when the browser's Fetch Metadata says it's same-origin, or its `Origin` is the API's own address, `CORS_ORIGIN` or `BETTER_AUTH_URL`; a request with neither must come from the address bar, or from a browser that sends no Fetch Metadata, and anything but a GET must send JSON. The browser extension, the app for iPhone and agents sign in with their own tokens and aren't affected.
 
 ## 0.2.2 - 2026-10-25
 
