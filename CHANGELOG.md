@@ -20,6 +20,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 - When the device is online but vauly's server doesn't answer, messages name the server instead of saying you're offline, and an error page from in front of the server says so.
 - On a narrow screen, a notification about a long name keeps its first word whole, as in "Saved", and shortens the name instead. It used to cut both.
 - Allowing an agent's request right as the page opens waits until the page has the agent: the buttons stay greyed out for that moment, instead of failing with "Open the item's vault to approve this".
+- On a wide screen the items list scrolls inside its card and the open item stays in view, with the filters and search above them staying put. The whole page used to scroll, which took the open item off the screen on a long list.
 
 ## 0.2.3 - 2026-10-25
 

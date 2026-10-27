@@ -155,12 +155,13 @@ function Items() {
 	return (
 		<Page
 			wide
+			fill
 			title={vault ? vault.name : "All items"}
 			description={description}
 		>
 			<div
 				data-slot="page-toolbar"
-				className="mb-3 flex flex-wrap-reverse items-center justify-between gap-3"
+				className="mb-3 flex shrink-0 flex-wrap-reverse items-center justify-between gap-3"
 			>
 				<Tabs
 					className="max-md:w-full max-md:overflow-x-auto"
@@ -239,13 +240,13 @@ function Items() {
 				<div
 					data-slot="item-browser"
 					data-open={search.id ? "true" : undefined}
-					className="grid grid-cols-1 items-start gap-3 md:grid-cols-5"
+					className="grid grid-cols-1 gap-3 md:min-h-0 md:flex-1 md:grid-cols-5"
 				>
 					<section
 						data-slot="item-list"
 						aria-label="Items"
 						className={cn(
-							"rounded-window bg-surface shadow-card flex flex-col gap-0.5 p-1.5 md:col-span-2",
+							"rounded-window bg-surface shadow-card flex flex-col gap-0.5 p-1.5 md:col-span-2 md:min-h-0 md:overflow-y-auto md:overscroll-contain",
 							search.id && "max-md:hidden",
 						)}
 					>
@@ -347,7 +348,7 @@ function Items() {
 					</section>
 					<div
 						className={cn(
-							"flex flex-col gap-2 md:col-span-3",
+							"flex flex-col gap-2 md:col-span-3 md:min-h-0 md:overflow-y-auto md:overscroll-contain",
 							!search.id && "max-md:hidden",
 						)}
 					>

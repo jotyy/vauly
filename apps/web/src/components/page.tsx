@@ -35,11 +35,17 @@ export function Page({
 	title,
 	description,
 	wide,
+	fill,
 	children,
 }: {
 	title: string;
 	description: ReactNode;
 	wide?: boolean;
+	/**
+	 * On wide screens the page takes the whole content column instead of scrolling it, so a
+	 * child marked `min-h-0 flex-1` can scroll on its own, the way a list beside its detail does.
+	 */
+	fill?: boolean;
 	children: ReactNode;
 }) {
 	const heading = useRef<HTMLHeadingElement>(null);
@@ -49,8 +55,11 @@ export function Page({
 		<div
 			data-slot="page"
 			className={cn(
-				"mx-auto w-full px-4 pt-4 pb-16 md:px-6 md:pt-6",
+				"mx-auto w-full px-4 pt-4 md:px-6 md:pt-6",
 				wide ? "max-w-6xl" : "max-w-4xl",
+				fill
+					? "pb-16 md:flex md:h-full md:min-h-0 md:flex-col md:pb-6"
+					: "pb-16",
 			)}
 		>
 			{isNativeApp && (
