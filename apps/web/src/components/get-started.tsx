@@ -10,6 +10,7 @@ import { type ReactNode, useState } from "react";
 
 import { webAddress } from "@/env.public";
 import { emergencyKitDone, openEmergencyKit } from "@/lib/emergency-kit";
+import { EXTENSION_STORE } from "@/lib/extension";
 import { useKeyring } from "@/lib/keyring";
 import {
 	useEvents,
@@ -21,8 +22,6 @@ import {
 import { notify } from "./notify";
 
 /** The extension's page on the Chrome Web Store; docs/browser-extension.md covers Firefox. */
-const EXTENSION_STORE =
-	"https://chromewebstore.google.com/detail/vauly-password-manager-fo/hjjbfdlkdnnbgaempacaeihooaopoock";
 
 type Step = {
 	id: string;
