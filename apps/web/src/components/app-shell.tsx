@@ -7,6 +7,7 @@ import {
 	MagnifyingGlassIcon,
 	MoonIcon,
 	PulseIcon,
+	PuzzlePieceIcon,
 	RobotIcon,
 	ShieldCheckIcon,
 	SquaresFourIcon,
@@ -15,11 +16,12 @@ import {
 	UsersThreeIcon,
 	VaultIcon,
 	WifiSlashIcon,
+	XIcon,
 } from "@phosphor-icons/react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { Avatar, AvatarFallback } from "@vauly/ui/components/avatar";
 import { Badge } from "@vauly/ui/components/badge";
-import { Button } from "@vauly/ui/components/button";
+import { Button, buttonVariants } from "@vauly/ui/components/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -51,12 +53,18 @@ import {
 import { demoAccount } from "@/env.public";
 import { useApplyAppStyle } from "@/lib/app-style";
 import { useOnline } from "@/lib/connection";
+import {
+	EXTENSION_DOCS,
+	EXTENSION_STORE,
+	installsFromChromeWebStore,
+} from "@/lib/extension";
 import { ago, initials, toneDot } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
 import { isNativeApp, setStatusBarText } from "@/lib/native";
 import { useOfflineCopy } from "@/lib/offline";
 import {
 	useDeletedItems,
+	useEvents,
 	useRequests,
 	useVaults,
 	useWorkspace,
@@ -340,6 +348,7 @@ function Sidebar({
 				</NavGroup>
 			</nav>
 			<div className="mt-auto flex flex-col gap-0.5 pt-4">
+				{!mobile && <ExtensionBox />}
 				<LockBox />
 				<UserMenu />
 			</div>
@@ -428,6 +437,77 @@ function NavLink({
 					</span>
 				))}
 		</Link>
+	);
+}
+
+const EXTENSION_BOX_KEY = "vauly.extension-box";
+
+/**
+ * Where to get the browser extension, at the bottom of the sidebar until this person has
+ * filled a login with it, or put the card away. Not in the app for iPhone, which has its
+ * own AutoFill.
+ */
+function ExtensionBox() {
+	const { me } = useKeyring();
+	const events = useEvents();
+	const [away, setAway] = useState(() => {
+		try {
+			return localStorage.getItem(EXTENSION_BOX_KEY) === "off";
+		} catch {
+			return false;
+		}
+	});
+	if (isNativeApp || away || !me || !events.data) return null;
+	const filled = events.data.some(
+		(event) => event.action === "filled" && event.actorId === me.id,
+	);
+	if (filled) return null;
+	const chromium = installsFromChromeWebStore();
+
+	const putAway = () => {
+		setAway(true);
+		try {
+			localStorage.setItem(EXTENSION_BOX_KEY, "off");
+		} catch {
+			// Then it's away until the page reloads.
+		}
+	};
+
+	return (
+		<div
+			data-slot="extension-box"
+			className="rounded-window border-line bg-surface mb-2 flex flex-col gap-2.5 border p-2.5"
+		>
+			<div className="flex items-start gap-2">
+				<PuzzlePieceIcon className="text-brand mt-0.5 size-4 shrink-0" />
+				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<span className="text-caption text-fg font-medium">
+						{chromium
+							? "Install the Chrome extension"
+							: "Get the browser extension"}
+					</span>
+					<span className="text-micro text-fg-muted">
+						Fills logins on any site, and saves new ones as you sign in.
+					</span>
+				</div>
+				<button
+					type="button"
+					aria-label="Not now"
+					onClick={putAway}
+					className="text-fg-subtle hover:text-fg -mt-1 -mr-1 rounded-md p-1 transition-colors"
+				>
+					<XIcon className="size-3.5" />
+				</button>
+			</div>
+			<a
+				href={chromium ? EXTENSION_STORE : EXTENSION_DOCS}
+				target="_blank"
+				rel="noreferrer"
+				className={cn(buttonVariants({ size: "sm" }), "w-full")}
+			>
+				{chromium ? "Add to Chrome" : "Get the extension"}
+			</a>
+		</div>
 	);
 }
 
