@@ -121,9 +121,12 @@ export function useDeleteItem() {
 export function ItemDetail({
 	item,
 	back,
+	className,
 }: {
 	item: Item;
 	back?: { label: string; onBack: () => void };
+	/** For the card itself, such as letting it scroll inside a fixed-height column. */
+	className?: string;
 }) {
 	const actions = useActions();
 	const remove = useDeleteItem();
@@ -276,7 +279,12 @@ export function ItemDetail({
 					</div>
 				</div>
 			)}
-			<section className="rounded-window bg-surface shadow-card flex flex-col">
+			<section
+				className={cn(
+					"rounded-window bg-surface shadow-card flex flex-col",
+					className,
+				)}
+			>
 				<header
 					data-slot="item-header"
 					className="border-line-subtle flex items-start gap-3 border-b p-4"

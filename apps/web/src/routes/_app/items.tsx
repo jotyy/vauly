@@ -348,7 +348,8 @@ function Items() {
 					</section>
 					<div
 						className={cn(
-							"flex flex-col gap-2 md:col-span-3 md:min-h-0 md:overflow-y-auto md:overscroll-contain",
+							// The column doesn't scroll: it would clip the card's edge. The card does.
+							"flex flex-col gap-2 md:col-span-3 md:min-h-0",
 							!search.id && "max-md:hidden",
 						)}
 					>
@@ -371,6 +372,7 @@ function Items() {
 								back={
 									isNativeApp ? { label: listName, onBack: back } : undefined
 								}
+								className="md:min-h-0 md:overflow-y-auto md:overscroll-contain"
 							/>
 						) : (
 							<div className="rounded-window border-line text-caption text-fg-subtle flex h-60 items-center justify-center border border-dashed">
