@@ -4,6 +4,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ## Unreleased
 
+### Changed
+
+- The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.
+
 ## 0.3.0 - 2026-10-27
 
 ### Added
