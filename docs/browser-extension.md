@@ -4,20 +4,9 @@ The extension shows the items for the site you're on, fills the login form with 
 
 ## Install
 
-The extension isn't in a store yet, so you build it from this repository and load it.
+Install it from the [Chrome Web Store](https://chromewebstore.google.com/detail/vauly-password-manager-fo/hjjbfdlkdnnbgaempacaeihooaopoock), then pin vauly to the toolbar. That works in Chrome, Edge, Brave, Arc and other Chromium browsers, and the store keeps it up to date.
 
-### Chrome and other Chromium browsers
-
-```sh
-bun install
-bun run --cwd apps/extension build
-```
-
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. Choose **Load unpacked** and pick `apps/extension/.output/chrome-mv3`.
-3. Pin vauly to the toolbar.
-
-### Firefox
+The extension isn't on Firefox Add-ons yet, so in Firefox you build it from this repository and load it:
 
 ```sh
 bun install
@@ -31,6 +20,18 @@ bun run --cwd apps/extension build:firefox
 Firefox removes a temporary add-on when it quits; load it again the next time.
 
 In Firefox, vauly's window offering to save a login takes the focus when it opens, since Firefox doesn't open windows in the background. Firefox for Android isn't supported yet: it can't open vauly's own windows, which saving logins and passkeys use.
+
+### For development
+
+To run a build of your own in a Chromium browser, build it and load it unpacked. An unpacked extension doesn't update itself.
+
+```sh
+bun install
+bun run --cwd apps/extension build
+```
+
+1. Open `chrome://extensions` and turn on **Developer mode**.
+2. Choose **Load unpacked** and pick `apps/extension/.output/chrome-mv3`.
 
 ## Connect and sign in
 

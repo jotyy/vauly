@@ -44,8 +44,8 @@ test("a new workspace shows what to do first", async ({ page }) => {
 	await expect(steps.getByText("Add your first items")).toBeVisible();
 	await expect(steps.getByText("Invite your team")).toBeVisible();
 	await expect(
-		steps.getByRole("link", { name: "How to install" }),
-	).toHaveAttribute("href", /browser-extension\.md$/);
+		steps.getByRole("link", { name: "Get the extension" }),
+	).toHaveAttribute("href", /^https:\/\/chromewebstore\.google\.com\//);
 
 	await printKit(page, "Print the kit");
 	await expect(steps.getByText("1 of 4 done")).toBeVisible();

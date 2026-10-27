@@ -10,6 +10,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 - Turning on two-step login now tells the account's other devices, the ones it signs out, if they have notifications on. The notification names the device that turned it on, and says, if it wasn't you, to ask the workspace's owner or an admin to reset your two-step login and then change your master password.
 - A release now sends the extension to the Chrome Web Store by itself: its tag uploads the new version and submits it for review, and the store publishes it once the review passes.
 
+### Changed
+
+- **The browser extension is on the [Chrome Web Store](https://chromewebstore.google.com/detail/vauly-password-manager-fo/hjjbfdlkdnnbgaempacaeihooaopoock).** [Browser extension](docs/browser-extension.md) and the Get started checklist link to it; building it yourself stays documented for development, and for Firefox.
+
 ### Fixed
 
 - On an iPhone, tapping a field no longer zooms the page in and leaves it zoomed: fields use 16px text on touch screens. The app fills the screen around the notch and the home indicator when it's installed.
