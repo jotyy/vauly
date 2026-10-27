@@ -447,6 +447,7 @@ test("a backup with files is a ZIP that imports back with them", async ({
 	await expect(vaultForm).toBeHidden();
 	await openAllItems(page);
 	await page.getByRole("button", { name: "Import", exact: true }).click();
+	await page.getByRole("menuitem", { name: "Choose a file…" }).click();
 	const importer = page.getByRole("dialog");
 	await importer.getByLabel("Export file").setInputFiles({
 		name: "vauly-backup.zip",

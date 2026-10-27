@@ -30,6 +30,7 @@ async function openImport(page: Page) {
 	await signIn(page, owner);
 	await openAllItems(page);
 	await page.getByRole("button", { name: "Import", exact: true }).click();
+	await page.getByRole("menuitem", { name: "Choose a file…" }).click();
 	return page.getByRole("dialog");
 }
 
@@ -136,6 +137,7 @@ test("a database's attachments come as files on their items", async ({
 
 	await openAllItems(page);
 	await page.getByRole("button", { name: "Import", exact: true }).click();
+	await page.getByRole("menuitem", { name: "Choose a file…" }).click();
 	const dialog = page.getByRole("dialog");
 	await dialog
 		.getByLabel("Export file")

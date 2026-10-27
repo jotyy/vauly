@@ -38,7 +38,12 @@ import {
 	sameItem,
 	WrongPasswordError,
 } from "@/lib/import";
-import { appFor, type ImportApp, importApps } from "@/lib/import/apps";
+import {
+	appFor,
+	type ImportApp,
+	importApps,
+	importDocs,
+} from "@/lib/import/apps";
 import { KDBX_LIMITS, keyFileTooBig } from "@/lib/import/kdbx-limits";
 import { appMarks } from "@/lib/import/marks";
 import { logoDomain } from "@/lib/logos";
@@ -55,8 +60,6 @@ import {
 import { Field, PasswordInput } from "./auth-layout";
 import { ItemTile } from "./item-tile";
 import { notify } from "./notify";
-
-const DOCS = "https://vauly.app/docs/import/";
 
 type Step =
 	| { name: "apps"; error?: string }
@@ -88,11 +91,14 @@ export function ImportDialog({
 	open,
 	onOpenChange,
 	defaultVaultId,
+	app: chosenApp,
 	onImported,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	defaultVaultId?: string;
+	/** An app already chosen, as from the Import menu: the dialog opens at its steps. */
+	app?: ImportApp;
 	onImported?: (vaultId: string) => void;
 }) {
 	const vaults = useVaults();
@@ -119,13 +125,15 @@ export function ImportDialog({
 	useEffect(() => {
 		if (open) {
 			attempt.current++;
-			setStep({ name: "apps" });
+			setStep(
+				chosenApp ? { name: "export", app: chosenApp } : { name: "apps" },
+			);
 			setVaultId(fallbackVault);
 		} else {
 			// Closed, however it closed: a database still opening is stopped.
 			opening.current?.abort();
 		}
-	}, [open, fallbackVault]);
+	}, [open, chosenApp, fallbackVault]);
 
 	// And when the dialog goes away altogether.
 	useEffect(() => () => opening.current?.abort(), []);
@@ -648,7 +656,7 @@ function ExportSteps({
 				error={error}
 			/>
 			<a
-				href={`${DOCS}#${app.id}`}
+				href={`${importDocs}#${app.id}`}
 				target="_blank"
 				rel="noreferrer"
 				className="text-caption text-link inline-flex items-center gap-1 self-start"

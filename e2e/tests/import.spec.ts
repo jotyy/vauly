@@ -60,6 +60,7 @@ async function openImport(page: Page) {
 	await signIn(page, owner);
 	await openAllItems(page);
 	await page.getByRole("button", { name: "Import", exact: true }).click();
+	await page.getByRole("menuitem", { name: "Choose a file…" }).click();
 	return page.getByRole("dialog");
 }
 
@@ -95,6 +96,51 @@ test("an empty vault offers to import from another app, with its steps", async (
 
 	await dialog.getByRole("button", { name: "Other apps" }).click();
 	await expect(apps).toBeVisible();
+});
+
+test("the Import menu lists the apps with their files, and opens at the chosen app's steps", async ({
+	page,
+}) => {
+	await signIn(page, owner);
+	await openAllItems(page);
+	await page.getByRole("button", { name: "Import", exact: true }).click();
+	const menu = page.getByRole("menu");
+	await expect(
+		menu.getByRole("menuitem", { name: "Choose a file…" }),
+	).toBeVisible();
+	await expect(
+		menu.getByRole("menuitem", { name: "1Password .1pux" }),
+	).toBeVisible();
+	await expect(
+		menu.getByRole("menuitem", { name: "Bitwarden .json" }),
+	).toBeVisible();
+	await expect(
+		menu.getByRole("menuitem", { name: "KeePassXC .kdbx" }),
+	).toBeVisible();
+	await expect(
+		menu.getByRole("menuitem", { name: "Another app CSV" }),
+	).toBeVisible();
+	await expect(
+		menu.getByRole("menuitem", { name: "How to export from each app" }),
+	).toHaveAttribute("href", "https://vauly.app/docs/import/");
+
+	await menu.getByRole("menuitem", { name: "Bitwarden .json" }).click();
+	const dialog = page.getByRole("dialog");
+	await expect(
+		dialog.getByRole("heading", { name: "Import from Bitwarden" }),
+	).toBeVisible();
+	await expect(
+		dialog.getByRole("list", { name: "How to export from Bitwarden" }),
+	).toContainText("Choose .json (Encrypted)");
+	await expect(page).toHaveURL(/import=true/);
+	await expect(page).toHaveURL(/from=bitwarden/);
+
+	// Back to the grid of apps, and closing clears the app from the address.
+	await dialog.getByRole("button", { name: "Other apps" }).click();
+	await expect(dialog.getByRole("list", { name: "Apps" })).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(dialog).toBeHidden();
+	await expect(page).not.toHaveURL(/from=/);
 });
 
 test("files that can't be imported say why", async ({ page }) => {

@@ -3,6 +3,9 @@ import type { ImportSource } from "./parsed";
 // The apps people move from, with how to export from each. docs/import.md says the same
 // at more length; keep the two in step.
 
+/** The page that says how to move from each app, and what comes over. */
+export const importDocs = "https://vauly.app/docs/import/";
+
 export type ImportApp = {
 	/** Also the anchor of the app's section in the docs. */
 	id: string;

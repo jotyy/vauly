@@ -9,6 +9,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 - **The API lets in the vauly app for iPhone**, which is on its way. On every deploy, it answers CORS for the app's origin, `capacitor://localhost`, without cookies, and accepts sign-ins from it; the app sends its session as a bearer token, as the browser extension does. [Security](docs/security.md#the-app-for-iphone) has the details.
 - Turning on two-step login now tells the account's other devices, the ones it signs out, if they have notifications on. The notification names the device that turned it on, and says, if it wasn't you, to ask the workspace's owner or an admin to reset your two-step login and then change your master password.
 - A release now sends the extension to the Chrome Web Store by itself: its tag uploads the new version and submits it for review, and the store publishes it once the review passes.
+- **Import** is now a menu: the apps vauly imports from, each with the file it expects, a **Choose a file…** entry for an export you already have, and a link to [Moving to vauly](docs/import.md). Picking an app opens the import at that app's steps.
 
 ### Changed
 

@@ -282,6 +282,7 @@ test("a backup holds cards and identities, and imports back", async ({
 
 	await openAllItems(page);
 	await page.getByRole("button", { name: "Import", exact: true }).click();
+	await page.getByRole("menuitem", { name: "Choose a file…" }).click();
 	const importer = page.getByRole("dialog");
 	await importer.getByLabel("Export file").setInputFiles({
 		name: "vauly-backup.csv",

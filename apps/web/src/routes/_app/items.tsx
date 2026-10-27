@@ -1,5 +1,7 @@
 import {
+	ArrowSquareOutIcon,
 	CaretLeftIcon,
+	FileArrowUpIcon,
 	LockSimpleIcon,
 	MagnifyingGlassIcon,
 	PlusIcon,
@@ -11,6 +13,15 @@ import {
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Button } from "@vauly/ui/components/button";
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@vauly/ui/components/dropdown-menu";
+import {
 	InputGroup,
 	InputGroupAddon,
 	InputGroupInput,
@@ -20,7 +31,7 @@ import { Tabs, TabsList, TabsTrigger } from "@vauly/ui/components/tabs";
 import { cn } from "@vauly/ui/lib/utils";
 import { type CSSProperties, useRef } from "react";
 import { z } from "zod";
-import { ImportDialog } from "@/components/import-dialog";
+import { AppMark, ImportDialog } from "@/components/import-dialog";
 import { ItemDetail, useDeleteItem } from "@/components/item-detail";
 import { ItemDialog } from "@/components/item-dialog";
 import { ItemTile } from "@/components/item-tile";
@@ -28,6 +39,7 @@ import { Page } from "@/components/page";
 import { SwipeRow } from "@/components/swipe-row";
 import { timesSeen, useBreached } from "@/lib/breaches";
 import { plural, toneDot } from "@/lib/format";
+import { type ImportApp, importApps, importDocs } from "@/lib/import/apps";
 import { logoDomain } from "@/lib/logos";
 import { isNativeApp } from "@/lib/native";
 import {
@@ -50,6 +62,8 @@ const searchSchema = z.object({
 	id: z.string().optional(),
 	new: z.boolean().optional(),
 	import: z.boolean().optional(),
+	/** The app being imported from, chosen in the Import menu. */
+	from: z.string().optional(),
 	health: z.enum(["breached", "weak", "reused", "exposed"]).optional(),
 });
 
@@ -143,8 +157,15 @@ function Items() {
 		});
 	const setNew = (open: boolean) =>
 		navigate({ search: (prev) => ({ ...prev, new: open || undefined }) });
-	const setImporting = (open: boolean) =>
-		navigate({ search: (prev) => ({ ...prev, import: open || undefined }) });
+	const setImporting = (open: boolean, app?: ImportApp) =>
+		navigate({
+			search: (prev) => ({
+				...prev,
+				import: open || undefined,
+				from: open ? app?.id : undefined,
+			}),
+		});
+	const importingFrom = importApps.find((app) => app.id === search.from);
 
 	const description = vault
 		? vault.personal
@@ -207,14 +228,7 @@ function Items() {
 					</InputGroup>
 					{adding && (
 						<>
-							<Button
-								variant="outline"
-								aria-label="Import"
-								onClick={() => setImporting(true)}
-							>
-								<UploadSimpleIcon data-icon="inline-start" />
-								<span className="max-md:hidden">Import</span>
-							</Button>
+							<ImportMenu onOpen={setImporting} />
 							<Button aria-label="New item" onClick={() => setNew(true)}>
 								<PlusIcon data-icon="inline-start" />
 								<span className="max-md:hidden">New item</span>
@@ -393,9 +407,57 @@ function Items() {
 				open={Boolean(search.import)}
 				onOpenChange={setImporting}
 				defaultVaultId={vault?.id}
+				app={importingFrom}
 				onImported={(vaultId) => navigate({ search: { vault: vaultId } })}
 			/>
 		</Page>
+	);
+}
+
+/**
+ * Import, as a menu: the apps vauly imports from, each with the file it expects, a way
+ * in for someone who already has an export, and the docs that say what comes over.
+ */
+function ImportMenu({
+	onOpen,
+}: {
+	onOpen: (open: boolean, app?: ImportApp) => void;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				render={<Button variant="outline" aria-label="Import" />}
+			>
+				<UploadSimpleIcon data-icon="inline-start" />
+				<span className="max-md:hidden">Import</span>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-64">
+				<DropdownMenuItem onClick={() => onOpen(true)}>
+					<FileArrowUpIcon />
+					Choose a file…
+				</DropdownMenuItem>
+				<DropdownMenuSeparator />
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>Import from</DropdownMenuLabel>
+					{importApps.map((app) => (
+						<DropdownMenuItem key={app.id} onClick={() => onOpen(true, app)}>
+							<AppMark app={app} className="size-6 rounded-md" />
+							<span className="truncate">{app.name}</span>
+							<span className="text-fg-subtle ml-auto shrink-0 pl-3">
+								{app.file}
+							</span>
+						</DropdownMenuItem>
+					))}
+				</DropdownMenuGroup>
+				<DropdownMenuSeparator />
+				<DropdownMenuItem
+					render={<a href={importDocs} target="_blank" rel="noreferrer" />}
+				>
+					<ArrowSquareOutIcon />
+					How to export from each app
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 

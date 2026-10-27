@@ -136,6 +136,7 @@ test("it opens in a new workspace with its password", async ({
 	await createWorkspace(page);
 	await openAllItems(page);
 	await page.getByRole("button", { name: "Import", exact: true }).click();
+	await page.getByRole("menuitem", { name: "Choose a file…" }).click();
 	const dialog = page.getByRole("dialog");
 	await dialog.getByLabel("Export file").setInputFiles({
 		name: "vauly-backup.zip",
