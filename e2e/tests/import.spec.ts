@@ -82,12 +82,12 @@ test("an empty vault offers to import from another app, with its steps", async (
 		await expect(apps.getByRole("button", { name: app })).toBeVisible();
 	}
 	// Each app says which file it expects, and the docs are a step away.
-	await expect(apps.getByRole("button", { name: "1Password" })).toContainText(
-		".1pux",
-	);
-	await expect(apps.getByRole("button", { name: "KeePassXC" })).toContainText(
-		".kdbx",
-	);
+	await expect(
+		apps.getByRole("button", { name: "1Password", exact: true }),
+	).toHaveAccessibleDescription(".1pux");
+	await expect(
+		apps.getByRole("button", { name: "KeePassXC", exact: true }),
+	).toHaveAccessibleDescription(".kdbx");
 	await expect(
 		dialog.getByRole("link", { name: "How to export from each app" }),
 	).toHaveAttribute("href", "https://vauly.app/docs/import/");
