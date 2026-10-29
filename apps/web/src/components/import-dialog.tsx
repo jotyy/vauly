@@ -596,10 +596,21 @@ function PickApp({
 						<button
 							type="button"
 							onClick={() => onApp(app)}
+							// Named by the app alone; the file it exports is its description.
+							aria-label={app.name}
+							aria-describedby={`import-file-${app.id}`}
 							className="text-body-sm text-fg hover:bg-tint/4 focus-visible:ring-ring flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors outline-none focus-visible:ring-2"
 						>
 							<AppMark app={app} />
-							<span className="min-w-0 leading-tight">{app.name}</span>
+							<span className="flex min-w-0 flex-col leading-tight">
+								{app.name}
+								<span
+									id={`import-file-${app.id}`}
+									className="text-caption text-fg-subtle"
+								>
+									{app.file}
+								</span>
+							</span>
 						</button>
 					</li>
 				))}
@@ -610,6 +621,15 @@ function PickApp({
 				onFile={onFile}
 				error={error}
 			/>
+			<a
+				href={DOCS}
+				target="_blank"
+				rel="noreferrer"
+				className="text-caption text-fg-muted hover:text-fg flex w-fit items-center gap-1 self-center"
+			>
+				How to export from each app
+				<ArrowSquareOutIcon className="size-3.5" />
+			</a>
 		</div>
 	);
 }

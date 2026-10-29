@@ -5,7 +5,7 @@ vauly imports from 1Password, Bitwarden, LastPass, Dashlane, Keeper, NordPass, R
 ## How it works
 
 1. In vauly, go to **All items** and choose **Import**. A new workspace also offers **Import from…** in Get started.
-2. Pick the app you're moving from. vauly shows how to export from it.
+2. Pick the app you're moving from. Each one says which file it exports, and vauly then shows how to export it.
 3. Export from that app, then drop the file into vauly. vauly works out the format from what's inside the file, so it doesn't matter what the file is called.
 4. Check what comes over, and choose the vault it goes to. Items already in that vault are left out, so importing the same file twice does no harm.
 5. Choose **Import**, then delete the export file and empty your trash. It holds your passwords in plain text.
