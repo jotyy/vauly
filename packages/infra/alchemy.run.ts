@@ -39,6 +39,8 @@ export const server = Cloudflare.Worker("server", {
 		// Limits on attached files in MB: 10 a file and 200 in all when unset.
 		FILES_MAX_MB: process.env.VAULY_FILES_MAX_MB ?? "",
 		FILES_TOTAL_MB: process.env.VAULY_FILES_TOTAL_MB ?? "",
+		// "off" stops the server asking GitHub which release is the newest (updates.ts).
+		UPDATE_CHECK: process.env.VAULY_UPDATE_CHECK ?? "",
 		// Only the demo at demo.vauly.app sets this: it holds the routes that save and
 		// restore the example team, and turns on what keeps a shared account usable.
 		DEMO_TOKEN: process.env.VAULY_DEMO_TOKEN

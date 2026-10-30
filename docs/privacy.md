@@ -20,6 +20,8 @@ When your team deploys vauly, it runs as a Worker with a D1 database in your Clo
 - **Sessions**, with the IP address and the browser each one signed in from, so you can see and end them under **Settings**.
 - **Counts that slow down guessing**: recent requests to its sign-in and session routes, by IP address and route, deleted after a minute once a later request comes in; and, for each account, how many wrong codes or master passwords were given in a row.
 
+**What the server asks for itself:** at most twice a day it asks github.com which release of vauly is the latest, so owners and admins can see when theirs is behind. The request carries nothing about your team; GitHub sees only that a Cloudflare Worker asked. Turn it off with `UPDATE_CHECK=off`.
+
 Cloudflare processes this as your provider, under your agreement with them. [Security](security.md) describes what the server can and can't see in detail.
 
 ## The browser extension

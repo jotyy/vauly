@@ -2,6 +2,8 @@
 
 New versions of vauly are [releases on GitHub](https://github.com/jotyy/vauly/releases). This page covers how to bring your copy up to date, what updates by itself and what doesn't, and what an update needs from you when it needs anything. **Settings › About** shows the version a copy runs.
 
+**Knowing when there's a new one.** Owners and admins see it in a card at the bottom of the sidebar and in **Settings › About**, with what's new and a link here. To know, your vauly's server asks github.com which release is the latest, at most twice a day; the request says nothing about your team, and browsers never make it. Set `UPDATE_CHECK` to `off` to stop it ([Settings](self-hosting.md#settings)). Watching the repository's releases on GitHub tells you too.
+
 ## Before you update
 
 - **Read the notes below**, and [CHANGELOG.md](../CHANGELOG.md) for what's new.
