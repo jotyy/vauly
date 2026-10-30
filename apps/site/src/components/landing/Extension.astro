@@ -1,6 +1,7 @@
 ---
 import BrandIcon from "@/components/BrandIcon.astro";
 import Icon from "@/components/Icon.astro";
+import { button, EXTENSION_STORE } from "@/lib/ui";
 import Heading from "./Heading.astro";
 import Section from "./Section.astro";
 
@@ -28,6 +29,15 @@ const points = [
 					))
 				}
 			</ul>
+			<div class="mt-2 flex flex-wrap items-center gap-x-6 gap-y-3">
+				<a href={EXTENSION_STORE} class={button("outline", "md")}>
+					<span aria-hidden="true"><BrandIcon brand="Googlechrome" /></span>
+					Add to Chrome
+				</a>
+				<a href="/docs/browser-extension/" class="text-label text-link font-medium underline-offset-4 hover:underline">
+					Firefox and other browsers →
+				</a>
+			</div>
 		</Heading>
 
 		<!-- A site's sign-in, with vauly's mark in the field and its menu open under it. -->
