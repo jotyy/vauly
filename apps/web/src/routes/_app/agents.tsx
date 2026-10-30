@@ -44,7 +44,7 @@ const kindLabel = { mcp: "Coding agent", cli: "Script", ci: "CI" } as const;
 
 function Agents() {
 	const agents = useAgents();
-	const requests = useRequests();
+	const requests = useRequests(4_000);
 	const lookup = useLookup();
 	const [creating, setCreating] = useState(false);
 	const pending = requests.data ?? [];

@@ -94,6 +94,7 @@ export function useBreached() {
 		],
 		enabled: on && logins.length > 0,
 		staleTime: HOUR,
+		refetchOnMount: true,
 		placeholderData: keepPreviousData,
 		queryFn: async () => {
 			const breached = new Map<string, number>();

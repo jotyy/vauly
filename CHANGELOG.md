@@ -10,6 +10,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ### Changed
 
+- The web app asks the server less often. Coming back to its tab refreshes only what's over 30 seconds old, **Where you're signed in** no longer looks this session up again each time, and agents' requests are checked every 10 seconds, every 4 on the Agents page.
 - The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.
 
 ### Fixed
