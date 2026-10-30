@@ -422,8 +422,10 @@ function Sessions() {
 	const [busy, setBusy] = useState<string | null>(null);
 	const sessions = useQuery({
 		queryKey: ["sessions"],
-		// Coming back to the tab asks again only after 30 seconds.
+		// Coming back to the tab asks again only after 30 seconds; opening Settings always
+		// asks, so a device that signed in meanwhile shows.
 		staleTime: 30_000,
+		refetchOnMount: "always",
 		queryFn: async () => {
 			// The keyring looked this session up when vauly opened; ask only if it couldn't.
 			const known = currentSessionId();
