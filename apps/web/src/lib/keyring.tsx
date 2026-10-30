@@ -163,6 +163,8 @@ type Keyring = {
 	reloadMe: () => Promise<void>;
 	autoLockMinutes: AutoLockMinutes;
 	setAutoLockMinutes: (minutes: AutoLockMinutes) => void;
+	/** This browser's session, as last looked up; undefined while it couldn't be. */
+	currentSessionId: () => string | null | undefined;
 };
 
 const KeyringContext = createContext<Keyring | null>(null);
@@ -849,6 +851,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			reloadMe,
 			autoLockMinutes,
 			setAutoLockMinutes,
+			currentSessionId: () => sessionId.current,
 		}),
 		[
 			autoLockMs,

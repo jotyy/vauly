@@ -16,7 +16,7 @@ import {
 import { isNativeApp } from "../lib/native";
 
 export function createQueryClient() {
-	return new QueryClient({
+	const client = new QueryClient({
 		defaultOptions: { queries: { retry: 1 } },
 		queryCache: new QueryCache({
 			onError: (error, query) => {
@@ -31,6 +31,15 @@ export function createQueryClient() {
 			},
 		}),
 	});
+	// Coming back to the tab refetches only the vault's data that's over 30 seconds old,
+	// so a glance at another window doesn't ask for every list again. Opening a page still
+	// asks for the latest, so a teammate's change shows as soon as it did before, and your
+	// own changes refresh everything at once.
+	client.setQueryDefaults(["vault"], {
+		staleTime: 30_000,
+		refetchOnMount: "always",
+	});
+	return client;
 }
 
 export const queryClient = createQueryClient();
