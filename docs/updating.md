@@ -12,7 +12,7 @@ New versions of vauly are [releases on GitHub](https://github.com/jotyy/vauly/re
 ## Update the server
 
 **A copy made with the Deploy to Cloudflare button:** in your copy of vauly on GitHub, open **Actions → Update vauly → Run workflow**. It replaces the files with the latest release of vauly and pushes, and Cloudflare builds and deploys it.
-- **Another version.** In the **version** box, a release such as `v0.2.3` takes that one. `next` takes vauly's development branch, which has changes that aren't released yet.
+- **Another version.** In the **version** box, a release such as `v0.3.1` takes that one. `next` takes vauly's development branch, which has changes that aren't released yet.
 - **Never backwards.** It never moves a copy back to an older version, since database migrations can't be undone, and it does nothing when the copy is already on the version you asked for.
 - **What it keeps.**
   - `wrangler.jsonc`, which names your Worker and its database. When an update needs a change there, the notes below say so.
@@ -20,11 +20,11 @@ New versions of vauly are [releases on GitHub](https://github.com/jotyy/vauly/re
 
 If the run says "Updated to jotyy/vauly@…" with no version, your copy still has the workflow from before releases. See [Copies whose Update vauly takes main](#copies-whose-update-vauly-takes-main).
 
-**Deployed from your machine:** check out the [latest release](https://github.com/jotyy/vauly/releases/latest), for example `v0.2.3`, then build and deploy:
+**Deployed from your machine:** check out the [latest release](https://github.com/jotyy/vauly/releases/latest), for example `v0.3.1`, then build and deploy:
 
 ```sh
 git fetch --tags
-git checkout v0.2.3
+git checkout v0.3.1
 bun install
 bun run build
 bun run deploy
@@ -58,6 +58,14 @@ Until October 24, 2026, vauly's main branch had changes that weren't released ye
 2. Run **Update vauly**.
 
 A copy on 0.1.0 then moves to the latest release. A copy that already took main after 0.1.0 stays where it is, because its database may have changes that 0.1.x doesn't. It moves on once a release has everything it has, and until then **Settings › About** says it runs a development version.
+
+### Updating from 0.3.0
+
+Nothing to do: 0.3.1 has no migrations. Update the server; the browser extension and the CLI are unchanged. From 0.3.1 on, owners and admins see when a newer release is out, so this is the last update to start without a reminder.
+
+### Updating from 0.2.3
+
+Nothing to do: 0.3.0 and 0.3.1 have no migrations. Update the server. The browser extension is on the [Chrome Web Store](https://chromewebstore.google.com/detail/vauly-password-manager-fo/hjjbfdlkdnnbgaempacaeihooaopoock) now and updates itself from there; the CLI is unchanged.
 
 ### Updating from 0.2.2
 
