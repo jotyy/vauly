@@ -2,6 +2,7 @@ import type { Auth, Session } from "@vauly/auth";
 import type { Database } from "@vauly/db";
 
 import type { Delivery } from "./push/notify";
+import type { UpdateCheck } from "./updates";
 
 export type Context = {
 	session: Session | null;
@@ -25,4 +26,6 @@ export type Context = {
 	notify: (deliveries: Delivery[] | Promise<Delivery[]>) => void;
 	/** The e2e stack, whose tests run a stand-in push service on localhost. */
 	localPush?: boolean;
+	/** How the newest release of vauly is found (updates.ts); absent when it's off. */
+	updates?: UpdateCheck;
 };

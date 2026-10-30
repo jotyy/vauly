@@ -1,4 +1,5 @@
 import {
+	ArrowCircleUpIcon,
 	CaretUpDownIcon,
 	DesktopIcon,
 	KeyIcon,
@@ -50,6 +51,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { instance } from "@/config";
 import { demoAccount } from "@/env.public";
 import { useApplyAppStyle } from "@/lib/app-style";
 import { useOnline } from "@/lib/connection";
@@ -62,6 +64,7 @@ import { ago, initials, toneDot } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
 import { isNativeApp, setStatusBarText } from "@/lib/native";
 import { useOfflineCopy } from "@/lib/offline";
+import { RELEASES, UPDATING_DOCS, useNewerRelease } from "@/lib/updates";
 import {
 	useDeletedItems,
 	useEvents,
@@ -348,6 +351,7 @@ function Sidebar({
 				</NavGroup>
 			</nav>
 			<div className="mt-auto flex flex-col gap-0.5 pt-4">
+				{!mobile && <UpdateBox />}
 				{!mobile && <ExtensionBox />}
 				<LockBox />
 				<UserMenu />
@@ -447,6 +451,76 @@ const EXTENSION_BOX_KEY = "vauly.extension-box";
  * filled a login with it, or put the card away. Not in the app for iPhone, which has its
  * own AutoFill.
  */
+const UPDATE_BOX_KEY = "vauly.update-dismissed";
+
+/**
+ * For owners and admins: a newer release of vauly is out, and how to update this copy.
+ * "Not now" puts it away on this device until the release after.
+ */
+function UpdateBox() {
+	const newer = useNewerRelease();
+	const [dismissed, setDismissed] = useState(() => {
+		try {
+			return localStorage.getItem(UPDATE_BOX_KEY);
+		} catch {
+			return null;
+		}
+	});
+	if (!newer || dismissed === newer) return null;
+
+	const putAway = () => {
+		setDismissed(newer);
+		try {
+			localStorage.setItem(UPDATE_BOX_KEY, newer);
+		} catch {
+			// Then it's away until the page reloads.
+		}
+	};
+
+	return (
+		<div
+			data-slot="update-box"
+			className="rounded-window border-line bg-surface mb-2 flex flex-col gap-2.5 border p-2.5"
+		>
+			<div className="flex items-start gap-2">
+				<ArrowCircleUpIcon className="text-brand mt-0.5 size-4 shrink-0" />
+				<div className="flex min-w-0 flex-1 flex-col gap-0.5">
+					<span className="text-caption text-fg font-medium">
+						vauly {newer} is out
+					</span>
+					<span className="text-micro text-fg-muted">
+						This copy runs {instance().version}.{" "}
+						<a
+							href={`${RELEASES}/tag/v${newer}`}
+							target="_blank"
+							rel="noreferrer"
+							className="text-link hover:underline"
+						>
+							What's new
+						</a>
+					</span>
+				</div>
+				<button
+					type="button"
+					aria-label="Not now"
+					onClick={putAway}
+					className="text-fg-subtle hover:text-fg -mt-1 -mr-1 rounded-md p-1 transition-colors"
+				>
+					<XIcon className="size-3.5" />
+				</button>
+			</div>
+			<a
+				href={UPDATING_DOCS}
+				target="_blank"
+				rel="noreferrer"
+				className={cn(buttonVariants({ size: "sm" }), "w-full")}
+			>
+				How to update
+			</a>
+		</div>
+	);
+}
+
 function ExtensionBox() {
 	const { me } = useKeyring();
 	const events = useEvents();

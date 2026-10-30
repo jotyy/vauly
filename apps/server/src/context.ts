@@ -58,6 +58,12 @@ export async function createContext({
 		files: fileLimits(),
 		notify: notifier(origin, db, waitUntil),
 		localPush: Boolean(ENV.E2E_RESET_TOKEN),
+		// The demo is ours to update; UPDATE_CHECK=off stops the check anywhere else. Local
+		// stacks never ask GitHub: their tests say what it would answer.
+		updates:
+			isDemo() || ENV.UPDATE_CHECK?.trim().toLowerCase() === "off"
+				? undefined
+				: { ask: !ENV.E2E_RESET_TOKEN, background: waitUntil },
 	};
 }
 

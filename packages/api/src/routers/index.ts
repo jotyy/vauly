@@ -10,6 +10,7 @@ import { itemsRouter } from "./items";
 import { linksRouter } from "./links";
 import { membersRouter } from "./members";
 import { pushRouter } from "./push";
+import { updatesRouter } from "./updates";
 import { vaultsRouter } from "./vaults";
 
 export const appRouter = {
@@ -24,6 +25,7 @@ export const appRouter = {
 	requests: requestsRouter,
 	events: eventsRouter,
 	push: pushRouter,
+	updates: updatesRouter,
 	/** Called by agents with their token, not by people. */
 	agent: agentApiRouter,
 };
