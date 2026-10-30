@@ -61,7 +61,7 @@ async function server() {
 				key: string;
 			}[]
 		).map((row) => row.key);
-	return { send, signIn, counted };
+	return { send, signIn, counted, sqlite };
 }
 
 /** Whether a response hands out a session: a token, or a session cookie with a value. */
@@ -111,6 +111,22 @@ describe("what Better Auth counts", () => {
 		});
 		expect(response.status).toBe(404);
 	});
+
+	test("deleting the account and unlinking a provider aren't served either", async () => {
+		const { send } = await server();
+		for (const path of [
+			"/delete-user",
+			"/delete-user/callback",
+			"/unlink-account",
+		]) {
+			const response = await send(path, {
+				method: path === "/delete-user/callback" ? "GET" : "POST",
+				body: path === "/delete-user/callback" ? undefined : {},
+				headers: { "cf-connecting-ip": ADDRESS },
+			});
+			expect(response.status).toBe(404);
+		}
+	});
 });
 
 describe("a sign-in refused at its second step", () => {
@@ -128,5 +144,30 @@ describe("a sign-in refused at its second step", () => {
 		expect(soon.status).toBe(429);
 		expect(await soon.json()).toMatchObject({ code: "TOO_MANY_TRIES" });
 		expect(handsOutSession(soon)).toBe(false);
+	});
+});
+
+describe("the list of where you're signed in", () => {
+	test("opens for a session signed in more than a day ago", async () => {
+		const { send, signIn, sqlite } = await server();
+		// Without two-step login, so signing in needs no code.
+		sqlite.run(
+			"UPDATE member SET totp_secret = NULL WHERE user_id = 'usr_mei'",
+		);
+		const signedIn = await signIn("");
+		expect(signedIn.status).toBe(200);
+		const cookie = signedIn.headers
+			.getSetCookie()
+			.map((line) => line.split(";")[0])
+			.join("; ");
+		// Signed in two days ago and used since, as on a laptop that stays signed in.
+		const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+		sqlite.run(`UPDATE session SET created_at = ${twoDaysAgo}`);
+		const listed = await send("/list-sessions", {
+			method: "GET",
+			headers: { cookie, "cf-connecting-ip": ADDRESS },
+		});
+		expect(listed.status).toBe(200);
+		expect(await listed.json()).toHaveLength(1);
 	});
 });

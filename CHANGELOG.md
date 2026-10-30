@@ -2,6 +2,12 @@
 
 Notable changes to vauly. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Fixed
+
+- **Settings › Where you're signed in** shows its list again in a browser that has stayed signed in for more than a day. It came back as an error (403) once the session asking for it was a day old.
+
 ## 0.3.0 - 2026-10-27
 
 ### Added
