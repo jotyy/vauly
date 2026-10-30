@@ -44,7 +44,17 @@ const BASE_PATH = "/api/auth";
 // keys with the auth hash, and a new name through `account.updateProfile`. Better Auth's
 // own routes for them would skip that, and the workspace's rules. Nothing in vauly checks
 // a password through Better Auth's route for it.
-const DISABLED_PATHS = ["/change-password", "/update-user", "/verify-password"];
+// vauly changes the master password, and deletes accounts, through its own procedures,
+// which check the auth key. Nothing signs in with another provider, so there's nothing to
+// unlink.
+const DISABLED_PATHS = [
+	"/change-password",
+	"/update-user",
+	"/verify-password",
+	"/delete-user",
+	"/delete-user/callback",
+	"/unlink-account",
+];
 
 let warnedNoAddress = false;
 
@@ -108,8 +118,8 @@ export function createAuth(
 			// Better Auth answers 403 to the list of sessions once the session asking was
 			// signed in more than freshAge ago (a day by default), so Settings couldn't show
 			// where you're signed in from a browser that stays signed in. vauly asks for the
-			// master password itself where it matters; the other route this would guard,
-			// /delete-user, isn't turned on.
+			// master password itself where it matters; the other routes this would guard,
+			// /delete-user and /unlink-account, are in DISABLED_PATHS.
 			freshAge: 0,
 		},
 		disabledPaths: DISABLED_PATHS,

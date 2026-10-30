@@ -111,6 +111,22 @@ describe("what Better Auth counts", () => {
 		});
 		expect(response.status).toBe(404);
 	});
+
+	test("deleting the account and unlinking a provider aren't served either", async () => {
+		const { send } = await server();
+		for (const path of [
+			"/delete-user",
+			"/delete-user/callback",
+			"/unlink-account",
+		]) {
+			const response = await send(path, {
+				method: path === "/delete-user/callback" ? "GET" : "POST",
+				body: path === "/delete-user/callback" ? undefined : {},
+				headers: { "cf-connecting-ip": ADDRESS },
+			});
+			expect(response.status).toBe(404);
+		}
+	});
 });
 
 describe("a sign-in refused at its second step", () => {
