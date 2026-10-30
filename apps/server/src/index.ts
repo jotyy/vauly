@@ -5,6 +5,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@vauly/api/routers/index";
 import { fromOwnPages, ownOrigins } from "@vauly/api/same-origin";
+import { saveLatest } from "@vauly/api/updates";
 import { APP_ORIGINS } from "@vauly/auth";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -91,6 +92,16 @@ if (ENV.E2E_RESET_TOKEN) {
 		}
 		await prepare();
 		await resetDatabase(getDb());
+		return c.text("OK");
+	});
+	// What GitHub would answer about the newest release, which the e2e stack never asks.
+	app.post("/__e2e/latest-release", async (c) => {
+		if (c.req.header("x-reset-token") !== ENV.E2E_RESET_TOKEN) {
+			return c.text("Forbidden", 403);
+		}
+		const { version } = await c.req.json<{ version: string | null }>();
+		await prepare();
+		await saveLatest(getDb(), version);
 		return c.text("OK");
 	});
 }

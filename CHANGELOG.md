@@ -4,6 +4,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ## Unreleased
 
+### Added
+
+- **Owners and admins see when a newer release of vauly is out**, in a card at the bottom of the sidebar and in **Settings › About**, with what's new and how to update. The server asks GitHub which release is the newest at most twice a day, after answering, and keeps the answer; nobody's browser contacts GitHub. `UPDATE_CHECK=off` turns it off; see [Updating](docs/updating.md).
+
 ### Changed
 
 - The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.

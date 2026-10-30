@@ -62,6 +62,7 @@ import {
 	useOfflineCopy,
 } from "@/lib/offline";
 import { pushEnabled, pushSupport, turnOffPush, turnOnPush } from "@/lib/push";
+import { RELEASES, UPDATING_DOCS, useNewerRelease } from "@/lib/updates";
 import { errorMessage, useMembers, useWorkspace } from "@/lib/vault-data";
 import { client } from "@/utils/orpc";
 
@@ -582,7 +583,6 @@ function Notifications() {
 	);
 }
 
-const RELEASES = "https://github.com/jotyy/vauly/releases";
 const UPDATING =
 	"https://vauly.app/docs/updating/#copies-whose-update-vauly-takes-main";
 
@@ -590,8 +590,26 @@ const UPDATING =
 function About() {
 	const { version, commit } = instance();
 	const release = /^\d+\.\d+\.\d+$/.test(version);
+	const newer = useNewerRelease();
 	return (
 		<Card>
+			{newer && (
+				<Row
+					label={`vauly ${newer} is out`}
+					hint="Owners and admins see when there's a newer release; the server checks twice a day. Updating keeps everything."
+				>
+					<a
+						href={UPDATING_DOCS}
+						target="_blank"
+						rel="noreferrer"
+						data-testid="newer-release"
+						className="text-body-sm text-link inline-flex items-center gap-1"
+					>
+						How to update
+						<ArrowSquareOutIcon className="size-3.5" />
+					</a>
+				</Row>
+			)}
 			<Row
 				label="Version"
 				hint={
