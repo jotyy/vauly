@@ -100,7 +100,6 @@ That browser held the group key for a moment. If the admin is one of the members
 ## Adding someone to a group
 
 Two things have to happen. An admin decides that Sam is in Engineering, and that's a row on the server. Someone who holds Engineering's group key wraps it to Sam's public key, and that's cryptography. Only a browser that holds the key can do the second.
-
 - **An admin in the group** does both in one step. Their browser wraps the key as they add Sam, and Sam can open Engineering's vaults right away.
 - **An admin who isn't in the group** adds Sam, and Sam waits. Engineering's members see "Sam is waiting for Engineering's key", with a **Give Sam the key** button on the group and on the Overview. If they turned notifications on, their devices tell them. The button shows who added Sam, and when.
 - **While Sam waits, the group gives them nothing.** They aren't in `vaults.list` for its vaults. `requireVaultAccess` refuses them, their agents can't use those items, and they don't count as people in the vault.
@@ -316,7 +315,6 @@ Existing rows don't change and nothing needs backfilling, so nothing changes unt
 ## Open questions
 
 For the maintainer. Each has a recommendation.
-
 1. **Who hands a new member the group's key?**
    - **Recommendation:** someone in the group, with a click. An admin in the group does it as they add the person. See [Why a click](#adding-someone-to-a-group).
    - **Rather than:** any member's browser automatically, or every admin holding every group key. Either way, adding a name to the list would be enough to get the key, with no person deciding.
