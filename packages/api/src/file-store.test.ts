@@ -23,6 +23,7 @@ const reserve = (id: string, size: number, maxTotal: number) => {
 				itemId: "itm_1",
 				size,
 				chunks: Math.ceil(size / MB),
+				storedIn: "d1",
 				createdBy: "u1",
 			},
 			maxTotal,

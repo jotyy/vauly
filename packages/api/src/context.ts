@@ -1,6 +1,7 @@
 import type { Auth, Session } from "@vauly/auth";
 import type { Database } from "@vauly/db";
 
+import type { Bucket } from "./file-chunks";
 import type { Delivery } from "./push/notify";
 import type { UpdateCheck } from "./updates";
 
@@ -18,6 +19,8 @@ export type Context = {
 	setupCode?: string;
 	/** The limits on attached files, in bytes. A total of 0 turns files off. */
 	files: { maxFileBytes: number; maxTotalBytes: number };
+	/** The R2 bucket bound as FILES, which new uploads go to; without it, D1. */
+	bucket?: Bucket;
 	/**
 	 * Sends notifications to people's devices once the response is on its way
 	 * (push/notify.ts). Nothing that calls it waits for it or fails with it, not even

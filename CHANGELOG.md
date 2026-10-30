@@ -4,6 +4,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ## Unreleased
 
+### Added
+
+- **Files can be kept in R2.** With an R2 bucket bound to the Worker as `FILES`, new uploads go there instead of D1, as encrypted as before, and files already in D1 stay readable. Deleting a file, an item for good, a vault, an account or the workspace deletes their objects too. Without a bucket nothing changes. [Self-hosting](docs/self-hosting.md#keeping-files-in-r2) says how to add one, and that R2 may ask for a payment method.
+
 ### Changed
 
 - The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.

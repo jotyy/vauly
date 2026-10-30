@@ -73,17 +73,42 @@ Files attached to items are kept in the same D1 database as everything else, enc
 
 On Cloudflare's free plan, a D1 database holds up to 500 MB, so vauly allows 10 MB a file and 200 MB of files in all, about 270 MB stored. That leaves room for the items and the activity log, which take a few MB for most teams. Uploading a 10 MB file writes about 25 rows of the free plan's 100,000 a day. On Workers Paid, a database can hold 10 GB: raise `FILES_TOTAL_MB` to match. Settings shows everyone how much is used.
 
+### Keeping files in R2
+
+For more room than D1 gives, bind an [R2](https://developers.cloudflare.com/r2/) bucket to the Worker as `FILES`.
+- **New uploads go to the bucket**, one object for each chunk, named `files/<file ID>/<n>`. They're the same base64 text D1 would hold, encrypted as before.
+- **Files uploaded before stay in D1**, and open as they did.
+- **Deleting removes the objects too**, in the background, within a minute or so. That covers removing a file, deleting its item for good, a vault, an account or the workspace, and uploads nobody finished.
+
+To add a bucket:
+1. **Turn on R2.** In the Cloudflare dashboard, open **R2 Object Storage**. Cloudflare asks for an R2 subscription first. Its checkout may ask for a payment method, even though usage within R2's free tier costs nothing.
+   - The free tier is 10 GB of storage, 1 million writes and 10 million reads a month ([R2 pricing](https://developers.cloudflare.com/r2/pricing/)).
+   - vauly writes one object for each MB uploaded and reads one for each MB downloaded. Deleting is free.
+2. **Make a bucket,** such as `vauly-files`: **Create bucket** in the dashboard, or `bunx wrangler r2 bucket create vauly-files`. Leave it private: only the Worker reads it.
+3. **Bind it in `wrangler.jsonc`.** Add this next to `"d1_databases"`:
+
+   ```jsonc
+   "r2_buckets": [{ "binding": "FILES", "bucket_name": "vauly-files" }],
+   ```
+
+   Then commit, which deploys again; deployed from your machine, run `bun run deploy`.
+   - Updates keep your `wrangler.jsonc`, so the binding stays.
+   - A binding added only in the dashboard is gone after the next deploy.
+4. **Raise `FILES_TOTAL_MB`** to suit. It counts files in R2 and D1 together. In R2 too, a file takes a third more room than its size.
+
+**Keep the binding.** Without it, files uploaded to the bucket can't be opened until it's back, and new uploads go to D1 again. Versions of vauly from before 0.4.0 don't know about the bucket either, so going back past it has the same effect.
+
 The demo at demo.vauly.app takes files up to 1 MB, 10 MB in all, and its hourly reset deletes them.
 
 ## Backups
 
 - **The database.** D1 keeps a point-in-time history you can restore from (Cloudflare calls it Time Travel; how far back depends on your plan). Everything sensitive in it is encrypted, so a database copy is only useful together with your team's master passwords.
 - **Backups people download.** Any member can download every item they can open, and their files, from **Settings → Download a backup**. By default the file is protected with a password they choose, in Bitwarden's password-protected format, which vauly and Bitwarden import. With files it's a ZIP, encrypted the same way. Without the password it's a CSV, or a ZIP of the CSV and the files, in plain text: store that encrypted. Importing either into vauly brings the files back with their items. See [Security](security.md#key-derivation).
-- **Files** are in the database, so its history and `wrangler d1 export` include them, encrypted.
+- **Files** in D1 are in the database, so its history and `wrangler d1 export` include them, encrypted. Files in an [R2 bucket](#keeping-files-in-r2) aren't, but backups people download include them.
 
 ## Removing an instance
 
-Delete the **vauly** Worker and the **vauly** D1 database in the Cloudflare dashboard, or run `bunx wrangler delete` and `bunx wrangler d1 delete vauly`. Deleting the database deletes **every item in it**, so download backups first.
+Delete the **vauly** Worker and the **vauly** D1 database in the Cloudflare dashboard, or run `bunx wrangler delete` and `bunx wrangler d1 delete vauly`, and the files bucket if you made one. Deleting the database deletes **every item in it**, so download backups first.
 
 ## When someone deletes their account
 
@@ -112,7 +137,7 @@ DELETE FROM setting WHERE key = 'require_two_step';
 
 ## Deploying with Alchemy
 
-The repository's development stack uses [Alchemy](https://alchemy.run) (`packages/infra/alchemy.run.ts`), which can also deploy, as two Workers: one for the web app and one for the API. `bun run deploy:stack -- --stage production` does that. It needs `BETTER_AUTH_SECRET`, and `CORS_ORIGIN` set to the web app's address; the one-Worker deploy above needs neither and is the simpler choice. Either way, the API also lets in the vauly app for iPhone, from `capacitor://localhost`, without cookies ([Security](security.md#the-app-for-iphone)).
+The repository's development stack uses [Alchemy](https://alchemy.run) (`packages/infra/alchemy.run.ts`), which can also deploy, as two Workers: one for the web app and one for the API. `bun run deploy:stack -- --stage production` does that. It needs `BETTER_AUTH_SECRET`, and `CORS_ORIGIN` set to the web app's address; the one-Worker deploy above needs neither and is the simpler choice. With `VAULY_FILES_BUCKET=1` it also makes an R2 bucket for [files](#keeping-files-in-r2). `bun run dev` always has one, kept on disk. Either way, the API also lets in the vauly app for iPhone, from `capacitor://localhost`, without cookies ([Security](security.md#the-app-for-iphone)).
 
 ## Checking what your instance serves
 
