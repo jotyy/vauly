@@ -4,6 +4,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ## Unreleased
 
+### Added
+
+- **The owner can sign everyone out at once**, in **Settings › Workspace**, with their master password: for when a device, a session or the database may have leaked. Every session but theirs ends, the browser extension's and the apps' included, and every agent can go too. Devices with notifications on are told why, and the activity log records it. [Self-hosting](docs/self-hosting.md#if-you-suspect-a-leak) says what else to do.
+
 ### Changed
 
 - The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.

@@ -22,6 +22,8 @@ export const closedInDemo: Record<string, string> = {
 	"account.deleteAccount":
 		"The demo account stays, so the next visitor can sign in.",
 	"members.transferOwnership": "The demo workspace keeps its owner.",
+	"account.signEveryoneOut":
+		"The demo keeps everyone signed in, since every visitor shares its account.",
 	// It swaps the account's keys, and the server can't tell they still come from the
 	// same master password: a way around changePassword's turn here.
 	"account.upgradeKdf":
