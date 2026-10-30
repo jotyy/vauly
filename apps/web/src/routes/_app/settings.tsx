@@ -418,16 +418,22 @@ function Settings() {
 /** Browsers signed in to this account. The browser extension counts as one of them. */
 function Sessions() {
 	const queryClient = useQueryClient();
+	const { currentSessionId } = useKeyring();
 	const [busy, setBusy] = useState<string | null>(null);
 	const sessions = useQuery({
 		queryKey: ["sessions"],
+		// Coming back to the tab asks again only after 30 seconds.
+		staleTime: 30_000,
 		queryFn: async () => {
-			const [list, current] = await Promise.all([
+			// The keyring looked this session up when vauly opened; ask only if it couldn't.
+			const known = currentSessionId();
+			const [list, currentId] = await Promise.all([
 				authClient.listSessions(),
-				authClient.getSession(),
+				known !== undefined
+					? known
+					: authClient.getSession().then((current) => current.data?.session.id),
 			]);
 			if (list.error) throw new Error(list.error.message);
-			const currentId = current.data?.session.id;
 			return (list.data ?? [])
 				.map((session) => ({
 					...session,

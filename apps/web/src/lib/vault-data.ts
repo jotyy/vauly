@@ -515,13 +515,18 @@ export function useAgents() {
 	});
 }
 
-export function useRequests() {
+/**
+ * Agents' requests waiting for approval, every 10 seconds; the Agents page, where
+ * someone is waiting on them, asks every 4. One query, so the fastest page in view sets
+ * the pace.
+ */
+export function useRequests(every = 10_000) {
 	const { status } = useKeyring();
 	return useQuery({
 		queryKey: ["vault", "requests"],
 		enabled: status === "unlocked",
 		queryFn: () => client.requests.list(),
-		...live(4_000),
+		...live(every),
 	});
 }
 
