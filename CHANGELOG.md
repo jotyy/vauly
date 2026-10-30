@@ -8,6 +8,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 - The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.
 
+### Fixed
+
+- **Settings › Where you're signed in** shows its list again in a browser that has stayed signed in for more than a day. It came back as an error (403) once the session asking for it was a day old.
+
 ## 0.3.0 - 2026-10-27
 
 ### Added
