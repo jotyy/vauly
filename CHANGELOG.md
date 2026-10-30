@@ -4,6 +4,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ## Unreleased
 
+### Added
+
+- **A copy made with the Deploy to Cloudflare button can get Update vauly in one step.** Cloudflare leaves GitHub workflows out of the copies it makes, so their Actions tab had no **Update vauly**. Owners and admins enter their copy's address on GitHub in **Settings › About** and choose **Add Update vauly**: GitHub opens with a short workflow filled in, to commit. It runs vauly's own, so it never needs updating. [Updating](docs/updating.md#a-copy-without-update-vauly) has the steps by hand.
+
 ### Changed
 
 - The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.

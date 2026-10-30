@@ -12,6 +12,10 @@ name: Update vauly
 # keeps .github/workflows, because GitHub doesn't let the default token change workflows;
 # add a VAULY_UPDATE_TOKEN secret (a fine-grained token for this repository with Contents
 # and Workflows write access) and updates replace them too.
+#
+# A copy that Cloudflare made without .github/workflows gets a short workflow of its own
+# that calls this one (packages/ui/src/lib/update-workflow.ts, docs/updating.md), so it
+# always runs vauly's latest.
 
 on:
   workflow_dispatch:
@@ -21,6 +25,16 @@ on:
         required: true
         default: latest
         type: string
+  workflow_call:
+    inputs:
+      version:
+        description: "latest (the latest release), a release such as v0.1.1, or next (vauly's development branch, not released yet)"
+        required: false
+        default: latest
+        type: string
+    secrets:
+      VAULY_UPDATE_TOKEN:
+        required: false
 
 permissions:
   contents: write
@@ -129,7 +143,9 @@ jobs:
             git rm -rq --cached .github/workflows
             rm -rf .github/workflows
             git checkout HEAD -- .github/workflows
-            if ! git diff --quiet HEAD "$target" -- .github/workflows; then
+            # A copy whose update.yml calls this one runs vauly's latest, and needs no other.
+            if ! git diff --quiet HEAD "$target" -- .github/workflows &&
+              ! grep -q '^ *uses: jotyy/vauly/\.github/workflows/update\.yml@' .github/workflows/update.yml 2>/dev/null; then
               echo "::notice title=vauly::vauly's workflows have changed, and this copy keeps its own. See \"Update the workflows\" in docs/updating.md."
               say "vauly's workflows have changed, and this copy keeps its own: see [Update the workflows](https://github.com/jotyy/vauly/blob/main/docs/updating.md#update-the-workflows)."
             fi
