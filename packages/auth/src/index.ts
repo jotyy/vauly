@@ -102,7 +102,16 @@ export function createAuth(
 			minPasswordLength: 64,
 			maxPasswordLength: 64,
 		},
-		session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
+		session: {
+			expiresIn: 60 * 60 * 24 * 7,
+			updateAge: 60 * 60 * 24,
+			// Better Auth answers 403 to the list of sessions once the session asking was
+			// signed in more than freshAge ago (a day by default), so Settings couldn't show
+			// where you're signed in from a browser that stays signed in. vauly asks for the
+			// master password itself where it matters; the other route this would guard,
+			// /delete-user, isn't turned on.
+			freshAge: 0,
+		},
 		disabledPaths: DISABLED_PATHS,
 		secret: env.BETTER_AUTH_SECRET,
 		baseURL: env.BETTER_AUTH_URL,
