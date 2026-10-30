@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { filesSeen, useFiles } from "@/lib/files";
 import { ago, plural } from "@/lib/format";
+import { usable } from "@/lib/known-keys";
 import type { useLookup } from "@/lib/use-lookup";
 import {
 	type AccessRequest,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/vault-data";
 
 import { ItemTile } from "./item-tile";
+import { KeyBadge, KeyChangedNotice } from "./key-dialogs";
 import { notify } from "./notify";
 
 export function ApprovalCard({
@@ -31,6 +33,7 @@ export function ApprovalCard({
 	const itemName = item?.name ?? "an item";
 	const seen = filesSeen(useFiles(request.itemId).data);
 	const files = seen.count;
+	const keyChanged = Boolean(agent) && !usable(agent?.key);
 
 	const decide = async (work: () => Promise<unknown>, message: string) => {
 		setBusy(true);
@@ -75,8 +78,14 @@ export function ApprovalCard({
 							.join(" · ")}
 					</p>
 				</div>
+				<KeyBadge check={agent?.key} />
 				<Badge variant="warning">Needs you</Badge>
 			</div>
+			{keyChanged && (
+				<div className="mx-3.5 mb-3.5">
+					<KeyChangedNotice name={agentName} kind="agent" />
+				</div>
+			)}
 			<div className="bg-surface-sunken text-caption mx-3.5 mb-3.5 flex flex-col gap-1 rounded-lg px-3 py-2.5 font-mono">
 				<span className="text-fg-muted">$ vauly run -- {request.command}</span>
 				{item && (
@@ -109,14 +118,14 @@ export function ApprovalCard({
 				<Button
 					variant="outline"
 					size="sm"
-					disabled={busy || !item || !agent}
+					disabled={busy || !item || !agent || keyChanged}
 					onClick={() => allow("once", "once")}
 				>
 					Allow once
 				</Button>
 				<Button
 					size="sm"
-					disabled={busy || !item || !agent}
+					disabled={busy || !item || !agent || keyChanged}
 					onClick={() => allow("hour", "for 1 hour")}
 				>
 					Allow for 1 hour

@@ -24,6 +24,7 @@ import { type ReactNode, useState } from "react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { switchVauly } from "@/components/connect-screen";
+import { OwnFingerprint } from "@/components/key-dialogs";
 import { notify } from "@/components/notify";
 import { Page, SectionTitle } from "@/components/page";
 import {
@@ -121,6 +122,12 @@ function Settings() {
 					hint="You sign in with it. Ask an admin to change it."
 				>
 					<span className="text-body-sm text-fg">{me.email}</span>
+				</Row>
+				<Row
+					label="Your key's fingerprint"
+					hint="Read it to a teammate, in person or on a call, so they can check that vauly shares with your key and not someone else's."
+				>
+					<OwnFingerprint />
 				</Row>
 				<Row
 					label="Master password"

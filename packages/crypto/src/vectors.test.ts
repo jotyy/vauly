@@ -19,6 +19,7 @@ import {
 	type Kdf,
 	kdfAllowed,
 	kdfOf,
+	keyFingerprint,
 	keyFromText,
 	keyToText,
 	open,
@@ -78,6 +79,8 @@ type Vectors = {
 		iv: string;
 		wrapped: string;
 	}[];
+	keyFingerprint: { publicKey: string; fingerprint: string }[];
+	keyFingerprintRefused: { why: string; publicKey: string }[];
 	linkKey: { key: string; text: string }[];
 	createAccount: {
 		password: string;
@@ -291,6 +294,23 @@ describe("key wrapping", () => {
 			expect(await keyToText(await aesKey(vector.key))).toBe(vector.text);
 			const key = await keyFromText(vector.text);
 			if (sealed) expect(await open(key, sealed.sealed)).toBeDefined();
+		}
+	});
+});
+
+describe("fingerprints", () => {
+	test("keyFingerprint", async () => {
+		for (const vector of vectors.keyFingerprint) {
+			expect(await keyFingerprint(vector.publicKey)).toBe(vector.fingerprint);
+		}
+	});
+
+	test("keys in another form, or off the curve, have none", async () => {
+		for (const vector of vectors.keyFingerprintRefused) {
+			await expect(
+				keyFingerprint(vector.publicKey),
+				vector.why,
+			).rejects.toThrow("Not a vauly public key");
 		}
 	});
 });

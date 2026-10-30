@@ -22,7 +22,7 @@ import {
 	vault,
 	vaultAccess,
 } from "@vauly/db/schema/vault";
-import { ne } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 
 /**
  * Empties every table so each e2e run starts from a fresh workspace. Mounted only when the
@@ -51,4 +51,28 @@ export async function resetDatabase(db: Database) {
 		db.delete(user),
 		db.delete(rateLimit),
 	]);
+}
+
+/**
+ * Puts another public key in place of a member's or an agent's, as someone with the
+ * database could, so the e2e tests can check that the apps notice. Mounted only with
+ * E2E_RESET_TOKEN, like resetDatabase.
+ */
+export async function swapPublicKey(
+	db: Database,
+	swap: { kind: "member" | "agent"; id: string; publicKey: string },
+) {
+	const [changed] =
+		swap.kind === "member"
+			? await db
+					.update(member)
+					.set({ publicKey: swap.publicKey })
+					.where(eq(member.userId, swap.id))
+					.returning({ id: member.userId })
+			: await db
+					.update(agent)
+					.set({ publicKey: swap.publicKey })
+					.where(eq(agent.id, swap.id))
+					.returning({ id: agent.id });
+	return Boolean(changed);
 }

@@ -4,6 +4,10 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 ## Unreleased
 
+### Added
+
+- **vauly checks teammates' and agents' public keys before it shares with them.** Each device keeps the key it first sees for each member and agent. If the server later gives another one, sharing with them and approving their requests stop until someone compares the new key and trusts it, so a key swapped in the database doesn't quietly get what's shared. Each key has a 30-digit fingerprint to compare in person or on a call: yours is in **Settings › Account**, others' are behind **Check key** on the Members and Agents pages, and `vauly whoami` prints an agent's. Unlocking now also checks that your private key belongs to the public key the server gives for you, and the CLI stops if the server gives its agent another key than its token's. See [Checking public keys](docs/security.md#checking-public-keys).
+
 ### Changed
 
 - The import dialog's list of apps says which file each one exports, such as `.1pux` or `.kdbx`, and links to [Moving to vauly](docs/import.md) underneath.

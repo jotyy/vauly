@@ -19,6 +19,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@vauly/ui/components/tabs";
 import { useEffect, useState } from "react";
 import { filesSeen, useFiles } from "@/lib/files";
+import { usable } from "@/lib/known-keys";
 import {
 	type Duration,
 	errorMessage,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/vault-data";
 
 import { CopyButton } from "./copy-button";
+import { KeyChangedNotice } from "./key-dialogs";
 import { notify } from "./notify";
 
 export function GrantDialog({
@@ -69,6 +71,8 @@ export function GrantDialog({
 		value: agent.id,
 		label: agent.name,
 	}));
+	const chosen = available.find((agent) => agent.id === agentId);
+	const keyChanged = Boolean(chosen) && !usable(chosen?.key);
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,6 +192,9 @@ export function GrantDialog({
 								Its files too, for references to them
 							</label>
 						)}
+						{chosen && keyChanged && (
+							<KeyChangedNotice name={chosen.name} kind="agent" />
+						)}
 					</div>
 				)}
 				<DialogFooter>
@@ -196,9 +203,9 @@ export function GrantDialog({
 					</Button>
 					<Button
 						hidden={choices.length === 0}
-						disabled={!agentId || busy}
+						disabled={!chosen || busy || keyChanged}
 						onClick={async () => {
-							const agent = available.find((a) => a.id === agentId);
+							const agent = chosen;
 							if (!agent) return;
 							setBusy(true);
 							try {

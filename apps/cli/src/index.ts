@@ -5,11 +5,11 @@ import { readFileSync } from "node:fs";
 import {
 	ApprovalPending,
 	CliError,
-	call,
 	cleanUpOnExit,
 	config,
 	prepareEnv,
 	resolveAll,
+	whoami,
 } from "./agent";
 import { serve } from "./mcp";
 import { createMasker, findReferences, parseEnvFile } from "./references";
@@ -73,9 +73,10 @@ async function run(args: string[]) {
 	if (refs.length > 0) {
 		const values = await resolveAll(config(), refs, command, {
 			timeoutMs: Number(process.env.VAULY_APPROVAL_TIMEOUT ?? 300) * 1000,
-			onWaiting: (count, agent) =>
+			onWaiting: (count, agent, fingerprint) =>
 				process.stderr.write(
-					`vauly: ${agent} needs approval for ${count} ${count === 1 ? "item" : "items"}. Approve it in vauly under Needs you…\n`,
+					`vauly: ${agent} needs approval for ${count} ${count === 1 ? "item" : "items"}. Approve it in vauly under Needs you…\n` +
+						`vauly: its key's fingerprint is ${fingerprint}, which vauly's Agents page shows too.\n`,
 				),
 		}).catch((error) => {
 			throw error instanceof ApprovalPending
@@ -156,8 +157,9 @@ async function main() {
 	}
 	if (command === "whoami") {
 		const cfg = config();
-		const me = await call<{ id: string; name: string }>(cfg, "whoami", null);
+		const me = await whoami(cfg);
 		console.log(`${me.name} (${me.id}) on ${cfg.server}`);
+		console.log(`Key fingerprint: ${me.fingerprint}`);
 		return;
 	}
 	if (command === "run") return run(args);

@@ -600,6 +600,58 @@ export async function unwrapKeyFrom(
 	return unwrapKey(aes, sealed);
 }
 
+// --- Fingerprints ----------------------------------------------------------------
+//
+// The server hands out the public keys that vault and item keys are wrapped to. Two
+// people who read each other the fingerprint of a key, in person or on a call, know the
+// key the server gave is the one in the other person's own app.
+
+/** How every P-256 public key starts as DER SubjectPublicKeyInfo; x and y follow. */
+const P256_SPKI = Uint8Array.from([
+	0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
+	0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00,
+	0x04,
+]);
+
+/**
+ * A public key's fingerprint: 30 digits in six groups of five. It's the SHA-256 of
+ * `vauly/fingerprint\n` and the key's 91 bytes; each group is five bytes of that, read
+ * big-endian, mod 100,000, the way Signal shows a safety number. It takes only the
+ * encoding every vauly app exports, of a point on the curve, so one key can't be handed
+ * out in two forms with two fingerprints.
+ */
+export async function keyFingerprint(publicKey: string): Promise<string> {
+	const refused = () => new Error("Not a vauly public key");
+	let spki: Bytes;
+	try {
+		spki = fromBase64(publicKey);
+	} catch {
+		throw refused();
+	}
+	const canonical =
+		spki.length === 91 &&
+		P256_SPKI.every((byte, i) => spki[i] === byte) &&
+		toBase64(spki) === publicKey;
+	if (!canonical) throw refused();
+	// WebCrypto refuses a point that isn't on the curve.
+	await importPublicKey(publicKey).catch(() => {
+		throw refused();
+	});
+	const label = encoder.encode("vauly/fingerprint\n");
+	const input = new Uint8Array(label.length + spki.length);
+	input.set(label);
+	input.set(spki, label.length);
+	const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", input));
+	const groups: string[] = [];
+	for (let i = 0; i < 30; i += 5) {
+		// 40 bits fit a double exactly.
+		let value = 0;
+		for (const byte of hash.subarray(i, i + 5)) value = value * 256 + byte;
+		groups.push(String(value % 100_000).padStart(5, "0"));
+	}
+	return groups.join(" ");
+}
+
 // --- Account bundle --------------------------------------------------------------
 
 /**
@@ -642,12 +694,35 @@ export async function openPrivateKey(
 	return importPrivateKey(await open(wrap, encryptedPrivateKey));
 }
 
+/** The server's public key for an account isn't the one its private key belongs to. */
+export class KeyMismatchError extends Error {
+	constructor() {
+		super(
+			"This server gives your account another public key than your own, so vauly didn't unlock. Nothing was shared with it.",
+		);
+	}
+}
+
+/**
+ * Opens the private key, and checks that it belongs to the public key the server gives
+ * for the account. The apps wrap new vault keys to that public key, so one that belonged
+ * to someone else would hand them over. Fails on a wrong password, and throws a
+ * KeyMismatchError for another key.
+ */
+export async function openAccountKey(
+	wrap: CryptoKey,
+	keys: Pick<AccountKeys, "publicKey" | "encryptedPrivateKey">,
+): Promise<CryptoKey> {
+	const pkcs8 = await open(wrap, keys.encryptedPrivateKey);
+	if ((await publicKeyOf(pkcs8)) !== keys.publicKey) {
+		throw new KeyMismatchError();
+	}
+	return importPrivateKey(pkcs8);
+}
+
 export async function unlockAccount(password: string, keys: AccountKeys) {
 	const { authKey, wrapKey: wrap } = await masterKeysFor(password, keys);
-	return {
-		authKey,
-		privateKey: await openPrivateKey(wrap, keys.encryptedPrivateKey),
-	};
+	return { authKey, privateKey: await openAccountKey(wrap, keys) };
 }
 
 /**

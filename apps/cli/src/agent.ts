@@ -15,9 +15,11 @@ import {
 	decodeAgentToken,
 	fileKeyOf,
 	importPrivateKey,
+	keyFingerprint,
 	openFileChunk,
 	openFileMeta,
 	openJson,
+	publicKeyOf,
 	unwrapKeyFrom,
 } from "@vauly/crypto";
 
@@ -75,6 +77,25 @@ export async function call<T>(
 	return body?.json as T;
 }
 
+/**
+ * The agent as the server knows it, with the fingerprint of its key. People's browsers
+ * wrap item keys to the public key the server gives for the agent, so that key must be
+ * the one its token's private key belongs to: if it isn't, someone else could open what
+ * they approve, and the CLI stops before it opens anything.
+ */
+export async function whoami(cfg: Config) {
+	const [me, publicKey] = await Promise.all([
+		call<{ id: string; name: string; publicKey: string }>(cfg, "whoami", null),
+		publicKeyOf(cfg.privateKeyRaw),
+	]);
+	if (me.publicKey !== publicKey) {
+		throw new CliError(
+			`${cfg.server} gives another public key for ${me.name} than the one in its token, so what people approve for it could go to someone else. Nothing was opened. Tell whoever runs your vauly.`,
+		);
+	}
+	return { ...me, fingerprint: await keyFingerprint(publicKey) };
+}
+
 /** A file on a granted item: its sealed name and key, and a pass to download it. */
 type GrantedFile = { id: string; meta: string; chunks: number; token: string };
 
@@ -110,7 +131,8 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Opens every referenced item. New ones wait for a person to approve them in vauly, for
- * up to `timeoutMs`; `onWaiting` says once how many are waiting.
+ * up to `timeoutMs`; `onWaiting` says once how many are waiting, and the fingerprint of
+ * the agent's key, for the person approving to compare.
  */
 export async function resolveAll(
 	cfg: Config,
@@ -121,14 +143,10 @@ export async function resolveAll(
 		onWaiting,
 	}: {
 		timeoutMs: number;
-		onWaiting?: (count: number, agentName: string) => void;
+		onWaiting?: (count: number, agentName: string, fingerprint: string) => void;
 	},
 ) {
-	const me = await call<{ publicKey: string; name: string }>(
-		cfg,
-		"whoami",
-		null,
-	);
+	const me = await whoami(cfg);
 	const privateKey = await importPrivateKey(cfg.privateKeyRaw);
 	const itemIds = [...new Set(refs.map((ref) => ref.itemId))];
 	// Items whose files a reference names: only for those does the agent ask for files.
@@ -182,7 +200,7 @@ export async function resolveAll(
 		}
 		if (pending.length === 0) continue;
 		if (!announced) {
-			onWaiting?.(pending.length, me.name);
+			onWaiting?.(pending.length, me.name, me.fingerprint);
 			announced = true;
 		}
 		// Poll until every pending request is decided, then resolve again.

@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 
 import { initials, toneDot } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
+import { usable } from "@/lib/known-keys";
 import {
 	canManage,
 	errorMessage,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/vault-data";
 
 import { Field } from "./auth-layout";
+import { KeyBadge, KeyChangedNotice } from "./key-dialogs";
 import { notify } from "./notify";
 
 const tones: { value: Tone; label: string }[] = [
@@ -187,13 +189,14 @@ export function VaultAccessDialog({
 	const managing = canManage(vault);
 	const managers = vault.members.filter((m) => m.role === "manage");
 	const inVault = new Set(vault.members.map((m) => m.userId));
-	const others = (members.data?.members ?? []).filter(
-		(m) => !inVault.has(m.userId),
-	);
+	const everyone = members.data?.members ?? [];
+	const others = everyone.filter((m) => !inVault.has(m.userId));
 	const choices = others.map((m) => ({
 		value: m.userId,
 		label: `${m.name} · ${m.email}`,
 	}));
+	const chosen = others.find((m) => m.userId === adding);
+	const keyChanged = Boolean(chosen) && !usable(chosen?.key);
 
 	useEffect(() => {
 		if (open) setAdding(others[0]?.userId ?? "");
@@ -237,10 +240,16 @@ export function VaultAccessDialog({
 								<AvatarFallback>{initials(person.name)}</AvatarFallback>
 							</Avatar>
 							<div className="flex min-w-0 flex-1 flex-col">
-								<span className="text-body-sm text-fg">
+								<span className="text-body-sm text-fg flex items-center gap-1.5">
 									{person.name}
-									{person.userId === me?.id && (
+									{person.userId === me?.id ? (
 										<span className="text-fg-subtle"> (you)</span>
+									) : (
+										<KeyBadge
+											check={
+												everyone.find((m) => m.userId === person.userId)?.key
+											}
+										/>
 									)}
 								</span>
 								<span className="text-caption text-fg-subtle truncate">
@@ -294,47 +303,51 @@ export function VaultAccessDialog({
 							Everyone in the workspace can open this vault.
 						</p>
 					) : (
-						<div className="flex gap-2">
-							<Select
-								items={choices}
-								value={adding}
-								onValueChange={(value) => value && setAdding(String(value))}
-							>
-								<SelectTrigger
-									className="min-w-0 flex-1"
-									aria-label="Person to add"
+						<div className="flex flex-col gap-2">
+							<div className="flex gap-2">
+								<Select
+									items={choices}
+									value={adding}
+									onValueChange={(value) => value && setAdding(String(value))}
 								>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{choices.map((choice) => (
-										<SelectItem key={choice.value} value={choice.value}>
-											{choice.label}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							<RoleSelect
-								label="What they can do"
-								size="default"
-								value={addingRole}
-								disabled={busy}
-								onChange={setAddingRole}
-							/>
-							<Button
-								disabled={!adding || busy}
-								onClick={() => {
-									const person = others.find((m) => m.userId === adding);
-									if (person) {
-										run(
-											actions.shareVault(vault, person, addingRole),
-											`${person.name} can open ${vault.name}`,
-										);
-									}
-								}}
-							>
-								Give access
-							</Button>
+									<SelectTrigger
+										className="min-w-0 flex-1"
+										aria-label="Person to add"
+									>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{choices.map((choice) => (
+											<SelectItem key={choice.value} value={choice.value}>
+												{choice.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<RoleSelect
+									label="What they can do"
+									size="default"
+									value={addingRole}
+									disabled={busy}
+									onChange={setAddingRole}
+								/>
+								<Button
+									disabled={!chosen || busy || keyChanged}
+									onClick={() => {
+										if (chosen) {
+											run(
+												actions.shareVault(vault, chosen, addingRole),
+												`${chosen.name} can open ${vault.name}`,
+											);
+										}
+									}}
+								>
+									Give access
+								</Button>
+							</div>
+							{chosen && keyChanged && (
+								<KeyChangedNotice name={chosen.name} kind="member" />
+							)}
 						</div>
 					))}
 			</DialogContent>

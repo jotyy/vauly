@@ -13,7 +13,7 @@ import { logger } from "hono/logger";
 
 import { createContext } from "./context";
 import { demoGuard, isDemo, mountDemo, restore } from "./demo";
-import { resetDatabase } from "./e2e-reset";
+import { resetDatabase, swapPublicKey } from "./e2e-reset";
 import { ENV } from "./env.server";
 
 import { createAuth, getDb, prepare } from "./services";
@@ -103,6 +103,21 @@ if (ENV.E2E_RESET_TOKEN) {
 		await prepare();
 		await saveLatest(getDb(), version);
 		return c.text("OK");
+	});
+	// Another key in place of a member's or an agent's, as someone with the database could.
+	app.post("/__e2e/public-key", async (c) => {
+		if (c.req.header("x-reset-token") !== ENV.E2E_RESET_TOKEN) {
+			return c.text("Forbidden", 403);
+		}
+		const swap = await c.req.json<{
+			kind: "member" | "agent";
+			id: string;
+			publicKey: string;
+		}>();
+		await prepare();
+		return (await swapPublicKey(getDb(), swap))
+			? c.text("OK")
+			: c.text("Not found", 404);
 	});
 }
 

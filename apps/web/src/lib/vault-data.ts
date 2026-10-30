@@ -26,6 +26,13 @@ import { webAddress } from "@/env.public";
 import { client } from "@/utils/orpc";
 
 import { useKeyring } from "./keyring";
+import {
+	type KeyCheck,
+	type KeyHolder,
+	requireKnownKey,
+	seeKeys,
+	trustKey,
+} from "./known-keys";
 import { itemRows, vaultRows } from "./offline";
 import { passwordStrength, type Strength } from "./secrets";
 
@@ -211,9 +218,12 @@ export type Item = ItemFields &
 		 */
 		unknown?: Record<string, unknown>;
 	};
-export type Member = Rows<typeof client.members.list>["members"][number];
+/** What this device makes of someone's public key; see lib/known-keys.ts. */
+type WithKey = { key: KeyCheck };
+export type Member = Rows<typeof client.members.list>["members"][number] &
+	WithKey;
 export type Invite = Rows<typeof client.members.list>["invites"][number];
-export type Agent = Rows<typeof client.agents.list>[number];
+export type Agent = Rows<typeof client.agents.list>[number] & WithKey;
 export type AccessRequest = Rows<typeof client.requests.list>[number];
 export type VaultEvent = Rows<typeof client.events.list>[number];
 export type Duration = "once" | "hour" | "day" | "always";
@@ -394,12 +404,48 @@ const live = (ms: number) => ({
 	refetchOnWindowFocus: true,
 });
 
+export const memberHolder = (member: {
+	userId: string;
+	publicKey: string;
+	email: string;
+}): KeyHolder => ({
+	kind: "member",
+	id: member.userId,
+	publicKey: member.publicKey,
+	email: member.email,
+});
+
+export const agentHolder = (agent: {
+	id: string;
+	publicKey: string;
+}): KeyHolder => ({ kind: "agent", id: agent.id, publicKey: agent.publicKey });
+
+/** Rows with what this device makes of each one's key, keeping keys seen for the first time. */
+async function withKeys<T>(
+	ownPublicKey: string | null,
+	rows: T[],
+	holder: (row: T) => KeyHolder,
+): Promise<(T & WithKey)[]> {
+	if (!ownPublicKey) throw new Error("Locked");
+	const checks = await seeKeys(ownPublicKey, rows.map(holder));
+	return rows.map((row, i) => ({
+		...row,
+		key: checks[i] ?? { status: "invalid", fingerprint: null },
+	}));
+}
+
 export function useMembers() {
-	const { status } = useKeyring();
+	const { status, ownPublicKey } = useKeyring();
 	return useQuery({
 		queryKey: ["vault", "members"],
 		enabled: status === "unlocked",
-		queryFn: () => client.members.list(),
+		queryFn: async () => {
+			const list = await client.members.list();
+			return {
+				...list,
+				members: await withKeys(ownPublicKey(), list.members, memberHolder),
+			};
+		},
 	});
 }
 
@@ -506,11 +552,12 @@ export function useLinks(itemId: string, editable: boolean) {
 }
 
 export function useAgents() {
-	const { status } = useKeyring();
+	const { status, ownPublicKey } = useKeyring();
 	return useQuery({
 		queryKey: ["vault", "agents"],
 		enabled: status === "unlocked",
-		queryFn: () => client.agents.list(),
+		queryFn: async () =>
+			withKeys(ownPublicKey(), await client.agents.list(), agentHolder),
 		...live(15_000),
 	});
 }
@@ -563,13 +610,28 @@ const refresh = (queryClient: QueryClient) =>
 
 export function useActions() {
 	const queryClient = useQueryClient();
-	const { me } = useKeyring();
+	const { me, ownPublicKey } = useKeyring();
 
 	return useMemo(() => {
 		const after = async <T>(work: Promise<T>) => {
 			const result = await work;
 			await refresh(queryClient);
 			return result;
+		};
+
+		const ownKey = () => {
+			const key = ownPublicKey();
+			if (!key) throw new Error("Locked");
+			return key;
+		};
+
+		/** Wraps `key` to a member or agent, only if their key is the one this device kept. */
+		const wrapFor = async (
+			holder: KeyHolder & { name: string },
+			key: CryptoKey,
+		) => {
+			await requireKnownKey(ownKey(), holder);
+			return wrapKeyFor(holder.publicKey, key);
 		};
 
 		const cached = <T>(key: string[]) =>
@@ -724,12 +786,12 @@ export function useActions() {
 			},
 
 			async createVault(meta: VaultMeta) {
-				if (!me) throw new Error("Locked");
 				const key = await newDataKey();
 				return after(
 					client.vaults.create({
 						encryptedMeta: await sealJson(key, meta),
-						wrappedKey: await wrapKeyFor(me.keys.publicKey, key),
+						// The key the private key was checked against, not the profile's.
+						wrappedKey: await wrapKeyFor(ownKey(), key),
 					}),
 				);
 			},
@@ -747,14 +809,22 @@ export function useActions() {
 
 			shareVault: async (
 				vault: Vault,
-				member: { userId: string; publicKey: string },
+				member: {
+					userId: string;
+					publicKey: string;
+					email: string;
+					name: string;
+				},
 				role: VaultRole,
 			) =>
 				after(
 					client.vaults.share({
 						vaultId: vault.id,
 						userId: member.userId,
-						wrappedKey: await wrapKeyFor(member.publicKey, vault.key),
+						wrappedKey: await wrapFor(
+							{ ...memberHolder(member), name: member.name },
+							vault.key,
+						),
 						role,
 					}),
 				),
@@ -790,6 +860,12 @@ export function useActions() {
 					publicKey: pair.publicKey,
 					secretHash: await sha256Hex(secret),
 				});
+				// This device made the key pair, so it knows the key is the agent's.
+				try {
+					await trustKey(ownKey(), agentHolder({ id, ...pair }), true);
+				} catch {
+					// The token is shown once: it's returned whatever happens here.
+				}
 				await refresh(queryClient);
 				return { id, token: encodeAgentToken(id, secret, pair.privateKeyRaw) };
 			},
@@ -811,7 +887,10 @@ export function useActions() {
 					client.agents.grant({
 						agentId: agent.id,
 						itemId: item.id,
-						wrappedKey: await wrapKeyFor(agent.publicKey, item.key),
+						wrappedKey: await wrapFor(
+							{ ...agentHolder(agent), name: agent.name },
+							item.key,
+						),
 						duration,
 						files: Boolean(files),
 						filesThrough: files?.through ?? null,
@@ -839,7 +918,10 @@ export function useActions() {
 				return after(
 					client.requests.approve({
 						id: request.id,
-						wrappedKey: await wrapKeyFor(agent.publicKey, item.key),
+						wrappedKey: await wrapFor(
+							{ ...agentHolder(agent), name: agent.name },
+							item.key,
+						),
 						duration,
 						files: shown.files,
 						filesThrough: shown.through,
@@ -849,8 +931,19 @@ export function useActions() {
 
 			deny: (request: AccessRequest) =>
 				after(client.requests.deny({ id: request.id })),
+
+			/**
+			 * Marks a member's or agent's current key as compared with them, or takes the
+			 * mark off. For a key that changed, marking it is what trusts the new key.
+			 */
+			async verifyKey(holder: KeyHolder, verified: boolean) {
+				await trustKey(ownKey(), holder, verified);
+				await queryClient.invalidateQueries({
+					queryKey: ["vault", holder.kind === "member" ? "members" : "agents"],
+				});
+			},
 		};
-	}, [queryClient, me]);
+	}, [queryClient, me, ownPublicKey]);
 }
 
 /** Readable message for anything an action throws. */

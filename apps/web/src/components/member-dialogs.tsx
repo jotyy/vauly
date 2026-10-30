@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import { webAddress } from "@/env.public";
 import { toneDot } from "@/lib/format";
+import { usable } from "@/lib/known-keys";
 import {
 	canManage,
 	errorMessage,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/vault-data";
 
 import { CopyButton } from "./copy-button";
+import { KeyChangedNotice } from "./key-dialogs";
 import { notify } from "./notify";
 
 export function inviteLink(token: string) {
@@ -82,6 +84,7 @@ export function GiveAccessDialog({
 	);
 	const [chosen, setChosen] = useState<Set<string>>(new Set());
 	const [busy, setBusy] = useState(false);
+	const keyChanged = Boolean(member) && !usable(member?.key);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: reset only when another person is opened
 	useEffect(() => {
@@ -146,12 +149,15 @@ export function GiveAccessDialog({
 						})}
 					</ul>
 				)}
+				{member && keyChanged && (
+					<KeyChangedNotice name={member.name} kind="member" />
+				)}
 				<DialogFooter>
 					<Button variant="ghost" onClick={() => onOpenChange(false)}>
 						Cancel
 					</Button>
 					<Button
-						disabled={busy || !member}
+						disabled={busy || !member || keyChanged}
 						onClick={async () => {
 							if (!member) return;
 							const targets = shared.filter(

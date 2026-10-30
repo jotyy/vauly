@@ -15,9 +15,11 @@ import {
 	type Kdf,
 	KdfError,
 	type KdfSettings,
+	KeyMismatchError,
 	kdfAllowed,
 	kdfIsCurrent,
 	kdfOf,
+	keyFingerprint,
 	keyFromText,
 	keyToText,
 	newDataKey,
@@ -25,14 +27,17 @@ import {
 	newKeypair,
 	newSalt,
 	open,
+	openAccountKey,
 	openFileChunk,
 	openFileMeta,
 	openJson,
+	publicKeyOf,
 	seal,
 	sealFileChunk,
 	sealFileMeta,
 	sealJson,
 	setArgon2,
+	toBase64,
 	unlockAccount,
 	unwrapKey,
 	unwrapKeyFrom,
@@ -305,6 +310,98 @@ describe("sharing", () => {
 
 	test("malformed tokens are rejected", () => {
 		expect(() => decodeAgentToken("vauly_agent_only")).toThrow();
+	});
+});
+
+describe("fingerprints", () => {
+	test("a key has one fingerprint, the same from its private key", async () => {
+		const pair = await newKeypair();
+		const fingerprint = await keyFingerprint(pair.publicKey);
+		expect(fingerprint).toMatch(/^\d{5}( \d{5}){5}$/);
+		expect(await keyFingerprint(pair.publicKey)).toBe(fingerprint);
+		expect(await keyFingerprint(await publicKeyOf(pair.privateKeyRaw))).toBe(
+			fingerprint,
+		);
+	});
+
+	test("different keys have different fingerprints", async () => {
+		const prints = new Set<string>();
+		for (let i = 0; i < 20; i++) {
+			prints.add(await keyFingerprint((await newKeypair()).publicKey));
+		}
+		expect(prints.size).toBe(20);
+	});
+
+	test("anything but a P-256 public key is refused", async () => {
+		const { publicKey } = await newKeypair();
+		const p384 = await crypto.subtle.generateKey(
+			{ name: "ECDH", namedCurve: "P-384" },
+			true,
+			["deriveBits"],
+		);
+		const spki = new Uint8Array(
+			await crypto.subtle.exportKey("spki", p384.publicKey),
+		);
+		for (const text of [
+			"",
+			"not base64!",
+			publicKey.slice(0, -4),
+			// The same bytes, with the unused bits of the padding set.
+			`${publicKey.slice(0, -3)}B==`,
+			toBase64(spki),
+		]) {
+			await expect(keyFingerprint(text)).rejects.toThrow(
+				"Not a vauly public key",
+			);
+		}
+	});
+});
+
+describe("your own key", () => {
+	test("the private key opens when it belongs to the public key given for it", async () => {
+		const account = await createAccount("own-key-example", FAST);
+		const { wrapKey: wrap } = await deriveMasterKeys(
+			"own-key-example",
+			account.keys.kdfSalt,
+			FAST,
+		);
+		const privateKey = await openAccountKey(wrap, account.keys);
+		const vaultKey = await newDataKey();
+		const wrapped = await wrapKeyFor(account.keys.publicKey, vaultKey);
+		expect(
+			await unwrapKeyFrom(privateKey, account.keys.publicKey, wrapped),
+		).toBeDefined();
+	});
+
+	test("a server that gives another public key doesn't get it used", async () => {
+		const account = await createAccount("own-key-example", FAST);
+		const other = await newKeypair();
+		const swapped = { ...account.keys, publicKey: other.publicKey };
+		const { wrapKey: wrap } = await deriveMasterKeys(
+			"own-key-example",
+			account.keys.kdfSalt,
+			FAST,
+		);
+		await expect(openAccountKey(wrap, swapped)).rejects.toBeInstanceOf(
+			KeyMismatchError,
+		);
+		await expect(
+			unlockAccount("own-key-example", swapped),
+		).rejects.toBeInstanceOf(KeyMismatchError);
+	});
+
+	test("a wrong password isn't taken for another key", async () => {
+		const account = await createAccount("own-key-example", FAST);
+		const { wrapKey: wrong } = await deriveMasterKeys(
+			"not-the-password",
+			account.keys.kdfSalt,
+			FAST,
+		);
+		const failure = await openAccountKey(wrong, account.keys).catch(
+			(error: unknown) => error,
+		);
+		expect(failure).toBeInstanceOf(Error);
+		expect(failure).not.toBeInstanceOf(KeyMismatchError);
 	});
 });
 

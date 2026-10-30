@@ -35,6 +35,7 @@ import { useBreached } from "@/lib/breaches";
 import { filesSeen, useFiles } from "@/lib/files";
 import { ago, plural } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
+import { usable } from "@/lib/known-keys";
 import { logoDomain } from "@/lib/logos";
 import { isNativeApp } from "@/lib/native";
 import { useLookup } from "@/lib/use-lookup";
@@ -312,6 +313,8 @@ function useNeeds() {
 			const agent = lookup.agents.get(request.agentId);
 			const item = lookup.items.get(request.itemId);
 			const id = `approval-${request.id}`;
+			// A changed key is approved only after it's checked, on the Agents page.
+			const keyChanged = Boolean(agent) && !usable(agent?.key);
 			// What the row shows of the item's files is what an approval covers.
 			const seen = filesSeen(
 				(allFiles.data ?? []).filter((file) => file.itemId === request.itemId),
@@ -326,7 +329,7 @@ function useNeeds() {
 						wants <span className="font-medium">{item?.name ?? "an item"}</span>
 					</>
 				),
-				meta: `for ${request.command}${request.files ? `, with its ${plural(seen.count, "file")}` : ""} · ${ago(request.createdAt)}`,
+				meta: `for ${request.command}${request.files ? `, with its ${plural(seen.count, "file")}` : ""} · ${ago(request.createdAt)}${keyChanged ? " · its key changed: check it on the Agents page" : ""}`,
 				actions: (
 					<>
 						<Button
@@ -347,7 +350,7 @@ function useNeeds() {
 						<Button
 							variant="outline"
 							size="sm"
-							disabled={busy === id || !item || !agent}
+							disabled={busy === id || !item || !agent || keyChanged}
 							onClick={() =>
 								run(
 									id,
