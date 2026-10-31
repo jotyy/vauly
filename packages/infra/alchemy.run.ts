@@ -17,10 +17,19 @@ export const db = Cloudflare.D1.Database("database", {
 	migrations: "../../packages/db/src/migrations",
 });
 
+// Attached files go to an R2 bucket when the Worker has one as FILES, and to D1 when it
+// doesn't. Local stacks have one, kept on disk; a deploy gets one with VAULY_FILES_BUCKET.
+// The one-Worker deploy (wrangler.jsonc) has none unless its owner adds it.
+const files =
+	process.env.VAULY_LOCAL_STATE || process.env.VAULY_FILES_BUCKET
+		? Cloudflare.R2.Bucket("files")
+		: undefined;
+
 export const server = Cloudflare.Worker("server", {
 	main: "../../apps/server/src/index.ts",
 	env: {
 		DB: db,
+		...(files && { FILES: files }),
 		CORS_ORIGIN: process.env.VAULY_WEB_PORT
 			? `http://localhost:${webPort}`
 			: appDomain

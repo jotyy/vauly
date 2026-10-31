@@ -8,6 +8,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 
 - **The owner can sign everyone out at once**, in **Settings › Workspace**, with their master password: for when a device, a session or the database may have leaked. Every session but theirs ends, the browser extension's and the apps' included, and every agent can go too. Devices with notifications on are told why, and the activity log records it. [Self-hosting](docs/self-hosting.md#if-you-suspect-a-leak) says what else to do.
 - **A copy made with the Deploy to Cloudflare button can get Update vauly in one step.** Cloudflare leaves GitHub workflows out of the copies it makes, so their Actions tab had no **Update vauly**. Owners and admins enter their copy's address on GitHub in **Settings › About** and choose **Add Update vauly**: GitHub opens with a short workflow filled in, to commit. It runs vauly's own, so it never needs updating. [Updating](docs/updating.md#a-copy-without-update-vauly) has the steps by hand.
+- **Files can be kept in R2.** With an R2 bucket bound to the Worker as `FILES`, new uploads go there instead of D1, as encrypted as before, and files already in D1 stay readable. Deleting a file, an item for good, a vault, an account or the workspace deletes their objects too. Without a bucket nothing changes. [Self-hosting](docs/self-hosting.md#keeping-files-in-r2) says how to add one, and that R2 may ask for a payment method.
 
 ### Changed
 

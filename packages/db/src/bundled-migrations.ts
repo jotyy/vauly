@@ -90,4 +90,14 @@ export const migrations: readonly {
 		hash: "e0d5ae1b9f861378ef0dade61d217300474232d3bed5f310f8d08da09dd294e4",
 		sql: "CREATE TABLE `rate_limit` (\n\t`id` text PRIMARY KEY,\n\t`key` text NOT NULL UNIQUE,\n\t`count` integer NOT NULL,\n\t`last_request` integer NOT NULL\n);\n--> statement-breakpoint\nALTER TABLE `member` ADD `sign_in_wrong_tries` integer DEFAULT 0 NOT NULL;--> statement-breakpoint\nALTER TABLE `member` ADD `sign_in_next_try_at` integer;--> statement-breakpoint\nALTER TABLE `member` ADD `session_wrong_tries` integer DEFAULT 0 NOT NULL;--> statement-breakpoint\nALTER TABLE `member` ADD `session_next_try_at` integer;",
 	},
+	{
+		name: "20261030160838_files_in_r2",
+		hash: "28ec9d670fbda4a73687a8c0c548c474387bc85190fb1493694b11b72310299e",
+		sql: "CREATE TABLE `file_purge` (\n\t`attachment_id` text PRIMARY KEY,\n\t`chunks` integer NOT NULL,\n\t`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL\n);\n--> statement-breakpoint\nALTER TABLE `attachment` ADD `stored_in` text DEFAULT 'd1' NOT NULL;",
+	},
+	{
+		name: "20261030160841_files_in_r2_purge",
+		hash: "4c3e2e406ba08d2be3ac4b3767ae38025edb16ada56ddee25edd87619a49da89",
+		sql: "-- A file whose chunks are in R2 leaves its ID behind when its row goes, however it goes:\n-- removed, its upload cancelled or left unfinished, or with its item, vault, account or\n-- workspace through the cascades. The Worker deletes the objects later.\nCREATE TRIGGER `attachment_purge_r2` AFTER DELETE ON `attachment`\nWHEN old.`stored_in` = 'r2'\nBEGIN\n\tINSERT OR IGNORE INTO `file_purge` (`attachment_id`, `chunks`) VALUES (old.`id`, old.`chunks`);\nEND;\n",
+	},
 ];

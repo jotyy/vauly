@@ -16,11 +16,12 @@ export const reserveUpload = (
 		itemId: string;
 		size: number;
 		chunks: number;
+		storedIn: "d1" | "r2";
 		createdBy: string;
 	},
 	maxTotal: number,
 ) =>
-	sql`insert into ${attachment} (id, item_id, size, chunks, created_by) select ${row.id}, ${row.itemId}, ${row.size}, ${row.chunks}, ${row.createdBy} where (select coalesce(sum(size), 0) from ${attachment}) + ${row.size} <= ${maxTotal}`;
+	sql`insert into ${attachment} (id, item_id, size, chunks, stored_in, created_by) select ${row.id}, ${row.itemId}, ${row.size}, ${row.chunks}, ${row.storedIn}, ${row.createdBy} where (select coalesce(sum(size), 0) from ${attachment}) + ${row.size} <= ${maxTotal}`;
 
 /** Base64 text and nothing else, so a chunk's length is the bytes it takes. */
 export const isBase64 = (text: string) => /^[A-Za-z0-9+/]*={0,2}$/.test(text);
