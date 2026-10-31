@@ -37,6 +37,7 @@ import {
 	DeleteAccountDialog,
 	DeviceUnlockDialog,
 	ExportDialog,
+	SignEveryoneOutDialog,
 } from "@/components/settings-dialogs";
 import { StylePicker } from "@/components/style-picker";
 import {
@@ -99,6 +100,7 @@ function Settings() {
 	const { theme = "system", setTheme } = useTheme();
 	const [changing, setChanging] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [signingOut, setSigningOut] = useState(false);
 	const [exporting, setExporting] = useState(false);
 	const [twoStep, setTwoStep] = useState<"on" | "off" | null>(null);
 	const [passkey, setPasskey] = useState(false);
@@ -369,6 +371,16 @@ function Settings() {
 							/>
 						</Row>
 						<RequireTwoStep />
+						{me.role === "owner" && !instance().demo && (
+							<Row
+								label="Sign everyone out"
+								hint="If you think a device, a session or the database has leaked: every other device, the browser extension's included, signs in again."
+							>
+								<Button variant="outline" onClick={() => setSigningOut(true)}>
+									Sign everyone out…
+								</Button>
+							</Row>
+						)}
 					</Card>
 				</>
 			)}
@@ -414,6 +426,11 @@ function Settings() {
 
 			<ChangePasswordDialog open={changing} onOpenChange={setChanging} />
 			<DeleteAccountDialog open={deleting} onOpenChange={setDeleting} />
+			<SignEveryoneOutDialog
+				open={signingOut}
+				onOpenChange={setSigningOut}
+				onDone={() => queryClient.invalidateQueries()}
+			/>
 			<ExportDialog open={exporting} onOpenChange={setExporting} />
 			<DeviceUnlockDialog open={passkey} onOpenChange={setPasskey} />
 			<TurnOnTwoStepDialog

@@ -9,6 +9,7 @@ import {
 import { ARGON2ID, kdfAllowed } from "@vauly/crypto";
 import { account, session, user } from "@vauly/db/schema/auth";
 import {
+	agent,
 	invite,
 	member,
 	setting,
@@ -31,6 +32,7 @@ import { hashToken, logEvent, logEventIf, newId } from "../lib";
 import {
 	liveDevices,
 	ownTwoStepNotice,
+	signedOutNotice,
 	twoStepDeliveries,
 } from "../push/notify";
 import { deleteWorkspace, removeFromWorkspace } from "../workspace";
@@ -510,6 +512,65 @@ export const accountRouter = {
 			}
 			await deleteWorkspace(db);
 			return { workspaceDeleted: true };
+		}),
+
+	/**
+	 * For when the owner thinks sessions have leaked: ends every session but this one, the
+	 * browser extension's and the apps' included, so every token anyone copied stops
+	 * working. With `agents`, every agent goes too: their tokens hold a private key and a
+	 * secret, so turning them off isn't enough, since turning one on again would bring a
+	 * copied token back. Behind the owner's master password.
+	 */
+	signEveryoneOut: adminProcedure
+		.input(z.object({ authKey: z.string().length(64), agents: z.boolean() }))
+		.handler(async ({ context, input }) => {
+			const { db, userId } = context;
+			if (context.member.role !== "owner") {
+				throw new ORPCError("FORBIDDEN", {
+					message: "Only the workspace's owner can sign everyone out",
+				});
+			}
+			await checkAuthKey(context, input.authKey);
+			const here = context.session.session;
+			// Everyone's devices hear why, and signing out deletes their subscriptions: so
+			// they're read first.
+			const people = await db.select({ userId: member.userId }).from(member);
+			const devices = await liveDevices(
+				db,
+				people.map((person) => person.userId),
+			);
+			const signOut = db
+				.delete(session)
+				.where(ne(session.id, here.id))
+				.returning({ id: session.id });
+			const logged = logEvent(db, {
+				actorType: "member",
+				actorId: userId,
+				action: "deleted",
+				detail: input.agents ? "sessions and agents" : "sessions",
+			});
+			let ended: { id: string }[];
+			let agents = 0;
+			if (input.agents) {
+				const [sessions, removed] = await db.batch([
+					signOut,
+					db.delete(agent).returning({ id: agent.id }),
+					logged,
+				]);
+				ended = sessions;
+				agents = removed.length;
+			} else {
+				[ended] = await db.batch([signOut, logged]);
+			}
+			context.notify(
+				people.map((person) => ({
+					userId: person.userId,
+					notice: signedOutNotice(context.session.user.name),
+					exceptSession: here.id,
+					devices,
+				})),
+			);
+			return { sessions: ended.length, agents };
 		}),
 
 	renameWorkspace: adminProcedure

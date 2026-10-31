@@ -110,6 +110,13 @@ Their master password alone signs them in again. It changes nothing about encryp
 DELETE FROM setting WHERE key = 'require_two_step';
 ```
 
+## If you suspect a leak
+
+If you think someone copied a session from a device, or a copy of the database got out:
+1. **Sign everyone out.** As the owner, open **Settings › Workspace › Sign everyone out** and enter your master password. Every session but yours ends, the browser extension's and the apps' included, so a copied session token stops working. If agent tokens may have leaked too, choose **Delete every agent too**: whoever made each agent makes a new one. Everyone signs in again, with two-step login if it's on, devices with notifications on are told why, and the activity log records it. Changing `BETTER_AUTH_SECRET` isn't a substitute: on a one-click deploy without that secret, it's kept in the database too.
+2. **Change the passwords that matter.** The database holds items encrypted, so a copy of it gives away no passwords, but it lets someone guess at master passwords offline for as long as they like. Ask anyone whose master password is short or used elsewhere to change it in **Settings**, and change the most important passwords stored in vauly, at the services they belong to.
+3. **Check the rest.** Signing out doesn't end share links or invites. Turn off links you don't need on their items, and cancel invites you don't expect on the **Members** page. The activity log shows what was opened, and by whom.
+
 ## Deploying with Alchemy
 
 The repository's development stack uses [Alchemy](https://alchemy.run) (`packages/infra/alchemy.run.ts`), which can also deploy, as two Workers: one for the web app and one for the API. `bun run deploy:stack -- --stage production` does that. It needs `BETTER_AUTH_SECRET`, and `CORS_ORIGIN` set to the web app's address; the one-Worker deploy above needs neither and is the simpler choice. Either way, the API also lets in the vauly app for iPhone, from `capacitor://localhost`, without cookies ([Security](security.md#the-app-for-iphone)).
