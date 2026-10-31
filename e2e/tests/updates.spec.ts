@@ -55,6 +55,52 @@ test("an owner sees that a newer release is out, until they put it away", async 
 	await expect(box).toBeHidden();
 });
 
+test("an owner adds Update vauly to their copy on GitHub, and finds it again", async ({
+	page,
+}) => {
+	await signIn(page, owner);
+	await openUserMenu(page, owner.name);
+	await page.getByRole("menuitem", { name: "Settings" }).click();
+	const field = page.getByRole("textbox", { name: "Your copy on GitHub" });
+	const save = page
+		.locator("form")
+		.filter({ has: field })
+		.getByRole("button", { name: "Save" });
+	const add = page.getByRole("link", { name: "Add Update vauly" });
+	await expect(add).toHaveCount(0);
+
+	await field.fill("https://gitlab.example.test/acme/vauly");
+	await save.click();
+	await expect(page.getByText("Enter the repository's address")).toBeVisible();
+	await expect(add).toHaveCount(0);
+
+	await field.fill("github.com/acme/vauly.git");
+	await save.click();
+	const link = new URL((await add.getAttribute("href")) ?? "");
+	expect(link.origin + link.pathname).toBe(
+		"https://github.com/acme/vauly/new/main",
+	);
+	expect(link.searchParams.get("filename")).toBe(
+		".github/workflows/update.yml",
+	);
+	expect(link.searchParams.get("value")).toContain(
+		"uses: jotyy/vauly/.github/workflows/update.yml@main",
+	);
+	await expect(
+		page.getByRole("link", { name: "Run Update vauly" }),
+	).toHaveAttribute(
+		"href",
+		"https://github.com/acme/vauly/actions/workflows/update.yml",
+	);
+
+	// It stays on this device.
+	await page.reload();
+	await page.getByLabel("Master password").fill(owner.password);
+	await page.getByRole("button", { name: "Unlock", exact: true }).click();
+	await expect(field).toHaveValue("https://github.com/acme/vauly");
+	await expect(add).toBeVisible();
+});
+
 test("nothing shows when this copy runs the newest release", async ({
 	page,
 	request,

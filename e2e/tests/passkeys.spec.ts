@@ -1,7 +1,6 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import {
-	type Browser,
 	type BrowserContext,
 	chromium,
 	expect,
@@ -43,8 +42,8 @@ const site = "https://login.acme.test";
 let context: BrowserContext;
 let worker: Worker;
 let extensionId = "";
-/** The teammate, in a browser of their own. */
-let meiBrowser: Browser;
+/** The teammate, in a browser of their own with the extension too. */
+let meiContext: BrowserContext;
 let mei: Page;
 
 // ── The sites' servers ──────────────────────────────────────────────────────────────
@@ -237,14 +236,7 @@ test.beforeAll(async ({ request }) => {
 	execFileSync("bun", ["run", "build"], { cwd: extensionDir, stdio: "ignore" });
 	await resetWorkspace(request);
 
-	context = await chromium.launchPersistentContext("", {
-		channel: "chromium",
-		baseURL: `http://localhost:${WEB_PORT}`,
-		args: [
-			`--disable-extensions-except=${extensionPath}`,
-			`--load-extension=${extensionPath}`,
-		],
-	});
+	context = await withExtension();
 	worker =
 		context.serviceWorkers()[0] ??
 		(await context.waitForEvent("serviceworker"));
@@ -290,8 +282,8 @@ test.beforeAll(async ({ request }) => {
 		(await page.getByTestId("invite-link").textContent()) ?? ""
 	).trim();
 	await page.close();
-	meiBrowser = await chromium.launch();
-	mei = await meiBrowser.newPage({ baseURL: `http://localhost:${WEB_PORT}` });
+	meiContext = await withExtension();
+	mei = await meiContext.newPage();
 	await mei.goto(inviteUrl);
 	await mei.getByLabel("Your name").fill(teammate.name);
 	await mei.getByLabel("Master password").fill(teammate.password);
@@ -309,20 +301,39 @@ test.beforeAll(async ({ request }) => {
 	await expect(mei.getByText(`${owner.name} can open Ops`)).toBeVisible();
 	await mei.keyboard.press("Escape");
 
-	const popup = await openPopup();
-	await popup.getByLabel("vauly address").fill(`http://localhost:${WEB_PORT}`);
-	await popup.getByRole("button", { name: "Continue" }).click();
-	await popup.getByLabel("Email").fill(owner.email);
-	await popup.getByLabel("Master password").fill(owner.password);
-	await popup.getByRole("button", { name: "Sign in" }).click();
-	await expect(popup.getByRole("list", { name: "All items" })).toBeVisible();
-	await popup.close();
+	await signInExtension(context, owner);
 });
 
 test.afterAll(async () => {
 	await context?.close();
-	await meiBrowser?.close();
+	await meiContext?.close();
 });
+
+/** A browser of someone's own, with the extension. */
+function withExtension() {
+	return chromium.launchPersistentContext("", {
+		channel: "chromium",
+		baseURL: `http://localhost:${WEB_PORT}`,
+		args: [
+			`--disable-extensions-except=${extensionPath}`,
+			`--load-extension=${extensionPath}`,
+		],
+	});
+}
+
+async function signInExtension(
+	browser: BrowserContext,
+	person: { email: string; password: string },
+) {
+	const popup = await openPopup(browser);
+	await popup.getByLabel("vauly address").fill(`http://localhost:${WEB_PORT}`);
+	await popup.getByRole("button", { name: "Continue" }).click();
+	await popup.getByLabel("Email").fill(person.email);
+	await popup.getByLabel("Master password").fill(person.password);
+	await popup.getByRole("button", { name: "Sign in" }).click();
+	await expect(popup.getByRole("list", { name: "All items" })).toBeVisible();
+	await popup.close();
+}
 
 async function opsAccess() {
 	await sidebarLink(mei, "Vaults").click();
@@ -331,8 +342,8 @@ async function opsAccess() {
 	return mei.getByRole("dialog");
 }
 
-async function openPopup() {
-	const popup = await context.newPage();
+async function openPopup(browser = context) {
+	const popup = await browser.newPage();
 	await popup.goto(`chrome-extension://${extensionId}/popup.html`);
 	return popup;
 }
@@ -353,8 +364,12 @@ async function withDeviceAuthenticator(page: Page) {
 	});
 }
 
-async function openSite(email = "alex@acme.test", url = site) {
-	const page = await context.newPage();
+async function openSite(
+	email = "alex@acme.test",
+	url = site,
+	browser = context,
+) {
+	const page = await browser.newPage();
 	await page.goto(`${url}/`);
 	await page.getByLabel("Email").fill(email);
 	return page;
@@ -366,7 +381,7 @@ const passkeyWindows = () =>
 /** Clicks a button on the site, and returns the window vauly opens for it. */
 async function vaulyWindow(page: Page, button: string) {
 	const [opened] = await Promise.all([
-		context.waitForEvent("page"),
+		page.context().waitForEvent("page"),
 		page.getByRole("button", { name: button }).click(),
 	]);
 	await expect(opened).toHaveURL(/\/passkey\.html#/);
@@ -757,5 +772,23 @@ test("someone who can only view a vault signs in with its passkeys, but can't sa
 	expect(refused).toEqual({ ok: false, error: "Pick a vault you can add to." });
 	await choose(window, "Cancel");
 	await expect(result(page)).toHaveText(/^NotAllowedError/);
+	await page.close();
+});
+
+test("a teammate signs in from their own extension with a passkey someone else saved", async () => {
+	// The owner saved ops@acme.test's passkey into Ops above. Mei made Ops, and signs in
+	// to Acme's site from a browser of their own, which never saw that passkey made.
+	await meiContext.route(/^https:\/\/(login\.)?acme\.test\//, relyingParty);
+	await signInExtension(meiContext, teammate);
+	const page = await openSite("ops@acme.test", site, meiContext);
+	const window = await vaulyWindow(page, "Sign in with a passkey");
+	// Only the passkeys in vaults Mei can open, not the owner's own.
+	const passkeys = window
+		.getByRole("list", { name: "Passkeys for acme.test" })
+		.getByRole("button");
+	await expect(passkeys).toHaveCount(1);
+	await expect(passkeys).toHaveAccessibleName("Sign in as ops@acme.test");
+	await choose(window, "Sign in as ops@acme.test");
+	await expect(result(page)).toHaveText("Signed in as ops@acme.test");
 	await page.close();
 });

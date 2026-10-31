@@ -42,6 +42,23 @@ test("the landing page leads into the docs", async ({ page }) => {
 	await expect(page).toHaveURL(/\/$/);
 });
 
+test("the extension's section links to the Chrome Web Store and the docs", async ({
+	page,
+}) => {
+	await page.goto("/");
+	const section = page.locator("#extension");
+	await expect(
+		section.getByRole("link", { name: "Add to Chrome" }),
+	).toHaveAttribute(
+		"href",
+		/^https:\/\/chromewebstore\.google\.com\/detail\/[^/]+\/hjjbfdlkdnnbgaempacaeihooaopoock$/,
+	);
+	await section
+		.getByRole("link", { name: "Firefox and other browsers" })
+		.click();
+	await expect(page).toHaveURL(/\/docs\/browser-extension\/$/);
+});
+
 test("the demo encrypts what you type, in the page", async ({ page }) => {
 	await page.goto("/");
 	const name = page.getByLabel("Name", { exact: true });

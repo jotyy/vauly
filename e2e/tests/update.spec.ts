@@ -5,6 +5,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
+import {
+	UPDATE_WORKFLOW,
+	UPDATE_WORKFLOW_PATH,
+} from "../../packages/ui/src/lib/update-workflow";
+
 // The Update vauly workflow (.github/workflows/update.yml), the way a copy of vauly runs
 // it: its script, in a copy made from a stand-in for jotyy/vauly with made-up releases.
 // The stand-in has main at v0.1.0, then v0.1.1 on a release branch, and next, the
@@ -222,6 +227,24 @@ test("a copy the old workflow moved past 0.1.0 stays there too", () => {
 		"This copy has database migrations that v0.1.1 doesn't: 20261024_push.",
 	);
 	expect(git(copy, "rev-parse", "HEAD")).toBe(ours);
+});
+
+test("a copy Cloudflare made without workflows updates with the short one", () => {
+	// Cloudflare's import leaves .github/workflows out; the person adds the short
+	// workflow, which runs this script from vauly's update.yml.
+	copy = newCopy("button-copy", "v0.1.0");
+	git(copy, "rm", "-rq", ".github/workflows");
+	write(copy, { [UPDATE_WORKFLOW_PATH]: UPDATE_WORKFLOW });
+	commit(copy, "Create update.yml");
+
+	const result = update("latest");
+	expect(result.code).toBe(0);
+	expect(result.summary).toContain("Updated to vauly v0.1.1.");
+	// It runs vauly's latest, so there's nothing to say about workflows.
+	expect(result.log).not.toContain("vauly's workflows have changed");
+	expect(readFileSync(path.join(copy, UPDATE_WORKFLOW_PATH), "utf8")).toBe(
+		UPDATE_WORKFLOW,
+	);
 });
 
 test("only latest, next or a release", () => {
