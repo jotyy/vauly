@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import {
+	type GitHubCopy,
+	gitHubAddress,
+	parseGitHubCopy,
+} from "@vauly/ui/lib/update-workflow";
 import { isNewer } from "@vauly/ui/lib/version";
+import { useSyncExternalStore } from "react";
 
 import { instance } from "@/config";
 import { client } from "@/utils/orpc";
@@ -27,4 +33,40 @@ export function useNewerRelease() {
 	});
 	const newest = latest.data?.latest;
 	return newest && isNewer(newest, instance().version) ? newest : null;
+}
+
+// This vauly's copy on GitHub, when it was made with the Deploy to Cloudflare button:
+// Settings › About asks an owner or admin for it once, and keeps it on this device.
+const COPY_KEY = "vauly.githubCopy";
+const copyListeners = new Set<() => void>();
+let unsaved = "";
+
+function readCopy() {
+	try {
+		return localStorage.getItem(COPY_KEY) ?? unsaved;
+	} catch {
+		return unsaved;
+	}
+}
+
+export function setGitHubCopy(copy: GitHubCopy) {
+	unsaved = gitHubAddress(copy);
+	try {
+		localStorage.setItem(COPY_KEY, unsaved);
+	} catch {
+		// Then it lasts until the page reloads.
+	}
+	for (const listener of copyListeners) listener();
+}
+
+export function useGitHubCopy() {
+	const address = useSyncExternalStore(
+		(listener) => {
+			copyListeners.add(listener);
+			return () => copyListeners.delete(listener);
+		},
+		readCopy,
+		() => "",
+	);
+	return address ? parseGitHubCopy(address) : null;
 }
