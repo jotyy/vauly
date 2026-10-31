@@ -1,6 +1,7 @@
 import {
 	ClockIcon,
 	DotsThreeIcon,
+	FingerprintIcon,
 	PlusIcon,
 	ShieldCheckIcon,
 	TrashIcon,
@@ -23,12 +24,14 @@ import { ApprovalCard } from "@/components/approval-card";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ConnectAgentCard } from "@/components/connect-agent-card";
 import { ItemTile } from "@/components/item-tile";
+import { CheckKeyDialog, KeyBadge } from "@/components/key-dialogs";
 import { notify } from "@/components/notify";
 import { Page, SectionTitle } from "@/components/page";
 import { ago } from "@/lib/format";
 import { useLookup } from "@/lib/use-lookup";
 import {
 	type Agent,
+	agentHolder,
 	errorMessage,
 	useActions,
 	useAgents,
@@ -122,6 +125,7 @@ function Agents() {
 function AgentRow({ agent }: { agent: Agent }) {
 	const actions = useActions();
 	const [deleting, setDeleting] = useState(false);
+	const [checking, setChecking] = useState(false);
 	const expires = agent.expiresAt ? new Date(agent.expiresAt) : null;
 	const expired = expires ? expires.getTime() < Date.now() : false;
 	const daysLeft = expires
@@ -147,6 +151,7 @@ function AgentRow({ agent }: { agent: Agent }) {
 					<Badge variant="secondary">{kindLabel[agent.kind]}</Badge>
 					{expired && <Badge variant="destructive">Expired</Badge>}
 					{!agent.enabled && <Badge>Paused</Badge>}
+					<KeyBadge check={agent.key} onCheck={() => setChecking(true)} />
 				</div>
 				<span className="text-caption text-fg-subtle truncate">
 					{[
@@ -182,6 +187,14 @@ function AgentRow({ agent }: { agent: Agent }) {
 					)
 				}
 			/>
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				aria-label={`Check ${agent.name}'s key`}
+				onClick={() => setChecking(true)}
+			>
+				<FingerprintIcon />
+			</Button>
 			<DropdownMenu>
 				<DropdownMenuTrigger
 					render={
@@ -229,6 +242,14 @@ function AgentRow({ agent }: { agent: Agent }) {
 				onConfirm={() =>
 					run(actions.deleteAgent(agent.id), `Deleted ${agent.name}`)
 				}
+			/>
+			<CheckKeyDialog
+				owner={
+					checking
+						? { ...agentHolder(agent), name: agent.name, key: agent.key }
+						: null
+				}
+				onOpenChange={setChecking}
 			/>
 		</div>
 	);

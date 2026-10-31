@@ -1,6 +1,7 @@
 import {
 	CrownIcon,
 	DotsThreeIcon,
+	FingerprintIcon,
 	LinkIcon,
 	ShieldCheckIcon,
 	ShieldSlashIcon,
@@ -32,6 +33,7 @@ import {
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CheckKeyDialog, KeyBadge } from "@/components/key-dialogs";
 import {
 	GiveAccessDialog,
 	InviteLinkDialog,
@@ -43,6 +45,7 @@ import { useKeyring } from "@/lib/keyring";
 import {
 	errorMessage,
 	type Member,
+	memberHolder,
 	useActions,
 	useMembers,
 	useWorkspace,
@@ -74,6 +77,7 @@ function Members() {
 	const [removing, setRemoving] = useState<Member | null>(null);
 	const [handing, setHanding] = useState<Member | null>(null);
 	const [resetting, setResetting] = useState<Member | null>(null);
+	const [checking, setChecking] = useState<Member | null>(null);
 	const people = members.data?.members ?? [];
 	const invites = members.data?.invites ?? [];
 
@@ -161,6 +165,12 @@ function Members() {
 								<div className="flex items-center gap-2">
 									<span className="text-body-sm text-fg">{person.name}</span>
 									{isMe && <Badge variant="secondary">You</Badge>}
+									{!isMe && (
+										<KeyBadge
+											check={person.key}
+											onCheck={() => setChecking(person)}
+										/>
+									)}
 									{person.twoStep && (
 										<ShieldCheckIcon
 											role="img"
@@ -197,6 +207,18 @@ function Members() {
 							<span className="text-caption text-fg-subtle w-20 text-right">
 								{isMe ? "now" : ago(person.lastSeenAt ?? person.createdAt)}
 							</span>
+							{isMe ? (
+								<span className="size-7" />
+							) : (
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									aria-label={`Check ${person.name}'s key`}
+									onClick={() => setChecking(person)}
+								>
+									<FingerprintIcon />
+								</Button>
+							)}
 							{isAdmin && !isMe && person.role !== "owner" ? (
 								<DropdownMenu>
 									<DropdownMenuTrigger
@@ -319,6 +341,16 @@ function Members() {
 			<GiveAccessDialog
 				member={giving}
 				onOpenChange={(open) => !open && setGiving(null)}
+			/>
+			<CheckKeyDialog
+				owner={
+					checking && {
+						...memberHolder(checking),
+						name: checking.name,
+						key: checking.key,
+					}
+				}
+				onOpenChange={(open) => !open && setChecking(null)}
 			/>
 			<ConfirmDialog
 				open={Boolean(resetting)}

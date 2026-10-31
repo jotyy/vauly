@@ -319,6 +319,42 @@ const sharedSecret = await ecdh(keyPairs.ephemeral, recipientPublicKey);
 const shareInfo = `vauly/share:${recipientPublicKey}`;
 const shareKey = await hkdf(sharedSecret, shareInfo);
 
+/** A key's fingerprint: SHA-256 of the label and the key, five bytes per group of digits. */
+async function fingerprintVector(publicKey: string) {
+	const label = encoder.encode("vauly/fingerprint\n");
+	const hash = new Uint8Array(
+		await crypto.subtle.digest(
+			"SHA-256",
+			new Uint8Array([...label, ...fromB64(publicKey)]),
+		),
+	);
+	const groups = [0, 5, 10, 15, 20, 25].map((at) =>
+		(BigInt(`0x${hex(hash.subarray(at, at + 5))}`) % 100_000n)
+			.toString()
+			.padStart(5, "0"),
+	);
+	return { publicKey, hash: hex(hash), fingerprint: groups.join(" ") };
+}
+
+/** The account's key with its point compressed: the same key, in a form vauly refuses. */
+function compressedKey(publicKey: string) {
+	const spki = fromB64(publicKey);
+	const header = [
+		0x30, 0x39, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02,
+		0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03,
+		0x22, 0x00,
+	];
+	const odd = (spki[90] ?? 0) & 1;
+	return b64(new Uint8Array([...header, 2 + odd, ...spki.subarray(27, 59)]));
+}
+
+/** The account's key with one bit of y flipped: the right form, but off the curve. */
+function offCurveKey(publicKey: string) {
+	const spki = fromB64(publicKey);
+	spki[90] = (spki[90] ?? 0) ^ 1;
+	return b64(spki);
+}
+
 const nextPassword = "a new and longer passphrase";
 const nextSalt = run(0x10, 16);
 const nextKeys = await masterKeys(nextPassword, nextSalt, ARGON2ID_FLOOR);
@@ -700,6 +736,27 @@ const vectors = {
 			wrappingKey: hex(shareKey),
 			iv: b64(iv(8)),
 			wrapped: `${ephemeralPublicKey}:${await seal(shareKey, iv(8), vaultKey)}`,
+		},
+	],
+	keyFingerprint: await Promise.all(
+		[
+			account.publicKey,
+			recipientPublicKey,
+			await publicKeyOf(keyPairs.agent),
+		].map(fingerprintVector),
+	),
+	keyFingerprintRefused: [
+		{
+			why: "the same key, with its point compressed",
+			publicKey: compressedKey(account.publicKey),
+		},
+		{
+			why: "a point that isn't on the curve",
+			publicKey: offCurveKey(account.publicKey),
+		},
+		{
+			why: "the key with a byte after it",
+			publicKey: b64(new Uint8Array([...fromB64(account.publicKey), 0])),
 		},
 	],
 	linkKey: [{ key: b64(itemKey), text: base64Url(itemKey).replace(/=+$/, "") }],

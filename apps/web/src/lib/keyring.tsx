@@ -6,10 +6,11 @@ import {
 	checkedMasterKeys,
 	checkKdf,
 	createAccount,
+	KeyMismatchError,
 	kdfIsCurrent,
 	kdfOf,
 	newDataKey,
-	openPrivateKey,
+	openAccountKey,
 	open as openSealed,
 	refuseDowngrade,
 	sealJson,
@@ -50,6 +51,7 @@ import {
 	type UnlockMethod,
 	unlockWithDevice,
 } from "@/lib/device-unlock";
+import { forgetKnownKeys } from "@/lib/known-keys";
 import {
 	closeOfflineCopy,
 	forgetSnapshots,
@@ -150,6 +152,11 @@ type Keyring = {
 	lock: () => void;
 	signOut: () => Promise<void>;
 	vaultKey: (vaultId: string, wrappedKey: string) => Promise<CryptoKey>;
+	/**
+	 * While unlocked, the public key the unlocked private key belongs to, as checked when
+	 * it opened. New vault keys are wrapped to it, never to what the server says it is.
+	 */
+	ownPublicKey: () => string | null;
 	/** Checks the master password without changing anything, before a sensitive step. */
 	verifyPassword: (password: string) => Promise<boolean>;
 	changePassword: (current: string, next: string) => Promise<void>;
@@ -240,6 +247,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 	const [autoLockMinutes, setAutoLock] = useState(storedAutoLock);
 	const autoLockMs = autoLockMinutes * 60_000;
 	const privateKey = useRef<CryptoKey | null>(null);
+	const ownKey = useRef<string | null>(null);
 	const vaultKeys = useRef(new Map<string, Promise<CryptoKey>>());
 	const [deviceMethod, setDeviceMethod] = useState<UnlockMethod | null>(null);
 	useEffect(() => {
@@ -372,27 +380,33 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 	}, [loadMe, adoptSession]);
 
 	/**
-	 * Holds the unlocked private key, and opens this device's offline copy with it right
-	 * away, so the first queries can fall back on it. After an offline start, the copy
-	 * also brings back the name and email it holds.
+	 * Holds the unlocked private key, with the public key it was checked to belong to, and
+	 * opens this device's offline copy with it right away, so the first queries can fall
+	 * back on it. After an offline start, the copy also brings back the name and email it
+	 * holds.
 	 */
-	const open = useCallback((key: CryptoKey, accountId: string) => {
-		privateKey.current = key;
-		vaultKeys.current.clear();
-		openOfflineCopy(accountId, key).then((contents) => {
-			if (!contents) return;
-			setMe((current) =>
-				current?.id === accountId && !current.email
-					? { ...contents.profile, keys: current.keys }
-					: current,
-			);
-		});
-		setLastActive(Date.now());
-		setStatus("unlocked");
-	}, []);
+	const open = useCallback(
+		(key: CryptoKey, accountId: string, publicKey: string) => {
+			privateKey.current = key;
+			ownKey.current = publicKey;
+			vaultKeys.current.clear();
+			openOfflineCopy(accountId, key).then((contents) => {
+				if (!contents) return;
+				setMe((current) =>
+					current?.id === accountId && !current.email
+						? { ...contents.profile, keys: current.keys }
+						: current,
+				);
+			});
+			setLastActive(Date.now());
+			setStatus("unlocked");
+		},
+		[],
+	);
 
 	const lock = useCallback(() => {
 		privateKey.current = null;
+		ownKey.current = null;
 		vaultKeys.current.clear();
 		closeOfflineCopy();
 		queryClient.removeQueries({ queryKey: ["vault"] });
@@ -480,8 +494,9 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 					? keys
 					: await masterKeys(password, profile.keys, email);
 			open(
-				await openPrivateKey(wrapKey, profile.keys.encryptedPrivateKey),
+				await openAccountKey(wrapKey, profile.keys),
 				profile.id,
+				profile.keys.publicKey,
 			);
 			void noteKdf(email, profile.keys);
 			void upgrade(password, profile.keys);
@@ -494,8 +509,9 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			if (!me) throw new Error("Sign in first");
 			const { wrapKey } = await masterKeys(password, me.keys, me.email);
 			try {
-				open(await openPrivateKey(wrapKey, me.keys.encryptedPrivateKey), me.id);
-			} catch {
+				open(await openAccountKey(wrapKey, me.keys), me.id, me.keys.publicKey);
+			} catch (error) {
+				if (error instanceof KeyMismatchError) throw error;
 				throw new WrongPasswordError();
 			}
 			void noteKdf(me.email, me.keys);
@@ -541,7 +557,8 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			await forgetDevice(me.id);
 			throw new PasskeyUnlockError("broken");
 		}
-		open(key, me.id);
+		// The copy opened only for a private key that belongs to this public key.
+		open(key, me.id, me.keys.publicKey);
 	}, [me, deviceRecord, open, forgetDevice]);
 
 	const register = useCallback<Keyring["register"]>(
@@ -576,10 +593,23 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 				throw new Error(result.error.message ?? "Couldn't sign in");
 			await adoptSession();
 			const profile = await loadMe();
-			open(account.privateKey, profile.id);
+			open(account.privateKey, profile.id, account.keys.publicKey);
 		},
 		[loadMe, open, adoptSession],
 	);
+
+	// A key pair never changes. If the profile loads again with another public key while
+	// unlocked, lock, so nothing is wrapped to it; unlocking again checks it.
+	useEffect(() => {
+		if (!ownKey.current || !me || me.keys.publicKey === ownKey.current) return;
+		lock();
+		notify.error(
+			"vauly locked",
+			"This server now gives your account another public key than your own, so vauly locked before anything was shared with it.",
+		);
+	}, [me, lock]);
+
+	const ownPublicKey = useCallback(() => ownKey.current, []);
 
 	// Another device signed this one out, or an admin removed the person: start over.
 	const statusRef = useRef(status);
@@ -638,7 +668,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			if (!me) return false;
 			const { wrapKey } = await masterKeys(password, me.keys, me.email);
 			try {
-				await openPrivateKey(wrapKey, me.keys.encryptedPrivateKey);
+				await openSealed(wrapKey, me.keys.encryptedPrivateKey);
 				return true;
 			} catch {
 				return false;
@@ -690,6 +720,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			const { authKey } = await masterKeys(password, fresh.keys, fresh.email);
 			const result = await client.account.deleteAccount({ authKey });
 			// The account and its sessions are gone on the server; this device forgets it too.
+			await forgetKnownKeys(fresh.keys.publicKey);
 			lock();
 			sessionId.current = null;
 			setOfflineAccount(null);
@@ -865,8 +896,10 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			autoLockMinutes,
 			setAutoLockMinutes,
 			currentSessionId: () => sessionId.current,
+			ownPublicKey,
 		}),
 		[
+			ownPublicKey,
 			autoLockMs,
 			autoLockMinutes,
 			verifyPassword,

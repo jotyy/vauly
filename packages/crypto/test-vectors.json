@@ -133,6 +133,37 @@
 			"wrapped": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEg3DmlZkZXn3XR1WL4X30adQJXTn9eo27mqmr3Kx2QlSpIoWg20ylwBN7fttuE7IwoKkWqWfM48q5mwBYGHDklA==:ICEiIyQlJicoKSor.5U7rha0TTVqI8/9AUsOKkJ2ifL/iKW55gEYcwQoawa1n41LtleWm8zsGYxjA5IKQ"
 		}
 	],
+	"keyFingerprint": [
+		{
+			"publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2H/Jc9cHHNyX+72wjj166QX4dNT6gsSIGJ5517qLP2bVQbcbnFsuLNUKzkZ0yfUwUFgPnPXwhfRGdqbX8vORAA==",
+			"hash": "a6d85ad971754c8ddd3653a62004bf12564fd667615681d394bdae87f533c43c",
+			"fingerprint": "03697 39254 01791 84135 76596 64659"
+		},
+		{
+			"publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEExbYfSNvBov0AHG3aLWyxrb36V9R/5PDcGN3M6OpwimgOevlDtahMT/YsyD0bnwR1eprdG2rSfkw1zZcdgHDDQ==",
+			"hash": "8cfec37068efb7a6e3c7c33ad4537d18b3589d1cd5422fcfd0516a2d9ec2ba80",
+			"fingerprint": "42600 51559 16253 44156 63696 25634"
+		},
+		{
+			"publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5KTYsazzTlB/ZP98tKX/p0NL6fqn5ffVlc26s4ehgze3kfHPA5ZFxuoHg76WPca2oDBr3owLKyL62kxACJp7/g==",
+			"hash": "1d12605837f0b0c152f848ef9cf1302d3f373b5146c6ac388e44fedad9620c45",
+			"fingerprint": "55511 10744 85296 12593 86158 31490"
+		}
+	],
+	"keyFingerprintRefused": [
+		{
+			"why": "the same key, with its point compressed",
+			"publicKey": "MDkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDIgAC2H/Jc9cHHNyX+72wjj166QX4dNT6gsSIGJ5517qLP2Y="
+		},
+		{
+			"why": "a point that isn't on the curve",
+			"publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2H/Jc9cHHNyX+72wjj166QX4dNT6gsSIGJ5517qLP2bVQbcbnFsuLNUKzkZ0yfUwUFgPnPXwhfRGdqbX8vORAQ=="
+		},
+		{
+			"why": "the key with a byte after it",
+			"publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2H/Jc9cHHNyX+72wjj166QX4dNT6gsSIGJ5517qLP2bVQbcbnFsuLNUKzkZ0yfUwUFgPnPXwhfRGdqbX8vORAAA="
+		}
+	],
 	"linkKey": [
 		{
 			"key": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8=",

@@ -37,6 +37,8 @@ vauly --version
 vauly whoami                       # checks VAULY_SERVER and VAULY_TOKEN
 ```
 
+`vauly whoami` also prints the fingerprint of the agent's key, worked out from its token. **Check key** on the agent's row in vauly shows the fingerprint people's browsers wrap items to. If the two match, what they approve can only be opened with this token. If the server gives another key than the token's, the CLI says so and opens nothing ([Checking public keys](security.md#checking-public-keys)).
+
 The script downloads the build for your machine from the [latest release](https://github.com/jotyy/vauly/releases/latest), checks it against the release's `SHA256SUMS`, and installs it as `/usr/local/bin/vauly`, or `~/.local/bin/vauly` when `/usr/local/bin` isn't writable. Set `VAULY_VERSION=0.1.0` for a given release, or `VAULY_INSTALL_DIR` for another directory. To read the script before running it, download it first: `curl -fsSL https://vauly.app/install.sh -o install.sh`.
 
 On Windows, download `vauly-windows-x64.exe` from the release and check it with `certutil -hashfile vauly-windows-x64.exe SHA256` against `SHA256SUMS`.
