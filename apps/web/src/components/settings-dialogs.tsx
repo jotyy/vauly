@@ -657,6 +657,127 @@ function download(name: string, contents: string) {
 	setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/**
+ * The owner ends every session but this one, for when they think sessions have leaked,
+ * behind their master password. Deleting every agent too is a separate choice: they're
+ * the scripts and tools people set up, and each has to be made again.
+ */
+export function SignEveryoneOutDialog({
+	open,
+	onOpenChange,
+	onDone,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	onDone: () => void;
+}) {
+	const keyring = useKeyring();
+	const agents = useAgents();
+	const [password, setPassword] = useState("");
+	const [withAgents, setWithAgents] = useState(false);
+	const [error, setError] = useState("");
+	const [busy, setBusy] = useState(false);
+
+	useEffect(() => {
+		if (open) {
+			setPassword("");
+			setWithAgents(false);
+			setError("");
+		}
+	}, [open]);
+
+	const agentCount = agents.data?.length ?? 0;
+
+	const submit = async (event: FormEvent) => {
+		event.preventDefault();
+		setError("");
+		setBusy(true);
+		try {
+			const ended = await client.account.signEveryoneOut({
+				authKey: await keyring.authKey(password),
+				agents: withAgents,
+			});
+			onOpenChange(false);
+			notify.success(
+				"Everyone else is signed out",
+				ended.agents > 0
+					? `${plural(ended.sessions, "session")} ended, and ${plural(ended.agents, "agent")} deleted.`
+					: `${plural(ended.sessions, "session")} ended.`,
+			);
+			onDone();
+		} catch (err) {
+			setError(errorMessage(err));
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	return (
+		<FormDialog
+			open={open}
+			onOpenChange={(next) => !busy && onOpenChange(next)}
+			title="Sign everyone out?"
+			description="Every device but this one is signed out, yours too. Nothing in the vaults changes."
+			onSubmit={submit}
+			footer={
+				<>
+					<Button
+						type="button"
+						variant="ghost"
+						onClick={() => onOpenChange(false)}
+					>
+						Cancel
+					</Button>
+					<Button
+						type="submit"
+						variant="destructive"
+						disabled={busy || !password}
+					>
+						{busy ? "Signing out…" : "Sign everyone out"}
+					</Button>
+				</>
+			}
+		>
+			<ul
+				aria-label="What happens"
+				className="text-body-sm text-fg-muted flex list-disc flex-col gap-1 pl-5"
+			>
+				<li>
+					Browsers, the browser extension and the apps sign in again, with
+					two-step login if it's on. A copied session stops working.
+				</li>
+				<li>Devices with notifications on are told why.</li>
+				<li>The activity log records that you did it.</li>
+			</ul>
+			{agentCount > 0 && (
+				<div className="flex flex-col gap-1">
+					{/* biome-ignore lint/a11y/noLabelWithoutControl: the checkbox inside is the control */}
+					<label className="text-body-sm text-fg flex items-center gap-2.5">
+						<Checkbox
+							checked={withAgents}
+							onCheckedChange={(checked) => setWithAgents(checked === true)}
+						/>
+						Delete every agent too ({agentCount})
+					</label>
+					<p className="text-caption text-fg-muted pl-6.5">
+						Their tokens stop working, and whoever made them makes new ones.
+						Agents use tokens of their own, not sessions.
+					</p>
+				</div>
+			)}
+			<Field label="Master password">
+				<PasswordInput
+					required
+					autoComplete="current-password"
+					value={password}
+					onChange={(event) => setPassword(event.target.value)}
+				/>
+			</Field>
+			<FormError>{error}</FormError>
+		</FormDialog>
+	);
+}
+
 /** "Mei Chen", "Mei Chen and Sam Ortiz", "Mei Chen, Sam Ortiz and 2 others" */
 function names(people: { name: string }[]) {
 	const shown = people.slice(0, 2).map((person) => person.name);

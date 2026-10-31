@@ -19,6 +19,12 @@ import {
 import { Skeleton } from "@vauly/ui/components/skeleton";
 import { Switch } from "@vauly/ui/components/switch";
 import { Tabs, TabsList, TabsTrigger } from "@vauly/ui/components/tabs";
+import {
+	addUpdateWorkflowLink,
+	gitHubAddress,
+	parseGitHubCopy,
+	runUpdateWorkflowLink,
+} from "@vauly/ui/lib/update-workflow";
 import { useTheme } from "next-themes";
 import { type ReactNode, useState } from "react";
 
@@ -32,6 +38,7 @@ import {
 	DeleteAccountDialog,
 	DeviceUnlockDialog,
 	ExportDialog,
+	SignEveryoneOutDialog,
 } from "@/components/settings-dialogs";
 import { StylePicker } from "@/components/style-picker";
 import {
@@ -63,7 +70,13 @@ import {
 	useOfflineCopy,
 } from "@/lib/offline";
 import { pushEnabled, pushSupport, turnOffPush, turnOnPush } from "@/lib/push";
-import { RELEASES, UPDATING_DOCS, useNewerRelease } from "@/lib/updates";
+import {
+	RELEASES,
+	setGitHubCopy,
+	UPDATING_DOCS,
+	useGitHubCopy,
+	useNewerRelease,
+} from "@/lib/updates";
 import { errorMessage, useMembers, useWorkspace } from "@/lib/vault-data";
 import { client } from "@/utils/orpc";
 
@@ -88,6 +101,7 @@ function Settings() {
 	const { theme = "system", setTheme } = useTheme();
 	const [changing, setChanging] = useState(false);
 	const [deleting, setDeleting] = useState(false);
+	const [signingOut, setSigningOut] = useState(false);
 	const [exporting, setExporting] = useState(false);
 	const [twoStep, setTwoStep] = useState<"on" | "off" | null>(null);
 	const [passkey, setPasskey] = useState(false);
@@ -364,6 +378,16 @@ function Settings() {
 							/>
 						</Row>
 						<RequireTwoStep />
+						{me.role === "owner" && !instance().demo && (
+							<Row
+								label="Sign everyone out"
+								hint="If you think a device, a session or the database has leaked: every other device, the browser extension's included, signs in again."
+							>
+								<Button variant="outline" onClick={() => setSigningOut(true)}>
+									Sign everyone out…
+								</Button>
+							</Row>
+						)}
 					</Card>
 				</>
 			)}
@@ -409,6 +433,11 @@ function Settings() {
 
 			<ChangePasswordDialog open={changing} onOpenChange={setChanging} />
 			<DeleteAccountDialog open={deleting} onOpenChange={setDeleting} />
+			<SignEveryoneOutDialog
+				open={signingOut}
+				onOpenChange={setSigningOut}
+				onDone={() => queryClient.invalidateQueries()}
+			/>
 			<ExportDialog open={exporting} onOpenChange={setExporting} />
 			<DeviceUnlockDialog open={passkey} onOpenChange={setPasskey} />
 			<TurnOnTwoStepDialog
@@ -603,9 +632,11 @@ const UPDATING =
 
 /** Which vauly this is, for a bug report and for knowing whether there's a newer one. */
 function About() {
-	const { version, commit } = instance();
+	const { version, commit, demo } = instance();
 	const release = /^\d+\.\d+\.\d+$/.test(version);
 	const newer = useNewerRelease();
+	const { me } = useKeyring();
+	const canUpdate = !!me && me.role !== "member" && !demo;
 	return (
 		<Card>
 			{newer && (
@@ -645,7 +676,69 @@ function About() {
 					<ArrowSquareOutIcon className="size-3.5" />
 				</a>
 			</Row>
+			{canUpdate && <UpdateOnGitHub />}
 		</Card>
+	);
+}
+
+/**
+ * Update vauly in a copy made with the Deploy to Cloudflare button, which Cloudflare can
+ * leave without it (docs/updating.md): the copy's address on GitHub, kept on this
+ * device, gives a link that adds the workflow and one that runs it.
+ */
+function UpdateOnGitHub() {
+	const copy = useGitHubCopy();
+	const address = copy ? gitHubAddress(copy) : "";
+	return (
+		<>
+			<Row
+				label="Your copy on GitHub"
+				hint="For a vauly made with the Deploy to Cloudflare button: the repository it made for you. Kept on this device."
+			>
+				<SaveField
+					key={address}
+					label="Your copy on GitHub"
+					placeholder="github.com/you/vauly"
+					maxLength={200}
+					value={address}
+					onSave={async (value) => {
+						const parsed = parseGitHubCopy(value);
+						if (!parsed)
+							throw new Error(
+								"Enter the repository's address, such as https://github.com/you/vauly.",
+							);
+						setGitHubCopy(parsed);
+					}}
+				/>
+			</Row>
+			{copy && (
+				<Row
+					label="Update vauly in your copy"
+					hint="Run it from your copy's Actions tab. If it isn't there, Cloudflare left it out when it made your copy: Add Update vauly opens GitHub with it filled in, and you choose Commit changes."
+				>
+					<div className="flex flex-wrap items-center gap-4">
+						<a
+							href={addUpdateWorkflowLink(copy)}
+							target="_blank"
+							rel="noreferrer"
+							className="text-body-sm text-link inline-flex items-center gap-1"
+						>
+							Add Update vauly
+							<ArrowSquareOutIcon className="size-3.5" />
+						</a>
+						<a
+							href={runUpdateWorkflowLink(copy)}
+							target="_blank"
+							rel="noreferrer"
+							className="text-body-sm text-link inline-flex items-center gap-1"
+						>
+							Run Update vauly
+							<ArrowSquareOutIcon className="size-3.5" />
+						</a>
+					</div>
+				</Row>
+			)}
+		</>
 	);
 }
 
@@ -751,10 +844,14 @@ function SaveField({
 	label,
 	value,
 	onSave,
+	placeholder,
+	maxLength = 80,
 }: {
 	label: string;
 	value: string;
 	onSave: (value: string) => Promise<void>;
+	placeholder?: string;
+	maxLength?: number;
 }) {
 	const [draft, setDraft] = useState(value);
 	const [busy, setBusy] = useState(false);
@@ -780,7 +877,8 @@ function SaveField({
 				aria-label={label}
 				className="md:w-56"
 				value={draft}
-				maxLength={80}
+				placeholder={placeholder}
+				maxLength={maxLength}
 				onChange={(event) => setDraft(event.target.value)}
 			/>
 			<Button

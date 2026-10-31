@@ -1,4 +1,5 @@
 import { describeDevice } from "@vauly/api/device";
+import { purgeFiles } from "@vauly/api/file-chunks";
 import { type Delivery, notify, signInNotice } from "@vauly/api/push/notify";
 import { createAuth as createConfiguredAuth } from "@vauly/auth";
 import { createDb, type Database } from "@vauly/db";
@@ -49,6 +50,27 @@ async function storedSecret(db: Database) {
 		.where(eq(setting.key, "auth_secret"));
 	if (!row) throw new Error("No auth secret in the database");
 	return row.value;
+}
+
+let purgedAt = 0;
+
+/**
+ * Deletes the R2 objects of files that are gone, after the response, at most once a minute
+ * in each Worker instance. Without a bucket there's nothing to delete. A failure is
+ * logged, and what it left is tried again next time.
+ */
+export function purgeFilesLater(
+	waitUntil: (promise: Promise<unknown>) => void,
+) {
+	const bucket = ENV.FILES;
+	const now = Date.now();
+	if (!bucket || now - purgedAt < 60_000) return;
+	purgedAt = now;
+	waitUntil(
+		purgeFiles(getDb(), bucket).catch((error) => {
+			console.error(error);
+		}),
+	);
 }
 
 /**

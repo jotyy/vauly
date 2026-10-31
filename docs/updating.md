@@ -18,7 +18,7 @@ New versions of vauly are [releases on GitHub](https://github.com/jotyy/vauly/re
   - `wrangler.jsonc`, which names your Worker and its database. When an update needs a change there, the notes below say so.
   - `.github/workflows`, which GitHub's default token can't change. To let updates replace the workflows too, add a repository secret named `VAULY_UPDATE_TOKEN`: a fine-grained token for that repository with read and write access to Contents and Workflows.
 
-If the run says "Updated to jotyy/vauly@…" with no version, your copy still has the workflow from before releases. See [Copies whose Update vauly takes main](#copies-whose-update-vauly-takes-main).
+No **Update vauly** in your copy's Actions tab? See [A copy without Update vauly](#a-copy-without-update-vauly). If the run says "Updated to jotyy/vauly@…" with no version, your copy still has the workflow from before releases. See [Copies whose Update vauly takes main](#copies-whose-update-vauly-takes-main).
 
 **Deployed from your machine:** check out the [latest release](https://github.com/jotyy/vauly/releases/latest), for example `v0.3.1`, then build and deploy:
 
@@ -32,9 +32,44 @@ bun run deploy
 
 Either way, the Worker updates the database itself on its first request after the deploy. It applies each migration it's missing, once and in order.
 
+### A copy without Update vauly
+
+Cloudflare makes your copy with a token that can't add GitHub workflows, so a copy made with the button can have no `.github/workflows` at all, and no **Update vauly** in its Actions tab. Add it once, in one step:
+- **From vauly:** as an owner or admin, enter your copy's address on GitHub in **Settings › About** and choose **Add Update vauly**. GitHub opens a new file, `.github/workflows/update.yml`, with the workflow filled in. Choose **Commit changes**.
+- **By hand:** in your copy on GitHub, choose **Add file → Create new file**, name it `.github/workflows/update.yml`, paste this and commit it:
+
+```yaml
+name: Update vauly
+
+# Replaces this copy's files with a release of vauly, the latest one unless you name
+# another. vauly's own update.yml does the work: https://vauly.app/docs/updating/
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "latest, a release such as v0.3.1, or next (not released yet)"
+        required: true
+        default: latest
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    uses: jotyy/vauly/.github/workflows/update.yml@main
+    with:
+      version: ${{ inputs.version }}
+    secrets:
+      VAULY_UPDATE_TOKEN: ${{ secrets.VAULY_UPDATE_TOKEN }}
+```
+
+Then **Actions → Update vauly → Run workflow** is there, and works as above. This short workflow runs [vauly's update.yml](https://github.com/jotyy/vauly/blob/main/.github/workflows/update.yml) as it is in the latest release, so you never need to update it. It passes on only `VAULY_UPDATE_TOKEN`, if you add one, and none of your other secrets.
+
 ### Update the workflows
 
-A copy keeps its own `.github/workflows` unless it has `VAULY_UPDATE_TOKEN`. When vauly's workflows change, the **Update vauly** run says so. To update a workflow by hand:
+A copy keeps its own `.github/workflows` unless it has `VAULY_UPDATE_TOKEN`. When vauly's workflows change, the **Update vauly** run says so, unless your copy has the short **Update vauly** from [A copy without Update vauly](#a-copy-without-update-vauly), which always runs vauly's latest. To update a workflow by hand:
 1. Open the file in your copy on GitHub, for example `.github/workflows/update.yml`, and choose **Edit**.
 2. Replace its contents with the same file in vauly, for example [update.yml](https://github.com/jotyy/vauly/blob/main/.github/workflows/update.yml).
 3. Commit.

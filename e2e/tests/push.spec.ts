@@ -586,3 +586,34 @@ test("a sign-in that fails its two-step check tells nobody", async () => {
 	await laptop.page.waitForTimeout(1000);
 	expect(pushesTo(laptop)).toHaveLength(before + 1);
 });
+
+test("the owner signing everyone out tells the devices why", async () => {
+	await turnOn(phone);
+	const phoneBefore = pushesTo(phone).length;
+	const laptopBefore = pushesTo(laptop).length;
+
+	await laptop.page
+		.getByRole("navigation")
+		.getByRole("link", { name: "Overview" })
+		.click();
+	await openSettings(laptop.page);
+	await laptop.page.getByRole("button", { name: "Sign everyone out…" }).click();
+	const dialog = laptop.page.getByRole("dialog");
+	await dialog.getByLabel("Master password").fill(owner.password);
+	await dialog.getByRole("button", { name: "Sign everyone out" }).click();
+	await expect(dialog).toBeHidden();
+
+	// The phone heard why, though it's signed out now; the laptop, which did it, didn't.
+	await expect.poll(() => pushesTo(phone).length).toBe(phoneBefore + 1);
+	const { notice } = await read(
+		phone,
+		pushesTo(phone).at(-1) as Received,
+		await serverKey(laptop.page),
+	);
+	expect(notice.title).toBe("vauly signed you out");
+	expect(notice.body).toBe(
+		`${owner.name} signed everyone out of the workspace. Sign in again; nothing in your vaults changed.`,
+	);
+	await laptop.page.waitForTimeout(1000);
+	expect(pushesTo(laptop)).toHaveLength(laptopBefore);
+});

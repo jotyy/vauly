@@ -145,3 +145,28 @@ describe("two-step login", () => {
 		);
 	});
 });
+
+describe("signing everyone out", () => {
+	const verb = (detail: string) =>
+		describeEvent(
+			{
+				id: "evt_3",
+				action: "deleted",
+				actorName: "Alex",
+				detail,
+			} as VaultEvent,
+			{
+				items: new Map(),
+				vaults: new Map(),
+				agents: new Map(),
+				members: new Map(),
+			},
+		).verb;
+
+	test("says whether the agents went too", () => {
+		expect(verb("sessions")).toBe("signed everyone out");
+		expect(verb("sessions and agents")).toBe(
+			"signed everyone out and deleted every agent",
+		);
+	});
+});

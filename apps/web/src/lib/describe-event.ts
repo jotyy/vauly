@@ -70,6 +70,9 @@ export function describeEvent(
 			if (event.itemId) return parts("deleted", itemName);
 			if (event.detail?.startsWith("agent "))
 				return parts("deleted the agent", event.detail.slice(6));
+			if (event.detail === "sessions") return parts("signed everyone out");
+			if (event.detail === "sessions and agents")
+				return parts("signed everyone out and deleted every agent");
 			return parts("deleted a vault");
 		case "revealed":
 			return parts(`revealed ${field(event.detail, item)} of`, itemName);

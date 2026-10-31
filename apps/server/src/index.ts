@@ -13,10 +13,15 @@ import { logger } from "hono/logger";
 
 import { createContext } from "./context";
 import { demoGuard, isDemo, mountDemo, restore } from "./demo";
-import { resetDatabase, swapPublicKey } from "./e2e-reset";
+import {
+	emptyBucket,
+	listFiles,
+	resetDatabase,
+	swapPublicKey,
+} from "./e2e-reset";
 import { ENV } from "./env.server";
 
-import { createAuth, getDb, prepare } from "./services";
+import { createAuth, getDb, prepare, purgeFilesLater } from "./services";
 
 const app = new Hono();
 
@@ -92,7 +97,17 @@ if (ENV.E2E_RESET_TOKEN) {
 		}
 		await prepare();
 		await resetDatabase(getDb());
+		if (ENV.FILES) await emptyBucket(ENV.FILES);
 		return c.text("OK");
+	});
+	// Whether files go to R2 here, and the objects it holds once those of files that are
+	// gone are deleted: what the files tests check about storage.
+	app.post("/__e2e/files", async (c) => {
+		if (c.req.header("x-reset-token") !== ENV.E2E_RESET_TOKEN) {
+			return c.text("Forbidden", 403);
+		}
+		await prepare();
+		return c.json(await listFiles(getDb(), ENV.FILES));
 	});
 	// What GitHub would answer about the newest release, which the e2e stack never asks.
 	app.post("/__e2e/latest-release", async (c) => {
@@ -154,6 +169,9 @@ app.use("/*", async (c, next) => {
 			ownOrigins(c.req.url, ENV.CORS_ORIGIN, ENV.BETTER_AUTH_URL),
 		),
 	});
+
+	// The context has readied the database, so the files left to delete can be read.
+	purgeFilesLater((promise) => c.executionCtx.waitUntil(promise));
 
 	const rpcResult = await rpcHandler.handle(c.req.raw, {
 		prefix: "/rpc",

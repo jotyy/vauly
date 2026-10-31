@@ -165,6 +165,8 @@ type Keyring = {
 	 * everything about it on this device. True when the whole workspace went with it.
 	 */
 	deleteAccount: (password: string) => Promise<{ workspaceDeleted: boolean }>;
+	/** The auth key from the master password, for a step the server guards with it. */
+	authKey: (password: string) => Promise<string>;
 	rename: (name: string) => Promise<void>;
 	/** Loads the profile again, after something about the account changed. */
 	reloadMe: () => Promise<void>;
@@ -738,6 +740,16 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 		[me, lock, forgetDevice, loadMe],
 	);
 
+	const authKey = useCallback(
+		async (password: string) => {
+			if (!me) throw new Error("Sign in first");
+			// Fresh settings: another device may have changed the master password.
+			const fresh = await loadMe();
+			return (await masterKeys(password, fresh.keys, fresh.email)).authKey;
+		},
+		[me, loadMe],
+	);
+
 	const startDeviceUnlock = useCallback(
 		async (password: string): Promise<Enrolment> => {
 			if (!me) throw new Error("Sign in first");
@@ -878,6 +890,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			verifyPassword,
 			changePassword,
 			deleteAccount,
+			authKey,
 			rename,
 			reloadMe,
 			autoLockMinutes,
@@ -892,6 +905,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			verifyPassword,
 			changePassword,
 			deleteAccount,
+			authKey,
 			rename,
 			reloadMe,
 			setAutoLockMinutes,

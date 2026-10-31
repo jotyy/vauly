@@ -5,7 +5,6 @@ import {
 	agent,
 	agentGrant,
 	attachment,
-	attachmentChunk,
 	item,
 	member,
 	vaultAccess,
@@ -13,6 +12,7 @@ import {
 import { and, eq, gt, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 
+import { getChunk } from "../file-chunks";
 import { readPass, signPass } from "../file-pass";
 import { publicProcedure } from "../index";
 import { hashToken, logEvent, newId } from "../lib";
@@ -426,17 +426,17 @@ export const agentApiRouter = {
 			if (!grant || !standing) throw expired;
 			const [row] = await db
 				.select({
-					data: attachmentChunk.data,
+					id: attachment.id,
+					chunks: attachment.chunks,
+					storedIn: attachment.storedIn,
 					itemId: attachment.itemId,
 					vaultId: item.vaultId,
 				})
-				.from(attachmentChunk)
-				.innerJoin(attachment, eq(attachment.id, attachmentChunk.attachmentId))
+				.from(attachment)
 				.innerJoin(item, eq(item.id, attachment.itemId))
 				.where(
 					and(
-						eq(attachmentChunk.attachmentId, pass.fileId),
-						eq(attachmentChunk.index, input.index),
+						eq(attachment.id, pass.fileId),
 						eq(attachment.itemId, grant.itemId),
 						isNotNull(attachment.meta),
 						lte(attachment.createdAt, grant.filesThrough ?? new Date(0)),
@@ -451,7 +451,12 @@ export const agentApiRouter = {
 						),
 					),
 				);
-			if (!row) throw new ORPCError("NOT_FOUND", { message: "File not found" });
+			const notFound = new ORPCError("NOT_FOUND", {
+				message: "File not found",
+			});
+			if (!row) throw notFound;
+			const data = await getChunk(db, context.bucket, row, input.index);
+			if (data === undefined) throw notFound;
 			if (input.index === 0) {
 				await logEvent(db, {
 					actorType: "agent",
@@ -462,7 +467,7 @@ export const agentApiRouter = {
 					detail: `file:${pass.fileId}`,
 				});
 			}
-			return { data: row.data };
+			return { data };
 		}),
 
 	poll: agentProcedure

@@ -192,6 +192,11 @@ export const attachment = sqliteTable(
 		meta: text("meta"),
 		size: integer("size").notNull(),
 		chunks: integer("chunks").notNull(),
+		/**
+		 * Where its chunks are: rows of `attachment_chunk`, or objects in the R2 bucket bound
+		 * as FILES, which uploads use once there is one. Files from before stay in D1.
+		 */
+		storedIn: text("stored_in").$type<"d1" | "r2">().notNull().default("d1"),
 		createdBy: text("created_by").notNull(),
 		createdAt: createdAt(),
 	},
@@ -199,9 +204,21 @@ export const attachment = sqliteTable(
 );
 
 /**
+ * Files kept in R2 that are gone from the database, whose objects are still to be
+ * deleted. A trigger on `attachment` adds them, so every cascade that deletes a file is
+ * covered; the Worker deletes the objects later (packages/api/src/file-chunks.ts).
+ */
+export const filePurge = sqliteTable("file_purge", {
+	attachmentId: text("attachment_id").primaryKey(),
+	chunks: integer("chunks").notNull(),
+	createdAt: createdAt(),
+});
+
+/**
  * A file's contents, a chunk a row, sealed with the file key. It's base64 text rather
  * than a BLOB because D1 hands a BLOB back as an array of numbers, which costs a Worker
- * more CPU to read than the free plan gives a request.
+ * more CPU to read than the free plan gives a request. In R2 a chunk is an object named
+ * `files/<file ID>/<index>` holding the same text.
  */
 export const attachmentChunk = sqliteTable(
 	"attachment_chunk",

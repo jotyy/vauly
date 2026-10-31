@@ -1,18 +1,20 @@
 import { ORPCError } from "@orpc/server";
 import { fileChunks, sealedChunkLength } from "@vauly/crypto";
 import type { Database } from "@vauly/db";
-import { attachment, attachmentChunk, item } from "@vauly/db/schema/vault";
-import { and, count, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
+import { attachment, item } from "@vauly/db/schema/vault";
+import { and, eq, inArray, isNotNull, sql, sum } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Context } from "../context";
+import { getChunk, putChunk, storedChunks } from "../file-chunks";
 import { clearStaleUploads, isBase64, reserveUpload } from "../file-store";
 import { memberProcedure } from "../index";
 import { logEvent, myVaultIds, newId, requireItemAccess } from "../lib";
 
 // Files attached to items, encrypted on the device (packages/crypto, "Files"). An upload
 // is create, a put for each chunk, then finish, which stores the sealed name and key and
-// makes the file show up. The server checks sizes and roles; it can't read a file.
+// makes the file show up. The server checks sizes and roles; it can't read a file. Its
+// chunks go to the R2 bucket when one is bound, and to D1 otherwise (file-chunks.ts).
 
 const fileId = z.string().regex(/^att_[0-9a-z]{12}$/);
 const meta = z.string().min(20).max(4_000);
@@ -97,7 +99,7 @@ export const filesRouter = {
 			}),
 		)
 		.handler(async ({ context, input }) => {
-			const { db, userId, files } = context;
+			const { db, userId, files, bucket } = context;
 			const owner = await requireItemAccess(db, userId, input.itemId, {
 				role: "edit",
 			});
@@ -124,6 +126,7 @@ export const filesRouter = {
 						itemId: owner.id,
 						size: input.size,
 						chunks: input.chunks,
+						storedIn: bucket ? "r2" : "d1",
 						createdBy: userId,
 					},
 					files.maxTotalBytes,
@@ -161,13 +164,7 @@ export const filesRouter = {
 			) {
 				throw new ORPCError("BAD_REQUEST", { message: "Wrong chunk" });
 			}
-			await context.db
-				.insert(attachmentChunk)
-				.values({ attachmentId: file.id, index: input.index, data: input.data })
-				.onConflictDoUpdate({
-					target: [attachmentChunk.attachmentId, attachmentChunk.index],
-					set: { data: input.data },
-				});
+			await putChunk(context.db, context.bucket, file, input.index, input.data);
 		}),
 
 	/** Drops an upload that didn't finish, so its room is free again. Only its uploader can. */
@@ -196,11 +193,7 @@ export const filesRouter = {
 			if (file.createdBy !== userId) {
 				throw new ORPCError("NOT_FOUND", { message: "File not found" });
 			}
-			const [stored] = await db
-				.select({ chunks: count() })
-				.from(attachmentChunk)
-				.where(eq(attachmentChunk.attachmentId, file.id));
-			if (stored?.chunks !== file.chunks) {
+			if ((await storedChunks(db, context.bucket, file)) !== file.chunks) {
 				throw new ORPCError("BAD_REQUEST", {
 					message: "Part of the file is missing. Try again.",
 				});
@@ -232,16 +225,10 @@ export const filesRouter = {
 		.handler(async ({ context, input }) => {
 			const { db, userId } = context;
 			const { file, item: owner } = await requireFile(context, input.id);
-			const [row] = await db
-				.select({ data: attachmentChunk.data })
-				.from(attachmentChunk)
-				.where(
-					and(
-						eq(attachmentChunk.attachmentId, file.id),
-						eq(attachmentChunk.index, input.index),
-					),
-				);
-			if (!row) throw new ORPCError("NOT_FOUND", { message: "File not found" });
+			const data = await getChunk(db, context.bucket, file, input.index);
+			if (data === undefined) {
+				throw new ORPCError("NOT_FOUND", { message: "File not found" });
+			}
 			if (input.index === 0) {
 				await logEvent(db, {
 					actorType: "member",
@@ -252,7 +239,7 @@ export const filesRouter = {
 					detail: `file:${file.id}`,
 				});
 			}
-			return { data: row.data };
+			return { data };
 		}),
 
 	/** A new name is a new `meta`, sealed on the device; the contents stay as they are. */

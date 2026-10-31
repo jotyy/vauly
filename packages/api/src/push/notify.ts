@@ -418,6 +418,20 @@ export function ownTwoStepNotice(device: string, userId: string): Notice {
 	};
 }
 
+/**
+ * What the owner signing everyone out tells the devices it signed out, theirs included:
+ * why, so nobody takes it for something wrong with their own account.
+ */
+export function signedOutNotice(owner: string): Notice {
+	return {
+		title: "vauly signed you out",
+		body: `${owner} signed everyone out of the workspace. Sign in again; nothing in your vaults changed.`,
+		url: "/",
+		tag: "signed-out",
+		ttl: 24 * 60 * 60,
+	};
+}
+
 /** What a new sign-in, as `sessionId`, tells the account's other devices. */
 export function signInNotice(device: string, sessionId: string): Notice {
 	return {

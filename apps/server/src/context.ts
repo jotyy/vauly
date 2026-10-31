@@ -56,6 +56,7 @@ export async function createContext({
 		secret: await prepare(),
 		setupCode: ENV.SETUP_CODE || undefined,
 		files: fileLimits(),
+		bucket: ENV.FILES,
 		notify: notifier(origin, db, waitUntil),
 		localPush: Boolean(ENV.E2E_RESET_TOKEN),
 		// The demo is ours to update; UPDATE_CHECK=off stops the check anywhere else. Local
