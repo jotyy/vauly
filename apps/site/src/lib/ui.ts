@@ -35,3 +35,7 @@ export const DEPLOY_URL = `https://deploy.workers.cloudflare.com/?url=${REPOSITO
 
 /** A vauly anyone can sign in to, with an example team that comes back every hour. */
 export const DEMO_URL = "https://demo.vauly.app";
+
+/** The browser extension on the Chrome Web Store, as in apps/web/src/lib/extension.ts. */
+export const EXTENSION_STORE =
+	"https://chromewebstore.google.com/detail/vauly-password-manager-fo/hjjbfdlkdnnbgaempacaeihooaopoock";
