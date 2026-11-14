@@ -20,7 +20,7 @@
 		"@vauly/ui": "workspace:*",
 		"@phosphor-icons/core": "2.1.1",
 		"@tailwindcss/vite": "^4.3.3",
-		"astro": "7.4.2",
+		"astro": "7.4.7",
 		"preact": "11.0.1",
 		"simple-icons": "16.35.0",
 		"tailwindcss": "catalog:"
