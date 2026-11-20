@@ -23,4 +23,5 @@ CREATE TABLE `proposal_rule` (
 	CONSTRAINT `fk_proposal_rule_vault_id_vault_id_fk` FOREIGN KEY (`vault_id`) REFERENCES `vault`(`id`) ON DELETE CASCADE
 );
 --> statement-breakpoint
+ALTER TABLE `agent` ADD `rule_generation` integer DEFAULT 0 NOT NULL;--> statement-breakpoint
 CREATE INDEX `proposal_agent_idx` ON `proposal` (`agent_id`,`status`);

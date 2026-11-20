@@ -175,6 +175,7 @@ describe("proposal rules", () => {
 			agentId: "agt_one",
 			agentPublicKey: "made-up-public-key",
 			vaultId: "vlt_one",
+			generation: 3,
 		};
 		const sealed = await sealProposalRule(vaultKey, rule);
 		expect(

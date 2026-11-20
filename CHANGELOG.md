@@ -7,7 +7,7 @@ Notable changes to vauly. The format follows [Keep a Changelog](https://keepacha
 ### Added
 
 - **Agents can put secrets into vauly without seeing them.** `vauly put acme/production --env-file .env.production` reads the values on the agent's machine, seals them so only the agent's owner can open them, and proposes them. The proposal shows up in **Needs you** with each key marked new or changed and its value masked until revealed; **Accept** saves it, sealed with the vault's keys, and **Decline** discards it. The server stores only ciphertext: neither the values nor the key names. See [Agents and scripts](docs/agents.md#move-a-projects-secrets-into-vauly).
-- **Accept proposals from an agent into a vault without asking.** While vauly is unlocked in your browser, it accepts that agent's proposals into that vault as they arrive. Turn it off from the agent's menu on **Agents**.
+- **Accept proposals from an agent into a vault without asking.** While vauly is unlocked in your browser, it accepts that agent's proposals into that vault as they arrive. Turn it off from the agent's menu on **Agents**. Pausing the agent turns it off too, and drops its waiting proposals. A proposal nobody answers expires after a week, and an agent may make 200 a day.
 - **Environment items**: one app's secrets in one item, such as `acme/production`, each a hidden field named after its variable. The item shows them as a table, with **Copy references** for `KEY=vauly://itm_…/fields/KEY` lines to commit in place of the values.
 - `vauly refs <item>` prints those lines, and `vauly ls` lists the items an agent may use with their fields' names. Neither prints a value.
 - `vauly mcp` has three more tools: `propose_secrets`, `list_fields` and `list_items`. None returns a value.

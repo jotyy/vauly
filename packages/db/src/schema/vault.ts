@@ -247,6 +247,11 @@ export const agent = sqliteTable("agent", {
 	lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }),
 	/** When its requests last sent notifications: at most once every few minutes. */
 	notifiedAt: integer("notified_at", { mode: "timestamp_ms" }),
+	/**
+	 * The generation a rule accepting its proposals must carry, sealed: raised each time
+	 * one is set or removed, so a removed rule put back doesn't apply again.
+	 */
+	ruleGeneration: integer("rule_generation").notNull().default(0),
 	createdAt: createdAt(),
 });
 
@@ -312,7 +317,8 @@ export const accessRequest = sqliteTable(
 	(table) => [index("access_request_status_idx").on(table.status)],
 );
 
-export type ProposalStatus = "pending" | "accepted" | "declined";
+/** `expired`: nobody answered it within a week; its sealed values are gone. */
+export type ProposalStatus = "pending" | "accepted" | "declined" | "expired";
 
 /**
  * Values an agent proposes for its owner to accept: a new item, or new and changed fields

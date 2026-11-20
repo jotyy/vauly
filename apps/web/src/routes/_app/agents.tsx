@@ -26,7 +26,7 @@ import { ConnectAgentCard } from "@/components/connect-agent-card";
 import { ItemTile } from "@/components/item-tile";
 import { notify } from "@/components/notify";
 import { Page, SectionTitle } from "@/components/page";
-import { ProposalCard } from "@/components/proposal-card";
+import { ProposalCards } from "@/components/proposal-card";
 import { ago } from "@/lib/format";
 import { useProposalActions, useProposals } from "@/lib/proposals";
 import { useLookup } from "@/lib/use-lookup";
@@ -51,9 +51,10 @@ function Agents() {
 	const lookup = useLookup();
 	const [creating, setCreating] = useState(false);
 	const pending = requests.data ?? [];
-	const { proposals, rules } = useProposals();
+	const proposals = useProposals();
 	const list = agents.data ?? [];
-	const waiting = pending.length + proposals.length;
+	const waiting =
+		pending.length + proposals.proposals.length + proposals.unreadable.length;
 
 	return (
 		<Page
@@ -80,13 +81,7 @@ function Agents() {
 						</div>
 					) : (
 						<div className="mb-8 flex flex-col gap-3">
-							{proposals.map((opened) => (
-								<ProposalCard
-									key={opened.id}
-									opened={opened}
-									rule={rules.find((rule) => rule.agentId === opened.agentId)}
-								/>
-							))}
+							<ProposalCards proposals={proposals} />
 							{pending.map((request) => (
 								<ApprovalCard
 									key={request.id}
@@ -134,7 +129,8 @@ function Agents() {
 function AgentRow({ agent }: { agent: Agent }) {
 	const actions = useActions();
 	const proposalActions = useProposalActions();
-	const rule = useProposals().rules.find((r) => r.agentId === agent.id);
+	const { rules, generations } = useProposals();
+	const rule = rules.find((r) => r.agentId === agent.id);
 	const [deleting, setDeleting] = useState(false);
 	const expires = agent.expiresAt ? new Date(agent.expiresAt) : null;
 	const expired = expires ? expires.getTime() < Date.now() : false;
@@ -230,7 +226,10 @@ function AgentRow({ agent }: { agent: Agent }) {
 						<DropdownMenuItem
 							onClick={() =>
 								run(
-									proposalActions.removeRule(agent.id),
+									proposalActions.removeRule(
+										agent.id,
+										generations.get(agent.id) ?? 0,
+									),
 									`${agent.name}'s proposals wait for you again`,
 								)
 							}

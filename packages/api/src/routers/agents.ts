@@ -17,6 +17,7 @@ import {
 	requireAgentFor,
 	requireItemAccess,
 } from "../lib";
+import { dropProposals } from "./proposals";
 
 const wrapped = z.string().min(40).max(1_000);
 const HOUR = 60 * 60 * 1000;
@@ -188,15 +189,19 @@ export const agentsRouter = {
 				current.expiresAt?.getTime() ?? Date.now(),
 				Date.now(),
 			);
-			await db
-				.update(agent)
-				.set({
-					...(input.enabled === undefined ? {} : { enabled: input.enabled }),
-					...(input.extendDays
-						? { expiresAt: new Date(base + input.extendDays * 24 * HOUR) }
-						: {}),
-				})
-				.where(eq(agent.id, input.id));
+			await db.batch([
+				db
+					.update(agent)
+					.set({
+						...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+						...(input.extendDays
+							? { expiresAt: new Date(base + input.extendDays * 24 * HOUR) }
+							: {}),
+					})
+					.where(eq(agent.id, input.id)),
+				// A paused agent's proposals go, and so does any rule letting them in.
+				...(input.enabled === false ? dropProposals(db, input.id) : []),
+			]);
 		}),
 
 	remove: memberProcedure

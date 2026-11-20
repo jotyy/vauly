@@ -21,6 +21,7 @@ import {
 	propose,
 	referenceLines,
 	variableFor,
+	waitForAnswer,
 } from "./write";
 
 // vauly put, refs and ls, and their MCP tools, against a stand-in server with real
@@ -211,6 +212,75 @@ describe("collecting values", () => {
 	});
 });
 
+describe("vauly's own settings", () => {
+	test("are never proposed, from anywhere", () => {
+		const env = { VAULY_TOKEN: "made-up-token-value", VAULY_SERVER: "x" };
+		expect(() => collectValues({ fromEnv: ["VAULY_TOKEN"], env })).toThrow(
+			"vauly's own setting",
+		);
+		expect(() => collectValues({ fromEnv: ["vauly_server"], env })).toThrow(
+			"vauly's own setting",
+		);
+		expect(() =>
+			collectValues({ text: "A=made-up-a", keys: ["VAULY_TOKEN"] }),
+		).toThrow("vauly's own setting");
+		expect(
+			collectValues({
+				text: "VAULY_TOKEN=made-up-token-value\nKEEP=made-up-keep",
+			}),
+		).toEqual([{ label: "KEEP", value: "made-up-keep" }]);
+	});
+
+	test("propose_secrets refuses them, and leaks nothing", async () => {
+		const token = context.env.VAULY_TOKEN as string;
+		for (const variables of [["VAULY_TOKEN"], ["FROM_SHELL", "VAULY_SERVER"]]) {
+			const answer = await handle(
+				{
+					jsonrpc: "2.0",
+					id: 1,
+					method: "tools/call",
+					params: {
+						name: "propose_secrets",
+						arguments: { item: "acme/other", variables },
+					},
+				},
+				context,
+			);
+			const output = JSON.stringify(answer);
+			expect(output).toContain("vauly's own setting");
+			expect(output).not.toContain(token);
+			expect(output).not.toContain("made-up-shell-value");
+		}
+	});
+
+	test("vauly put --from-env refuses them", async () => {
+		const child = Bun.spawn(
+			[
+				"bun",
+				join(import.meta.dir, "index.ts"),
+				"put",
+				"acme/other",
+				"--from-env",
+				"VAULY_TOKEN",
+			],
+			{
+				cwd: project,
+				env: { ...process.env, ...context.env } as Record<string, string>,
+				stdout: "pipe",
+				stderr: "pipe",
+			},
+		);
+		const [stdout, stderr, status] = await Promise.all([
+			new Response(child.stdout).text(),
+			new Response(child.stderr).text(),
+			child.exited,
+		]);
+		expect(status).toBe(1);
+		expect(stderr).toContain("vauly's own setting");
+		expect(stdout + stderr).not.toContain(context.env.VAULY_TOKEN as string);
+	}, 30_000);
+});
+
 describe("proposing", () => {
 	test("sends sealed values only its owner opens", async () => {
 		received.length = 0;
@@ -238,6 +308,16 @@ describe("proposing", () => {
 		expect(opened.fields).toEqual(
 			FIELDS.map(({ label, value }) => ({ label, value })),
 		);
+	});
+
+	test("waiting ends when a proposal expires", async () => {
+		const sent = await propose(config(context.env), "acme/late", [
+			{ label: "LATE", value: "made-up-late" },
+		]);
+		answers.set(sent.id, { status: "expired", itemId: null });
+		await expect(
+			waitForAnswer(config(context.env), sent.id, 5_000, 10),
+		).rejects.toThrow("expired");
 	});
 
 	test("an item this agent may use, named, gets the change", async () => {

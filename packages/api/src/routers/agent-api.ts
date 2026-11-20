@@ -26,11 +26,14 @@ import { getChunk } from "../file-chunks";
 import { readPass, signPass } from "../file-pass";
 import { publicProcedure } from "../index";
 import { hashToken, logEvent, newId } from "../lib";
+import {
+	DAILY_PROPOSALS,
+	expireStale,
+	MAX_PENDING_PROPOSALS,
+} from "../proposal-terms";
 import { approvalDeliveries, proposalDeliveries } from "../push/notify";
 
 const DENIAL_COOLDOWN = 10 * 60 * 1000;
-/** Proposals an agent may have waiting at once, so it can't bury its owner in them. */
-const MAX_PENDING_PROPOSALS = 20;
 const proposalId = z.string().regex(/^prp_[0-9a-z]{16,40}$/);
 
 function sameHash(a: string, b: string) {
@@ -387,6 +390,21 @@ export const agentApiRouter = {
 				}
 				vaultId = entry.target.vaultId;
 			}
+			await expireStale(db, [me.id]);
+			const [today] = await db
+				.select({ n: count() })
+				.from(proposal)
+				.where(
+					and(
+						eq(proposal.agentId, me.id),
+						gt(proposal.createdAt, new Date(Date.now() - 24 * 60 * 60 * 1000)),
+					),
+				);
+			if ((today?.n ?? 0) >= DAILY_PROPOSALS) {
+				throw new ORPCError("TOO_MANY_REQUESTS", {
+					message: `This agent made ${DAILY_PROPOSALS} proposals in the last day. Try again tomorrow.`,
+				});
+			}
 			const [waiting] = await db
 				.select({ n: count() })
 				.from(proposal)
@@ -432,8 +450,9 @@ export const agentApiRouter = {
 	/** Whether its owner answered its proposals, and with which item. */
 	proposals: agentProcedure
 		.input(z.object({ ids: z.array(proposalId).min(1).max(20) }))
-		.handler(({ context, input }) =>
-			context.db
+		.handler(async ({ context, input }) => {
+			await expireStale(context.db, [context.agent.id]);
+			return context.db
 				.select({
 					id: proposal.id,
 					status: proposal.status,
@@ -445,8 +464,8 @@ export const agentApiRouter = {
 						eq(proposal.agentId, context.agent.id),
 						inArray(proposal.id, input.ids),
 					),
-				),
-		),
+				);
+		}),
 
 	/**
 	 * For each item: the sealed item and its key wrapped to this agent, or a pending

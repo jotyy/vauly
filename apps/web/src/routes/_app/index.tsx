@@ -31,7 +31,7 @@ import {
 } from "@/components/member-dialogs";
 import { notify } from "@/components/notify";
 import { Page, SectionTitle } from "@/components/page";
-import { ProposalCard } from "@/components/proposal-card";
+import { ProposalCards } from "@/components/proposal-card";
 import { useBreached } from "@/lib/breaches";
 import { filesSeen, useFiles } from "@/lib/files";
 import { ago, plural } from "@/lib/format";
@@ -65,9 +65,10 @@ export const Route = createFileRoute("/_app/")({
 function Overview() {
 	const { me } = useKeyring();
 	const needs = useNeeds();
-	const { proposals, rules } = useProposals();
+	const proposals = useProposals();
+	const proposed = proposals.proposals.length + proposals.unreadable.length;
 	const firstName = me?.name.split(" ")[0];
-	const count = needs.rows.length + proposals.length;
+	const count = needs.rows.length + proposed;
 
 	return (
 		<Page
@@ -92,15 +93,9 @@ function Overview() {
 						</Badge>
 					)}
 				</SectionTitle>
-				{proposals.length > 0 && (
+				{proposed > 0 && (
 					<div className="mb-3 flex flex-col gap-3">
-						{proposals.map((opened) => (
-							<ProposalCard
-								key={opened.id}
-								opened={opened}
-								rule={rules.find((rule) => rule.agentId === opened.agentId)}
-							/>
-						))}
+						<ProposalCards proposals={proposals} />
 					</div>
 				)}
 				{count === 0 ? (

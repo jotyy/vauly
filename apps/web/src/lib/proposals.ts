@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { client } from "@/utils/orpc";
 
 import { useKeyring } from "./keyring";
+import { raiseRuleFloor, rememberAnswered, ruleFloor } from "./proposal-memory";
 import {
 	type Agent,
 	type CustomField,
@@ -133,12 +134,34 @@ export type OpenedProposal = Row & {
 	fields: ItemFields;
 };
 
-/** A rule this person set, checked: it opened with its vault's key and names the agent's key. */
-export type Rule = { agentId: string; vault: Vault; valid: boolean };
+/**
+ * A rule this person set, checked: it opened with its vault's key, names the agent's key,
+ * carries the agent's current generation, and wasn't removed in this browser.
+ */
+export type Rule = {
+	agentId: string;
+	vault: Vault;
+	valid: boolean;
+	generation: number;
+};
+
+/** A proposal that didn't open here: damaged, not its agent's, or for an item gone from view. */
+export type UnreadableProposal = Pick<
+	Row,
+	"id" | "agentId" | "itemId" | "count" | "createdAt"
+> & { agent: Agent };
+
+/** Whether an agent may still act: not paused, its access not expired. */
+export const agentActive = (
+	agent: Pick<Agent, "enabled" | "expiresAt">,
+	now = Date.now(),
+) =>
+	agent.enabled &&
+	(!agent.expiresAt || new Date(agent.expiresAt).getTime() > now);
 
 /**
  * This person's agents' proposals, opened here, every 10 seconds; and their rules. One
- * that doesn't open, because it's damaged or not its agent's, isn't shown.
+ * that doesn't open is listed apart, to be declined.
  */
 export function useProposals() {
 	const keyring = useKeyring();
@@ -168,9 +191,11 @@ export function useProposals() {
 			const byItem = new Map((items.data ?? []).map((i) => [i.id, i]));
 			const byVault = new Map((vaults.data ?? []).map((v) => [v.id, v]));
 			const proposals: OpenedProposal[] = [];
+			const unreadable: UnreadableProposal[] = [];
 			for (const row of raw.data?.proposals ?? []) {
 				const agent = byAgent.get(row.agentId);
 				if (!agent) continue;
+				const { sealed: _sealed, ...rest } = row;
 				try {
 					const proposal = await keyring.openProposal({
 						agentPublicKey: agent.publicKey,
@@ -183,37 +208,52 @@ export function useProposals() {
 					});
 					const item = row.itemId ? byItem.get(row.itemId) : undefined;
 					// A change to an item this person can't open here can't be merged.
-					if (row.itemId && !item) continue;
+					if (row.itemId && !item) throw new Error("Item not here");
 					const merged = mergeProposal(
 						item ? fieldsWithUnknown(item) : null,
 						proposal,
 					);
 					proposals.push({ ...row, agent, proposal, item, ...merged });
 				} catch {
-					// Not one its agent made, or damaged: nothing to show.
+					unreadable.push({ ...rest, agent });
 				}
 			}
+			const generations = new Map(
+				(raw.data?.generations ?? []).map((row) => [
+					row.agentId,
+					row.generation,
+				]),
+			);
+			const accountId = keyring.me?.id ?? "";
 			const rules: Rule[] = [];
 			for (const row of raw.data?.rules ?? []) {
 				const vault = byVault.get(row.vaultId);
 				const agent = byAgent.get(row.agentId);
 				if (!vault || !agent) continue;
-				const valid = await openProposalRule(
+				const rule = await openProposalRule(
 					vault.key,
 					row.sealed,
 					row.agentId,
 					row.vaultId,
-				)
-					.then((rule) => rule.agentPublicKey === agent.publicKey)
-					.catch(() => false);
-				rules.push({ agentId: row.agentId, vault, valid });
+				).catch(() => null);
+				const generation = rule?.generation ?? 0;
+				const valid =
+					rule !== null &&
+					rule.agentPublicKey === agent.publicKey &&
+					generation === generations.get(row.agentId) &&
+					generation > ruleFloor(accountId, row.agentId) &&
+					agentActive(agent);
+				rules.push({ agentId: row.agentId, vault, valid, generation });
 			}
-			return { proposals, rules };
+			return { proposals, unreadable, rules, generations };
 		},
 	});
 	return {
 		proposals: opened.data?.proposals ?? [],
+		unreadable: opened.data?.unreadable ?? [],
 		rules: opened.data?.rules ?? [],
+		/** Each agent's rule generation as the server has it: a new rule takes the next. */
+		generations: opened.data?.generations ?? new Map<string, number>(),
 		isLoading: raw.isLoading || opened.isLoading,
 	};
 }
@@ -227,7 +267,9 @@ const fieldsWithUnknown = (item: Item): ItemFields => ({
 
 export function useProposalActions() {
 	const queryClient = useQueryClient();
+	const accountId = useKeyring().me?.id ?? "";
 	return useMemo(() => {
+		const answered = (id: string) => rememberAnswered(accountId, id);
 		const refresh = () =>
 			queryClient.invalidateQueries({ queryKey: ["vault"] });
 		return {
@@ -247,6 +289,7 @@ export function useProposalActions() {
 						data: await sealJson(opened.item.key, opened.fields),
 						auto,
 					});
+					answered(opened.id);
 					await refresh();
 					return result;
 				}
@@ -260,52 +303,68 @@ export function useProposalActions() {
 					agentWrappedKey: await wrapKeyFor(opened.agent.publicKey, key),
 					auto,
 				});
+				answered(opened.id);
 				await refresh();
 				return result;
 			},
 
-			async decline(opened: OpenedProposal) {
-				await client.proposals.decline({ id: opened.id });
+			/** Declines one, whether it opened here or not. */
+			async decline(proposal: { id: string }) {
+				await client.proposals.decline({ id: proposal.id });
+				answered(proposal.id);
 				await refresh();
 			},
 
-			/** Accepts this agent's proposals into `vault` without asking, in this person's browsers. */
-			async setRule(agent: Agent, vault: Vault) {
+			/**
+			 * Accepts this agent's proposals into `vault` without asking, in this person's
+			 * browsers. `generation` is the agent's current one: the rule carries the next.
+			 */
+			async setRule(agent: Agent, vault: Vault, generation: number) {
+				const next = generation + 1;
 				await client.proposals.setRule({
 					agentId: agent.id,
 					vaultId: vault.id,
+					generation: next,
 					sealed: await sealProposalRule(vault.key, {
 						v: 1,
 						agentId: agent.id,
 						agentPublicKey: agent.publicKey,
 						vaultId: vault.id,
+						generation: next,
 					}),
 				});
 				await refresh();
 			},
 
-			async removeRule(agentId: string) {
+			/** Removes it, and remembers here that no rule up to its generation counts again. */
+			async removeRule(agentId: string, generation: number) {
 				await client.proposals.removeRule({ agentId });
+				raiseRuleFloor(accountId, agentId, generation);
 				await refresh();
 			},
 		};
-	}, [queryClient]);
+	}, [queryClient, accountId]);
 }
 
 /**
- * Which proposals a rule accepts: those from an agent with a rule that checked out, made
- * in the last day, that make a new item or change one in the rule's own vault.
+ * Which proposals a rule accepts: those from an active agent with a rule that checked
+ * out, made in the last day, never answered in this browser, that make a new item or
+ * change one in the rule's own vault.
  */
 export function acceptedByRule(
 	proposals: OpenedProposal[],
 	rules: Rule[],
-	now = Date.now(),
+	{
+		answered = new Set<string>(),
+		now = Date.now(),
+	}: { answered?: Set<string>; now?: number } = {},
 ) {
 	return proposals.flatMap((opened) => {
 		const rule = rules.find(
 			(candidate) => candidate.agentId === opened.agentId && candidate.valid,
 		);
 		if (!rule || !freshEnough(opened.proposal, now)) return [];
+		if (answered.has(opened.id) || !agentActive(opened.agent, now)) return [];
 		if (opened.item && opened.item.vaultId !== rule.vault.id) return [];
 		return [{ opened, vault: rule.vault }];
 	});

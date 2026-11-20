@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { Proposal } from "@vauly/crypto";
-
+import {
+	answeredProposals,
+	raiseRuleFloor,
+	rememberAnswered,
+	ruleFloor,
+} from "./proposal-memory";
 import {
 	acceptedByRule,
 	environmentReferences,
@@ -88,16 +93,22 @@ describe("auto-accept", () => {
 		agentId: string,
 		item?: { vaultId: string },
 		at = new Date(),
+		agent: { enabled: boolean; expiresAt: Date | null } = {
+			enabled: true,
+			expiresAt: null,
+		},
+		id = `prp_${agentId}`,
 	) =>
 		({
-			id: `prp_${agentId}`,
+			id,
 			agentId,
+			agent,
 			proposal: proposal([], at),
 			item,
 		}) as unknown as OpenedProposal;
 	const rules: Rule[] = [
-		{ agentId: "agt_ok", vault, valid: true },
-		{ agentId: "agt_bad", vault, valid: false },
+		{ agentId: "agt_ok", vault, valid: true, generation: 1 },
+		{ agentId: "agt_bad", vault, valid: false, generation: 1 },
 	];
 
 	test("accepts what a valid rule lets in, and nothing else", () => {
@@ -112,7 +123,7 @@ describe("auto-accept", () => {
 				opened("agt_none"),
 			],
 			rules,
-			now,
+			{ now },
 		);
 		expect(
 			picked.map(({ opened, vault }) => [
@@ -124,6 +135,73 @@ describe("auto-accept", () => {
 			["agt_ok", null, "vlt_team"],
 			["agt_ok", "vlt_team", "vlt_team"],
 		]);
+	});
+});
+
+describe("auto-accept never acts twice, or for an agent that stopped", () => {
+	const vault = { id: "vlt_team", name: "Team" } as Vault;
+	const rules: Rule[] = [
+		{ agentId: "agt_ok", vault, valid: true, generation: 1 },
+	];
+	const make = (
+		id: string,
+		agent = { enabled: true, expiresAt: null as Date | null },
+	) =>
+		({
+			id,
+			agentId: "agt_ok",
+			agent,
+			proposal: proposal([]),
+		}) as unknown as OpenedProposal;
+
+	test("a proposal answered in this browser is left alone, even handed back", () => {
+		const picked = acceptedByRule([make("prp_seen"), make("prp_new")], rules, {
+			answered: new Set(["prp_seen"]),
+		});
+		expect(picked.map(({ opened }) => opened.id)).toEqual(["prp_new"]);
+	});
+
+	test("a paused or expired agent's proposals wait for a person", () => {
+		const picked = acceptedByRule(
+			[
+				make("prp_paused", { enabled: false, expiresAt: null }),
+				make("prp_expired", {
+					enabled: true,
+					expiresAt: new Date(Date.now() - 1000),
+				}),
+			],
+			rules,
+		);
+		expect(picked).toEqual([]);
+	});
+});
+
+describe("what this browser remembers", () => {
+	const store = () => {
+		const data = new Map<string, string>();
+		return {
+			getItem: (key: string) => data.get(key) ?? null,
+			setItem: (key: string, value: string) => {
+				data.set(key, value);
+			},
+		};
+	};
+
+	test("answered proposals, per account", () => {
+		const s = store();
+		rememberAnswered("usr_a", "prp_one", s);
+		rememberAnswered("usr_a", "prp_two", s);
+		expect([...answeredProposals("usr_a", s)]).toEqual(["prp_one", "prp_two"]);
+		expect(answeredProposals("usr_b", s).size).toBe(0);
+	});
+
+	test("a removed rule's generation, so it never counts again", () => {
+		const s = store();
+		expect(ruleFloor("usr_a", "agt_ok", s)).toBe(0);
+		raiseRuleFloor("usr_a", "agt_ok", 3, s);
+		raiseRuleFloor("usr_a", "agt_ok", 2, s);
+		expect(ruleFloor("usr_a", "agt_ok", s)).toBe(3);
+		expect(ruleFloor("usr_b", "agt_ok", s)).toBe(0);
 	});
 });
 

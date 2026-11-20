@@ -85,7 +85,7 @@ An agent can put secrets into vauly too, without seeing them. It proposes; a per
 vauly put acme/production --env-file .env.production
 ```
 
-`vauly put` reads the values on this machine, from the env file, from its own environment (`--from-env DATABASE_URL,STRIPE_KEY`) or from stdin (`vauly put acme/production < .env.production`). It seals them so that only the agent's owner can open them, and sends them to vauly as a proposal. It prints the key names and the proposal's ID, never a value, waits for a person to answer (up to `VAULY_APPROVAL_TIMEOUT`), and prints the item's ID. `--keys A,B` sends only some keys, `--vault Engineering` suggests a vault for a new item, and `--no-wait` returns right away. vauly:// references and empty values in the file are left out.
+`vauly put` reads the values on this machine, from the env file, from its own environment (`--from-env DATABASE_URL,STRIPE_KEY`) or from stdin (`vauly put acme/production < .env.production`). It seals them so that only the agent's owner can open them, and sends them to vauly as a proposal. It prints the key names and the proposal's ID, never a value, waits for a person to answer (up to `VAULY_APPROVAL_TIMEOUT`), and prints the item's ID. `--keys A,B` sends only some keys, `--vault Engineering` suggests a vault for a new item, and `--no-wait` returns right away. vauly:// references, empty values and `VAULY_` variables (vauly's own settings, such as the token) are left out of a file, and refused by name. A proposal nobody answers expires after a week; an agent may have 20 waiting and make 200 a day.
 
 The item is an item's ID or its name. A name the agent can't use yet makes a new **Environment** item: one app's secrets, each a hidden field named after its variable. An item the agent may use gets new and changed fields; the rest stay as they are.
 
@@ -219,7 +219,7 @@ To hear about a request when vauly isn't open, turn on **Settings › Notificati
 
 ## What's recorded
 
-Every request, approval, denial, value handed to an agent, proposal, acceptance and listing appears in **Activity**, with the command that asked for it. Pausing an agent stops its token right away; deleting an item takes it out of every agent's reach until it's restored. An agent works for the person who created it: when they're taken out of a vault, their agents lose the items in it, whoever approved them, and when they leave the workspace, their agents are deleted.
+Every request, approval, denial, value handed to an agent, proposal, acceptance and listing appears in **Activity**, with the command that asked for it. Pausing an agent stops its token right away, and deletes its waiting proposals and any rule that accepts them; deleting an item takes it out of every agent's reach until it's restored. An agent works for the person who created it: when they're taken out of a vault, their agents lose the items in it, whoever approved them, and when they leave the workspace, their agents are deleted.
 
 ## Environment
 

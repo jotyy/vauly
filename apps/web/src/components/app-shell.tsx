@@ -195,7 +195,10 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
 	const workspace = useWorkspace();
 	const requests = useRequests();
 	const proposals = useProposals();
-	const pending = (requests.data?.length ?? 0) + proposals.proposals.length;
+	const pending =
+		(requests.data?.length ?? 0) +
+		proposals.proposals.length +
+		proposals.unreadable.length;
 
 	return (
 		<header
@@ -354,8 +357,9 @@ function Sidebar({
 						to="/agents"
 						icon={RobotIcon}
 						count={
-							(requests.data?.length ?? 0) + proposals.proposals.length ||
-							undefined
+							(requests.data?.length ?? 0) +
+								proposals.proposals.length +
+								proposals.unreadable.length || undefined
 						}
 					>
 						Agents

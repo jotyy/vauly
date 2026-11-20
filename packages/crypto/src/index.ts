@@ -755,6 +755,8 @@ export type ProposalRule = {
 	agentId: string;
 	agentPublicKey: string;
 	vaultId: string;
+	/** Raised each time a rule is set or removed: an older one no longer applies. */
+	generation: number;
 };
 
 const ruleData = (agentId: string, vaultId: string) =>
@@ -779,7 +781,12 @@ export async function openProposalRule(
 			await openWith(vaultKey, sealed, ruleData(agentId, vaultId)),
 		),
 	) as ProposalRule;
-	if (rule.v !== 1 || rule.agentId !== agentId || rule.vaultId !== vaultId) {
+	if (
+		rule.v !== 1 ||
+		rule.agentId !== agentId ||
+		rule.vaultId !== vaultId ||
+		!Number.isInteger(rule.generation)
+	) {
 		throw new Error("Unknown rule format");
 	}
 	return rule;

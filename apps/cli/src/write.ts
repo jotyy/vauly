@@ -24,6 +24,17 @@ import { formatReference, parseEnvFile, parseReference } from "./references";
 /** A name an environment variable can have. */
 const VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/** vauly's own settings, such as VAULY_TOKEN: never a value to propose. */
+const own = (name: string) => name.toUpperCase().startsWith("VAULY_");
+
+const refuseOwn = (name: string) => {
+	if (own(name)) {
+		throw new CliError(
+			`${name} is vauly's own setting, not a secret to propose.`,
+		);
+	}
+};
+
 export type Proposed = { label: string; value: string };
 
 /**
@@ -62,6 +73,7 @@ export function collectValues({
 	if (text !== undefined) add(parseEnvFile(text));
 	if (fromEnv) {
 		for (const name of fromEnv) {
+			refuseOwn(name);
 			if (!VARIABLE.test(name)) {
 				throw new CliError(`${name} isn't a variable name.`);
 			}
@@ -71,8 +83,11 @@ export function collectValues({
 			found.set(name, env[name] as string);
 		}
 	}
+	// A project's env file may set them; they stay out of what's proposed.
+	for (const label of found.keys()) if (own(label)) found.delete(label);
 	let picked = [...found];
 	if (keys) {
+		for (const key of keys) refuseOwn(key);
 		const missing = keys.filter((key) => !found.has(key));
 		if (missing.length > 0) {
 			throw new CliError(`Not found: ${missing.join(", ")}.`);
@@ -317,6 +332,11 @@ export async function waitForAnswer(
 		if (row?.status === "accepted" && row.itemId) return row.itemId;
 		if (row?.status === "declined") {
 			throw new CliError("The proposal was declined in vauly.");
+		}
+		if (row?.status === "expired") {
+			throw new CliError(
+				"Nobody answered the proposal within a week, so it expired. Propose it again.",
+			);
 		}
 		if (!row) throw new CliError(`vauly doesn't know proposal ${id}.`);
 		if (Date.now() - started > timeoutMs) {

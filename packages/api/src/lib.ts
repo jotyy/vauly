@@ -18,6 +18,7 @@ import {
 	type SQL,
 	sql,
 } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 
 const alphabet = "0123456789abcdefghjkmnpqrstvwxyz";
 
@@ -182,6 +183,25 @@ export function logEvent(db: Database, entry: EventEntry) {
 	return db.insert(event).values({ id: newId("evt"), ...entry });
 }
 
+/** An event's columns as a select list, for an event written only on a condition. */
+function eventColumns(entry: EventEntry) {
+	return {
+		id: sql<string>`${newId("evt")}`.as("id"),
+		actorType: sql<EventEntry["actorType"]>`${entry.actorType}`.as(
+			"actor_type",
+		),
+		actorId: sql<string>`${entry.actorId}`.as("actor_id"),
+		action: sql<EventAction>`${entry.action}`.as("action"),
+		itemId: sql<string | null>`${entry.itemId ?? null}`.as("item_id"),
+		vaultId: sql<string | null>`${entry.vaultId ?? null}`.as("vault_id"),
+		subjectId: sql<string | null>`${entry.subjectId ?? null}`.as("subject_id"),
+		detail: sql<string | null>`${entry.detail ?? null}`.as("detail"),
+		createdAt: sql<Date>`(cast(unixepoch('subsecond') * 1000 as integer))`.as(
+			"created_at",
+		),
+	};
+}
+
 /**
  * The event for a change a batch makes only if it still can: written only if, when it
  * runs after that change, the member's row matches `where`.
@@ -194,25 +214,20 @@ export function logEventIf(
 ) {
 	return db.insert(event).select(
 		db
-			.select({
-				id: sql<string>`${newId("evt")}`.as("id"),
-				actorType: sql<EventEntry["actorType"]>`${entry.actorType}`.as(
-					"actor_type",
-				),
-				actorId: sql<string>`${entry.actorId}`.as("actor_id"),
-				action: sql<EventAction>`${entry.action}`.as("action"),
-				itemId: sql<string | null>`${entry.itemId ?? null}`.as("item_id"),
-				vaultId: sql<string | null>`${entry.vaultId ?? null}`.as("vault_id"),
-				subjectId: sql<string | null>`${entry.subjectId ?? null}`.as(
-					"subject_id",
-				),
-				detail: sql<string | null>`${entry.detail ?? null}`.as("detail"),
-				createdAt:
-					sql<Date>`(cast(unixepoch('subsecond') * 1000 as integer))`.as(
-						"created_at",
-					),
-			})
+			.select(eventColumns(entry))
 			.from(member)
 			.where(and(eq(member.userId, userId), where)),
 	);
+}
+
+/** The same, on a row of `table` that matches `where` when the batch gets to it. */
+export function logEventWhere(
+	db: Database,
+	table: SQLiteTable,
+	where: SQL | undefined,
+	entry: EventEntry,
+) {
+	return db
+		.insert(event)
+		.select(db.select(eventColumns(entry)).from(table).where(where).limit(1));
 }

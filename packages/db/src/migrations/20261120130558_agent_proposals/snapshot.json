@@ -1,7 +1,7 @@
 {
 	"version": "7",
 	"dialect": "sqlite",
-	"id": "0c9476df-ab2f-45e1-a9ba-bab351114aa2",
+	"id": "24db7890-a847-4bd1-8354-6edd979eef8c",
 	"prevIds": ["16dcc92e-a439-492f-87a1-aa1ae02e1d1d"],
 	"ddl": [
 		{
@@ -673,6 +673,16 @@
 			"default": null,
 			"generated": null,
 			"name": "notified_at",
+			"entityType": "columns",
+			"table": "agent"
+		},
+		{
+			"type": "integer",
+			"notNull": true,
+			"autoincrement": false,
+			"default": "0",
+			"generated": null,
+			"name": "rule_generation",
 			"entityType": "columns",
 			"table": "agent"
 		},

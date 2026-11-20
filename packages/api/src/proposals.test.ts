@@ -299,32 +299,278 @@ describe("proposals", () => {
 		expect(polled[0]?.status).toBe("declined");
 	});
 
-	test("rules are the owner's, for vaults they can change", async () => {
+	test("rules are the owner's, and each carries the next generation", async () => {
 		const { sqlite, as } = await workspace();
+		const rule = (generation: number) => ({
+			agentId: "agt_ci",
+			vaultId: "vlt_team",
+			sealed: "x".repeat(40),
+			generation,
+		});
 		await expect(
-			call(
-				appRouter.proposals.setRule,
-				{ agentId: "agt_ci", vaultId: "vlt_team", sealed: "x".repeat(40) },
-				{ context: as("usr_mei") },
-			),
+			call(appRouter.proposals.setRule, rule(1), { context: as("usr_mei") }),
 		).rejects.toThrow("Agent not found");
-		await call(
-			appRouter.proposals.setRule,
-			{ agentId: "agt_ci", vaultId: "vlt_team", sealed: "x".repeat(40) },
-			{ context: as("usr_alex") },
-		);
-		const { rules } = await call(appRouter.proposals.list, undefined, {
+		// Only the next generation is taken: an old rule can't be set again.
+		await expect(
+			call(appRouter.proposals.setRule, rule(5), { context: as("usr_alex") }),
+		).rejects.toThrow("changed");
+		await call(appRouter.proposals.setRule, rule(1), {
 			context: as("usr_alex"),
 		});
-		expect(rules).toEqual([
+		const listed = await call(appRouter.proposals.list, undefined, {
+			context: as("usr_alex"),
+		});
+		expect(listed.rules).toEqual([
 			{ agentId: "agt_ci", vaultId: "vlt_team", sealed: "x".repeat(40) },
 		]);
+		expect(listed.generations).toEqual([{ agentId: "agt_ci", generation: 1 }]);
 		await call(
 			appRouter.proposals.removeRule,
 			{ agentId: "agt_ci" },
 			{ context: as("usr_alex") },
 		);
 		expect(sqlite.query("SELECT * FROM proposal_rule").all()).toHaveLength(0);
+		// Removing raises the generation, so the removed rule's 1 no longer counts.
+		expect(
+			sqlite.query("SELECT rule_generation AS g FROM agent").get(),
+		).toEqual({ g: 2 });
+		await expect(
+			call(appRouter.proposals.setRule, rule(2), { context: as("usr_alex") }),
+		).rejects.toThrow("changed");
+	});
+
+	test("a paused or expired agent's proposals aren't accepted", async () => {
+		const { sqlite, vaultKey, itemKey, as, propose } = await workspace();
+		await propose(ID, null);
+		await propose("prp_0123456789abcdeg", "itm_granted");
+		const key = await newDataKey();
+		const newItem = {
+			id: ID,
+			vaultId: "vlt_team",
+			wrappedKey: await wrapKey(vaultKey, key),
+			data: await sealJson(key, { kind: "environment", name: "x" }),
+		};
+		sqlite.run(
+			`UPDATE agent SET expires_at = ${Date.now() - 1000} WHERE id = 'agt_ci'`,
+		);
+		await expect(
+			call(appRouter.proposals.accept, newItem, { context: as("usr_alex") }),
+		).rejects.toThrow("paused or its access expired");
+		const listed = await call(appRouter.proposals.list, undefined, {
+			context: as("usr_alex"),
+		});
+		expect(listed.proposals).toHaveLength(0);
+
+		sqlite.run("UPDATE agent SET expires_at = NULL WHERE id = 'agt_ci'");
+		await call(
+			appRouter.proposals.setRule,
+			{
+				agentId: "agt_ci",
+				vaultId: "vlt_team",
+				sealed: "x".repeat(40),
+				generation: 1,
+			},
+			{ context: as("usr_alex") },
+		);
+		// Pausing drops its waiting proposals and its rule.
+		await call(
+			appRouter.agents.update,
+			{ id: "agt_ci", enabled: false },
+			{ context: as("usr_alex") },
+		);
+		expect(sqlite.query("SELECT count(*) AS n FROM proposal").get()).toEqual({
+			n: 0,
+		});
+		expect(sqlite.query("SELECT * FROM proposal_rule").all()).toHaveLength(0);
+		await expect(
+			call(
+				appRouter.proposals.accept,
+				{
+					id: "prp_0123456789abcdeg",
+					revision: 1,
+					data: await sealJson(itemKey, { kind: "environment", name: "y" }),
+				},
+				{ context: as("usr_alex") },
+			),
+		).rejects.toThrow("Proposal not found");
+		expect(sqlite.query("SELECT count(*) AS n FROM item").get()).toEqual({
+			n: 2,
+		});
+	});
+
+	test("a change isn't accepted once the agent's grant on the item is gone", async () => {
+		const { sqlite, itemKey, as, propose } = await workspace();
+		await propose(ID, "itm_granted");
+		sqlite.run("DELETE FROM agent_grant WHERE item_id = 'itm_granted'");
+		await expect(
+			call(
+				appRouter.proposals.accept,
+				{
+					id: ID,
+					revision: 1,
+					data: await sealJson(itemKey, { kind: "environment", name: "y" }),
+				},
+				{ context: as("usr_alex") },
+			),
+		).rejects.toThrow("may no longer use this item");
+		expect(
+			sqlite
+				.query("SELECT status, sealed IS NOT NULL AS kept FROM proposal")
+				.get(),
+		).toEqual({ status: "pending", kept: 1 });
+	});
+
+	test("a change whose item moved on claims nothing, and can be retried", async () => {
+		const { sqlite, db, itemKey, as, propose } = await workspace();
+		await propose(ID, "itm_granted");
+		// Someone saves the item between the check and the write.
+		const batch = db.batch.bind(db);
+		Object.assign(db, {
+			batch: async (statements: readonly PromiseLike<unknown>[]) => {
+				sqlite.run(
+					"UPDATE item SET revision = revision + 1 WHERE id = 'itm_granted'",
+				);
+				Object.assign(db, { batch });
+				return batch(statements as never);
+			},
+		});
+		const data = await sealJson(itemKey, { kind: "environment", name: "y" });
+		const error = await call(
+			appRouter.proposals.accept,
+			{ id: ID, revision: 1, data },
+			{ context: as("usr_alex") },
+		).catch((caught: unknown) => caught);
+		expect(error).toMatchObject({ code: "CONFLICT", data: { retry: true } });
+		expect(
+			sqlite
+				.query("SELECT status, sealed IS NOT NULL AS kept FROM proposal")
+				.get(),
+		).toEqual({ status: "pending", kept: 1 });
+		const row = sqlite
+			.query("SELECT data, revision FROM item WHERE id = 'itm_granted'")
+			.get() as { data: string; revision: number };
+		expect(row.revision).toBe(2);
+		expect(await openJson(itemKey, row.data)).toEqual({
+			kind: "environment",
+			name: "acme/staging",
+		});
+		expect(
+			sqlite
+				.query(
+					"SELECT count(*) AS n FROM event WHERE action IN ('updated', 'accepted')",
+				)
+				.get(),
+		).toEqual({ n: 0 });
+		// Read again, at the item's new revision, it goes through.
+		await call(
+			appRouter.proposals.accept,
+			{ id: ID, revision: 2, data },
+			{ context: as("usr_alex") },
+		);
+		expect(sqlite.query("SELECT status FROM proposal").get()).toEqual({
+			status: "accepted",
+		});
+	});
+
+	test("a new item isn't left behind when its proposal can't be claimed", async () => {
+		const { sqlite, db, vaultKey, as, propose } = await workspace();
+		await propose(ID, null);
+		const batch = db.batch.bind(db);
+		Object.assign(db, {
+			batch: async (statements: readonly PromiseLike<unknown>[]) => {
+				// Declined in another tab meanwhile.
+				sqlite.run("UPDATE proposal SET status = 'declined'");
+				Object.assign(db, { batch });
+				return batch(statements as never);
+			},
+		});
+		const key = await newDataKey();
+		await expect(
+			call(
+				appRouter.proposals.accept,
+				{
+					id: ID,
+					vaultId: "vlt_team",
+					wrappedKey: await wrapKey(vaultKey, key),
+					data: await sealJson(key, { kind: "environment", name: "x" }),
+				},
+				{ context: as("usr_alex") },
+			),
+		).rejects.toThrow("changed");
+		expect(sqlite.query("SELECT count(*) AS n FROM item").get()).toEqual({
+			n: 2,
+		});
+	});
+
+	test("an agent makes at most 200 proposals a day", async () => {
+		const { sqlite, propose } = await workspace();
+		const yesterday = Date.now() - 25 * 60 * 60 * 1000;
+		for (let n = 0; n < 200; n++) {
+			const status = n < 195 ? "declined" : "accepted";
+			sqlite.run(
+				`INSERT INTO proposal (id, agent_id, count, status, created_at) VALUES ('prp_made${String(n).padStart(12, "0")}', 'agt_ci', 1, '${status}', ${n < 5 ? yesterday : Date.now()})`,
+			);
+		}
+		// Five of them were yesterday: room for five more today.
+		for (let n = 0; n < 5; n++) {
+			await propose(`prp_today${String(n).padStart(11, "0")}`, null);
+		}
+		await expect(propose("prp_onetoomany000000", null)).rejects.toThrow(
+			"200 proposals in the last day",
+		);
+	});
+
+	test("a week-old proposal expires: no longer listed, answered or counted", async () => {
+		const { sqlite, as, asAgent, propose } = await workspace();
+		for (let n = 0; n < 20; n++) {
+			await propose(`prp_old${String(n).padStart(13, "0")}`, null);
+		}
+		await expect(propose(ID, null)).rejects.toThrow("20 proposals waiting");
+		sqlite.run(
+			`UPDATE proposal SET created_at = ${Date.now() - 8 * 24 * 60 * 60 * 1000}`,
+		);
+		await expect(
+			call(
+				appRouter.proposals.decline,
+				{ id: "prp_old0000000000000" },
+				{ context: as("usr_alex") },
+			),
+		).rejects.toThrow("expired");
+		expect(await propose(ID, null)).toMatchObject({ status: "pending" });
+		expect(
+			sqlite
+				.query(
+					"SELECT count(*) AS n FROM proposal WHERE status = 'expired' AND sealed IS NULL",
+				)
+				.get(),
+		).toEqual({ n: 20 });
+		const listed = await call(appRouter.proposals.list, undefined, {
+			context: as("usr_alex"),
+		});
+		expect(listed.proposals.map((row) => row.id)).toEqual([ID]);
+		const polled = await call(
+			appRouter.agent.proposals,
+			{ ids: ["prp_old0000000000000"] },
+			{ context: asAgent },
+		);
+		expect(polled[0]?.status).toBe("expired");
+	});
+
+	test("a proposal that won't open can still be declined", async () => {
+		const { sqlite, as, asAgent } = await workspace();
+		await call(
+			appRouter.agent.propose,
+			{ id: ID, itemId: null, sealed: "not-a-proposal".repeat(4), count: 1 },
+			{ context: asAgent },
+		);
+		await call(
+			appRouter.proposals.decline,
+			{ id: ID },
+			{ context: as("usr_alex") },
+		);
+		expect(sqlite.query("SELECT status FROM proposal").get()).toEqual({
+			status: "declined",
+		});
 	});
 
 	test("listing hands over only standing grants, and logs each", async () => {

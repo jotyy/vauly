@@ -16,7 +16,9 @@ import {
 	type OpenedProposal,
 	type Rule,
 	suggestedVault,
+	type UnreadableProposal,
 	useProposalActions,
+	type useProposals,
 } from "@/lib/proposals";
 import { canEdit, errorMessage, useVaults } from "@/lib/vault-data";
 
@@ -40,9 +42,12 @@ const changeBadge: Record<
 export function ProposalCard({
 	opened,
 	rule,
+	generation,
 }: {
 	opened: OpenedProposal;
 	rule?: Rule;
+	/** The agent's rule generation as the server has it. */
+	generation: number;
 }) {
 	const actions = useProposalActions();
 	const vaults = useVaults();
@@ -76,7 +81,8 @@ export function ProposalCard({
 		decide(
 			async () => {
 				await actions.accept(opened, vault);
-				if (always && vault) await actions.setRule(opened.agent, vault);
+				if (always && vault)
+					await actions.setRule(opened.agent, vault, generation);
 			},
 			`${opened.item ? "Updated" : "Added"} ${target}`,
 		);
@@ -211,5 +217,80 @@ export function ProposalCard({
 				</Button>
 			</div>
 		</section>
+	);
+}
+
+/** A proposal that didn't open here: there's nothing to review, only to decline. */
+export function UnreadableProposalCard({
+	proposal,
+}: {
+	proposal: UnreadableProposal;
+}) {
+	const actions = useProposalActions();
+	const [busy, setBusy] = useState(false);
+	const agentName = proposal.agent.name;
+	return (
+		<section
+			aria-label={`A proposal from ${agentName} that can't be opened`}
+			className="rounded-window bg-surface shadow-card flex items-start gap-3 p-3.5"
+		>
+			<ItemTile kind="agent" />
+			<div className="flex min-w-0 flex-1 flex-col gap-1">
+				<p className="text-body-sm text-fg">
+					A proposal from <span className="font-medium">{agentName}</span> can't
+					be opened here
+				</p>
+				<p className="text-caption text-fg-subtle">
+					{[
+						plural(proposal.count, "value"),
+						proposal.itemId
+							? "for an item you can't open here"
+							: "damaged, or not made by this agent",
+						ago(proposal.createdAt),
+					].join(" · ")}
+				</p>
+			</div>
+			<Button
+				variant="outline"
+				size="sm"
+				disabled={busy}
+				onClick={async () => {
+					setBusy(true);
+					try {
+						await actions.decline(proposal);
+						notify.success(`Declined ${agentName}'s proposal`);
+					} catch (err) {
+						notify.error("That didn't work", errorMessage(err));
+					} finally {
+						setBusy(false);
+					}
+				}}
+			>
+				Decline
+			</Button>
+		</section>
+	);
+}
+
+/** Every proposal waiting for this person, readable or not. */
+export function ProposalCards({
+	proposals,
+}: {
+	proposals: ReturnType<typeof useProposals>;
+}) {
+	return (
+		<>
+			{proposals.proposals.map((opened) => (
+				<ProposalCard
+					key={opened.id}
+					opened={opened}
+					rule={proposals.rules.find((rule) => rule.agentId === opened.agentId)}
+					generation={proposals.generations.get(opened.agentId) ?? 0}
+				/>
+			))}
+			{proposals.unreadable.map((proposal) => (
+				<UnreadableProposalCard key={proposal.id} proposal={proposal} />
+			))}
+		</>
 	);
 }
