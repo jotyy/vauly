@@ -64,6 +64,7 @@ import { ago, initials, toneDot } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
 import { isNativeApp, setStatusBarText } from "@/lib/native";
 import { useOfflineCopy } from "@/lib/offline";
+import { useProposals } from "@/lib/proposals";
 import { RELEASES, UPDATING_DOCS, useNewerRelease } from "@/lib/updates";
 import {
 	useDeletedItems,
@@ -72,6 +73,7 @@ import {
 	useVaults,
 	useWorkspace,
 } from "@/lib/vault-data";
+import { AutoAccept } from "./auto-accept";
 
 import { CommandPalette } from "./command-palette";
 import { NativeTabBar } from "./native-tab-bar";
@@ -138,6 +140,7 @@ export function AppShell() {
 			/>
 			{demoAccount && <DemoBanner />}
 			{!online && <OfflineBanner />}
+			<AutoAccept />
 			<TopBar onSearch={() => setSearching(true)} />
 			<div className="flex min-h-0 flex-1">
 				<Sidebar className="max-md:hidden" />
@@ -191,7 +194,8 @@ function DemoBanner() {
 function TopBar({ onSearch }: { onSearch: () => void }) {
 	const workspace = useWorkspace();
 	const requests = useRequests();
-	const pending = requests.data?.length ?? 0;
+	const proposals = useProposals();
+	const pending = (requests.data?.length ?? 0) + proposals.proposals.length;
 
 	return (
 		<header
@@ -287,6 +291,7 @@ function Sidebar({
 }) {
 	const vaults = useVaults();
 	const requests = useRequests();
+	const proposals = useProposals();
 	const deleted = useDeletedItems();
 	const sorted = [...(vaults.data ?? [])].sort(
 		(a, b) =>
@@ -345,7 +350,14 @@ function Sidebar({
 					<NavLink to="/activity" icon={PulseIcon}>
 						Activity
 					</NavLink>
-					<NavLink to="/agents" icon={RobotIcon} count={requests.data?.length}>
+					<NavLink
+						to="/agents"
+						icon={RobotIcon}
+						count={
+							(requests.data?.length ?? 0) + proposals.proposals.length ||
+							undefined
+						}
+					>
 						Agents
 					</NavLink>
 				</NavGroup>

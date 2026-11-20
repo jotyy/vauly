@@ -762,6 +762,7 @@ const kindNouns: Record<ItemKind, (n: number) => string> = {
 	"ssh-key": (n) => plural(n, "SSH key"),
 	card: (n) => plural(n, "payment card"),
 	identity: (n) => `${n} ${n === 1 ? "identity" : "identities"}`,
+	environment: (n) => plural(n, "environment"),
 };
 
 const leftoverText: Record<Leftover, (n: number) => string> = {

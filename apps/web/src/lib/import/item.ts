@@ -158,9 +158,15 @@ function firstLine(text: string) {
 }
 
 export function isKind(value: unknown): value is ItemKind {
-	return ["login", "api-key", "note", "ssh-key", "card", "identity"].includes(
-		String(value),
-	);
+	return [
+		"login",
+		"api-key",
+		"note",
+		"ssh-key",
+		"card",
+		"identity",
+		"environment",
+	].includes(String(value));
 }
 
 /** Splits "Work/Clients, billing" into tags. */

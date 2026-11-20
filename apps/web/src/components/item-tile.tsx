@@ -5,6 +5,7 @@ import {
 	KeyIcon,
 	NoteIcon,
 	RobotIcon,
+	StackIcon,
 	TerminalWindowIcon,
 } from "@phosphor-icons/react";
 import { cn } from "@vauly/ui/lib/utils";
@@ -21,6 +22,7 @@ const kindIcon: Record<ItemKind | "agent", typeof GlobeIcon> = {
 	"ssh-key": TerminalWindowIcon,
 	card: CreditCardIcon,
 	identity: IdentificationCardIcon,
+	environment: StackIcon,
 	agent: RobotIcon,
 };
 
@@ -31,6 +33,7 @@ const kindLabels: Record<ItemKind, string> = {
 	"ssh-key": "SSH key",
 	card: "Card",
 	identity: "Identity",
+	environment: "Environment",
 };
 
 /** What a kind is called; an item from a newer vauly, of a kind this one doesn't know, is an item. */

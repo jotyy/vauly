@@ -142,7 +142,14 @@ test("a coding agent sees which secrets need approval", async () => {
 		(list.result?.tools as { name: string }[] | undefined)?.map(
 			(tool) => tool.name,
 		),
-	).toEqual(["list_secrets", "run_with_secrets", "request_access"]);
+	).toEqual([
+		"list_secrets",
+		"run_with_secrets",
+		"request_access",
+		"propose_secrets",
+		"list_fields",
+		"list_items",
+	]);
 
 	const secrets = await client.call("list_secrets");
 	expect(secrets?.content?.[0]?.text).toContain(

@@ -77,6 +77,41 @@ vauly run --env-file .env -- npm test
 
 `vauly run` finds every reference, gets each value, starts the command with the values in its environment, and replaces any of those values that appear in the command's output with `<hidden>`. Variables without a reference pass through unchanged.
 
+## Move a project's secrets into vauly
+
+An agent can put secrets into vauly too, without seeing them. It proposes; a person accepts.
+
+```sh
+vauly put acme/production --env-file .env.production
+```
+
+`vauly put` reads the values on this machine, from the env file, from its own environment (`--from-env DATABASE_URL,STRIPE_KEY`) or from stdin (`vauly put acme/production < .env.production`). It seals them so that only the agent's owner can open them, and sends them to vauly as a proposal. It prints the key names and the proposal's ID, never a value, waits for a person to answer (up to `VAULY_APPROVAL_TIMEOUT`), and prints the item's ID. `--keys A,B` sends only some keys, `--vault Engineering` suggests a vault for a new item, and `--no-wait` returns right away. vauly:// references and empty values in the file are left out.
+
+The item is an item's ID or its name. A name the agent can't use yet makes a new **Environment** item: one app's secrets, each a hidden field named after its variable. An item the agent may use gets new and changed fields; the rest stay as they are.
+
+The proposal shows up for the agent's owner in **Needs you**, on the Overview and on **Agents**, with each key marked **New**, **Changed** or **Unchanged**. They can reveal values one at a time, choose the vault for a new item, then **Accept** or **Decline**. Accepting seals everything with the vault's keys in their browser and saves it; a new item is then the agent's to use until revoked, since it knows the values already. Declining deletes the sealed values. Ticking **Accept proposals from this agent into this vault without asking** lets the owner's browser accept the next ones by itself while vauly is unlocked there, for a day after the agent made each; proposals for an item in another vault still ask. **Ask before accepting proposals**, in the agent's menu on **Agents**, turns that off.
+
+Then write references instead of the values:
+
+```sh
+vauly refs acme/production > .env
+```
+
+```sh
+# .env: references only, safe to commit
+POSTGRES_PASSWORD=vauly://itm_7k2m9qx4hc3r/fields/POSTGRES_PASSWORD
+STRIPE_KEY=vauly://itm_7k2m9qx4hc3r/fields/STRIPE_KEY
+```
+
+`vauly refs` prints `KEY=vauly://itm_…/fields/KEY` for each of an item's fields, names only. For an item the agent can't use yet, it asks a person, as `vauly run` does. The web app's **Copy references**, on an environment item, copies the same lines.
+
+The layout we recommend for a project:
+- **`.env`, committed**: vauly:// references only. Each hidden field is masked on its own in `vauly run`'s output, and each item's use is approved and logged.
+- **Plain config, committed as is**: ports, feature flags, public URLs. Keep it out of vauly, in its own file such as `.env.defaults`, so a secret and a setting never share a line.
+- **Nothing else.** Delete the old `.env.production` once the item is accepted.
+
+`vauly ls` lists the items the agent may use without asking, each with its ID, name and fields' names. It reads them with the keys the agent already has, so it shows nothing the agent couldn't open, and each listing is in **Activity**. An item allowed for one run is listed by its ID alone: listing doesn't use it up.
+
 ## Coding agents over MCP
 
 Coding agents such as Claude Code and Cursor can use vauly as an MCP server. `vauly mcp` is the same agent as `vauly run`: the same token, the same approvals, and the same rule that the agent never sees a value. It reads the vauly:// references from the `.env` in the project, or from variables the agent passes.
@@ -86,6 +121,9 @@ Coding agents such as Claude Code and Cursor can use vauly as an MCP server. `va
 | `list_secrets`     | Lists the variables that hold a reference, and whether the agent may use each item yet or a person has to approve it first. No values, and no item names.                                                                      |
 | `run_with_secrets` | Runs a shell command with the values in its environment, like `vauly run`, and returns its exit code and output with every value as `<hidden>`. A new item waits for approval, then returns without running if nobody answers. |
 | `request_access`   | Asks a person to allow items, with a reason they read when they approve. Nothing runs.                                                                                                                                         |
+| `propose_secrets`  | Proposes values from an env file, or from variables in the server's own environment, for a new item or one the agent may use, like `vauly put`. Returns the key names and the proposal, never a value.                         |
+| `list_fields`      | An item's field names, each with its reference, like `vauly refs`.                                                                                                                                                             |
+| `list_items`       | The items the agent may use, with their IDs and field names, like `vauly ls`.                                                                                                                                                  |
 
 There is no tool that returns a value. Whatever a tool returns lands in the model's context, and from there in transcripts and logs; everything an agent does with a secret, such as tests, migrations and deploys, works through `run_with_secrets` instead.
 
@@ -181,7 +219,7 @@ To hear about a request when vauly isn't open, turn on **Settings › Notificati
 
 ## What's recorded
 
-Every request, approval, denial and value handed to an agent appears in **Activity**, with the command that asked for it. Pausing an agent stops its token right away; deleting an item takes it out of every agent's reach until it's restored. An agent works for the person who created it: when they're taken out of a vault, their agents lose the items in it, whoever approved them, and when they leave the workspace, their agents are deleted.
+Every request, approval, denial, value handed to an agent, proposal, acceptance and listing appears in **Activity**, with the command that asked for it. Pausing an agent stops its token right away; deleting an item takes it out of every agent's reach until it's restored. An agent works for the person who created it: when they're taken out of a vault, their agents lose the items in it, whoever approved them, and when they leave the workspace, their agents are deleted.
 
 ## Environment
 

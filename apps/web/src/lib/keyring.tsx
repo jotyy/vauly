@@ -10,7 +10,10 @@ import {
 	kdfOf,
 	newDataKey,
 	openPrivateKey,
+	openProposal as openProposalWith,
 	open as openSealed,
+	type Proposal,
+	type ProposalContext,
 	refuseDowngrade,
 	sealJson,
 	setArgon2,
@@ -150,6 +153,12 @@ type Keyring = {
 	lock: () => void;
 	signOut: () => Promise<void>;
 	vaultKey: (vaultId: string, wrappedKey: string) => Promise<CryptoKey>;
+	/** Opens a proposal one of this person's agents sealed to them. */
+	openProposal: (input: {
+		agentPublicKey: string;
+		context: ProposalContext;
+		sealed: string;
+	}) => Promise<Proposal>;
 	/** Checks the master password without changing anything, before a sensitive step. */
 	verifyPassword: (password: string) => Promise<boolean>;
 	changePassword: (current: string, next: string) => Promise<void>;
@@ -810,6 +819,19 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 		[me],
 	);
 
+	const openProposal = useCallback<Keyring["openProposal"]>(
+		(input) => {
+			const key = privateKey.current;
+			if (!key || !me) return Promise.reject(new Error("Locked"));
+			return openProposalWith({
+				ownerPrivateKey: key,
+				ownerPublicKey: me.keys.publicKey,
+				...input,
+			});
+		},
+		[me],
+	);
+
 	// Auto-lock after the chosen number of idle minutes.
 	useEffect(() => {
 		if (status !== "unlocked") return;
@@ -856,6 +878,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			lock,
 			signOut,
 			vaultKey,
+			openProposal,
 			verifyPassword,
 			changePassword,
 			deleteAccount,
@@ -892,6 +915,7 @@ export function KeyringProvider({ children }: { children: ReactNode }) {
 			lock,
 			signOut,
 			vaultKey,
+			openProposal,
 		],
 	);
 

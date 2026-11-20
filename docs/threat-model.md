@@ -29,7 +29,8 @@ From a backup, a D1 export, or a breach of the Cloudflare account.
 Whoever runs the Cloudflare account, someone who takes it over, or Cloudflare itself.
 - **Everything above, and it decides who gets what.** The API enforces the roles, the limits and two-step login, so a server that doesn't, doesn't. It can refuse anyone, delete data, change who's in the workspace, or hand out an old copy of the data.
 - **It can ask for less key derivation work, within limits.** The apps refuse settings below OWASP's minimums, and a device that has seen an account use Argon2id refuses PBKDF2 for it ([Key derivation](security.md#key-derivation)).
-- **It hands out public keys.** The apps wrap a vault's key to the public key the server gives for a member, and an item's key to the one it gives for an agent, without checking them yet. A server that swaps one gets what's shared with that member or agent from then on, though not what was shared before ([Limits](security.md#limits)).
+- **It hands out public keys.** The apps wrap a vault's key to the public key the server gives for a member, and an item's key to the one it gives for an agent, without checking them yet. A server that swaps one gets what's shared with that member or agent from then on, though not what was shared before ([Limits](security.md#limits)). The same goes for the owner's public key an agent seals its proposals to.
+- **It can't read or forge proposals.** It stores them sealed, names included, and a proposal opens as an agent's only if that agent's private key made it. It could hand an old one back, which its owner would see again; a rule accepts one by itself only within a day of when it was made ([Agents proposing secrets](security.md#agents-proposing-secrets)).
 - **It serves the web app.** Someone in control of the hosting could serve code that captures a master password the next time someone signs in. This is the main limit of every web app that encrypts on the device ([Limits](security.md#limits)). [`vauly verify`](security.md#checking-what-an-instance-serves) checks that what an instance served you is the build of its commit. Host vauly yourself, and limit who can deploy to it.
 
 ### Someone on the network
@@ -64,6 +65,7 @@ With the extension installed, every site's page sits next to vauly's button and 
 
 - **They get what the agent was allowed, and no more.** An agent acts for the person who created it, so it reaches only items in vaults that person can open. Anything new waits for a person to approve it ([Agents and scripts](security.md#agents-and-scripts)).
 - **Everything is on record.** Each request, approval and value handed over is in **Activity**, with the command that asked ([What's recorded](agents.md#whats-recorded)). An agent's requests notify people at most once every five minutes.
+- **They can propose values in the agent's name**, for a new item or one the agent may use. Its owner sees each key marked new or changed, and accepts or declines. If the owner lets that agent's proposals into a vault without asking, the token can change that vault's items it may use, and add new ones, until the owner turns it off ([Agents proposing secrets](security.md#agents-proposing-secrets)).
 - **Pausing or deleting the agent** stops the token right away.
 
 ### The agent or script itself
@@ -71,6 +73,7 @@ With the extension installed, every site's page sits next to vauly's button and 
 - **The command `vauly run` starts gets the values,** in its environment. The agent that called it sees only the exit code and the output, with each value as `<hidden>`.
 - **Masking catches a value only as it is.** A command that prints it changed, such as base64-encoded, gets past it, and an agent with a shell can run such a command. Allowing an item to an agent means trusting the commands it runs with it.
 - **Over MCP, no tool returns a value** ([Coding agents over MCP](agents.md#coding-agents-over-mcp)).
+- **Proposing doesn't show it values.** `vauly put` and `propose_secrets` read them on the machine and print key names only. An agent with a shell could still read the file it proposes from, as it could before; proposing lets it delete that file afterwards.
 
 ### Someone with a share link
 
@@ -115,6 +118,7 @@ Where data passes from one part of vauly to another, and what each side trusts t
   - **The menu** is a frame of the extension's own page, which the site can't read. It shows logins and never holds a password.
   - **The background** holds the unlocked private key, in session storage that pages and content scripts can't read. It decides which logins match a page, and fills only when you choose one.
   - **vauly's own windows,** for saving logins and for passkeys, are extension pages that sites can't open, frame, cover or click in.
+- **An agent and its owner.** A proposal is sealed on the agent's machine to its owner's public key, and opened, merged and sealed again with the vault's keys in the owner's browser. Nothing in between can read it.
 - **`vauly run` and the command it starts.** The CLI holds the token and decrypts on the machine where it runs. Values go only into the command's environment, and files into a folder only your user can read, deleted when the command ends. In the GitHub Action, only the step's script gets them, unless `export: true` hands them to every later step.
 - **A share link's sender and recipient.** The copy is encrypted in the sender's browser and decrypted in the recipient's. In between, the server holds ciphertext and counts each opening.
 - **A release and an instance.** Every instance of a version serves the same files, so `vauly verify` can tell whether yours is one of them.

@@ -60,6 +60,7 @@ import {
 import { ActivityRow } from "./activity-row";
 import { CopyButton } from "./copy-button";
 import { CardFields, Field, IdentityFields, type OnUse } from "./detail-fields";
+import { EnvironmentFields } from "./environment-fields";
 import { GrantDialog } from "./grant-dialog";
 import { ItemDialog } from "./item-dialog";
 import { ItemFiles } from "./item-files";
@@ -210,7 +211,7 @@ export function ItemDetail({
 				)}
 				{editable && (
 					<>
-						{item.secret && (
+						{(item.secret || item.fields?.length) && (
 							<>
 								<DropdownMenuItem onClick={() => setGranting(true)}>
 									<RobotIcon />
@@ -467,6 +468,14 @@ export function ItemDetail({
 					</div>
 				) : null}
 
+				{item.kind === "environment" && (
+					<div className="px-4">
+						<EnvironmentFields
+							item={item}
+							onUse={(action, field) => use(action, fieldRef(field))}
+						/>
+					</div>
+				)}
 				<dl className="divide-line-subtle flex flex-col divide-y px-4">
 					{item.username && (
 						<Field label="Username">
@@ -548,32 +557,33 @@ export function ItemDetail({
 							</span>
 						</Field>
 					)}
-					{item.fields?.map((field) => (
-						<Field key={`${field.label}:${field.value}`} label={field.label}>
-							{field.hidden ? (
-								<SecretValue
-									value={field.value}
-									label={field.label}
-									source={item.name}
-									onReveal={log("revealed", fieldRef(field))}
-									onCopied={log("copied", fieldRef(field))}
-								/>
-							) : (
-								<>
-									<span className="text-body-sm text-fg min-w-0 flex-1 break-words whitespace-pre-wrap">
-										{field.value}
-									</span>
-									<CopyButton
+					{item.kind !== "environment" &&
+						item.fields?.map((field) => (
+							<Field key={`${field.label}:${field.value}`} label={field.label}>
+								{field.hidden ? (
+									<SecretValue
 										value={field.value}
 										label={field.label}
 										source={item.name}
-										secret={false}
+										onReveal={log("revealed", fieldRef(field))}
 										onCopied={log("copied", fieldRef(field))}
 									/>
-								</>
-							)}
-						</Field>
-					))}
+								) : (
+									<>
+										<span className="text-body-sm text-fg min-w-0 flex-1 break-words whitespace-pre-wrap">
+											{field.value}
+										</span>
+										<CopyButton
+											value={field.value}
+											label={field.label}
+											source={item.name}
+											secret={false}
+											onCopied={log("copied", fieldRef(field))}
+										/>
+									</>
+								)}
+							</Field>
+						))}
 					{item.notes && (
 						<Field label="Notes">
 							<p className="text-body-sm text-fg py-1 leading-relaxed whitespace-pre-wrap">

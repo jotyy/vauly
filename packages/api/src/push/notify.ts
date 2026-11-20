@@ -360,6 +360,48 @@ export async function approvalDeliveries(
 	}));
 }
 
+/**
+ * Who hears about an agent's proposal: its owner, the only one who can open it. Quiet
+ * like its requests, at most once every few minutes.
+ */
+export async function proposalDeliveries(
+	db: Database,
+	from: { id: string; name: string; ownerId: string },
+	count: number,
+): Promise<Delivery[]> {
+	const now = new Date();
+	const [due] = await db
+		.update(agent)
+		.set({ notifiedAt: now })
+		.where(
+			and(
+				eq(agent.id, from.id),
+				or(
+					isNull(agent.notifiedAt),
+					lt(agent.notifiedAt, new Date(now.getTime() - AGENT_QUIET)),
+				),
+			),
+		)
+		.returning({ id: agent.id });
+	if (!due) return [];
+	return [{ userId: from.ownerId, notice: proposalNotice(from, count) }];
+}
+
+/** What an agent's proposal tells its owner: how many values, never their names. */
+export function proposalNotice(
+	agent: { id: string; name: string },
+	count: number,
+): Notice {
+	return {
+		title: `${agent.name} proposes ${count === 1 ? "1 secret" : `${count} secrets`}`,
+		body: "Open vauly to review, accept or decline.",
+		url: "/agents",
+		tag: `proposal:${agent.id}`,
+		urgent: true,
+		ttl: 60 * 60,
+	};
+}
+
 /** What an agent's request tells the people who can approve it. */
 export function approvalNotice(
 	agent: { id: string; name: string },

@@ -9,6 +9,7 @@ import { filesRouter } from "./files";
 import { itemsRouter } from "./items";
 import { linksRouter } from "./links";
 import { membersRouter } from "./members";
+import { proposalsRouter } from "./proposals";
 import { pushRouter } from "./push";
 import { updatesRouter } from "./updates";
 import { vaultsRouter } from "./vaults";
@@ -23,6 +24,7 @@ export const appRouter = {
 	members: membersRouter,
 	agents: agentsRouter,
 	requests: requestsRouter,
+	proposals: proposalsRouter,
 	events: eventsRouter,
 	push: pushRouter,
 	updates: updatesRouter,

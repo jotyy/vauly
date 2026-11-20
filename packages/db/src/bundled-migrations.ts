@@ -100,4 +100,9 @@ export const migrations: readonly {
 		hash: "4c3e2e406ba08d2be3ac4b3767ae38025edb16ada56ddee25edd87619a49da89",
 		sql: "-- A file whose chunks are in R2 leaves its ID behind when its row goes, however it goes:\n-- removed, its upload cancelled or left unfinished, or with its item, vault, account or\n-- workspace through the cascades. The Worker deletes the objects later.\nCREATE TRIGGER `attachment_purge_r2` AFTER DELETE ON `attachment`\nWHEN old.`stored_in` = 'r2'\nBEGIN\n\tINSERT OR IGNORE INTO `file_purge` (`attachment_id`, `chunks`) VALUES (old.`id`, old.`chunks`);\nEND;\n",
 	},
+	{
+		name: "20261120125706_agent_proposals",
+		hash: "fc314bece3dc893969745093f7025f59af952136592a1c4fd4b333204b30ff08",
+		sql: "CREATE TABLE `proposal` (\n\t`id` text PRIMARY KEY,\n\t`agent_id` text NOT NULL,\n\t`item_id` text,\n\t`sealed` text,\n\t`count` integer NOT NULL,\n\t`status` text DEFAULT 'pending' NOT NULL,\n\t`result_item_id` text,\n\t`decided_by` text,\n\t`decided_at` integer,\n\t`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,\n\tCONSTRAINT `fk_proposal_agent_id_agent_id_fk` FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON DELETE CASCADE,\n\tCONSTRAINT `fk_proposal_item_id_item_id_fk` FOREIGN KEY (`item_id`) REFERENCES `item`(`id`) ON DELETE CASCADE\n);\n--> statement-breakpoint\nCREATE TABLE `proposal_rule` (\n\t`agent_id` text PRIMARY KEY,\n\t`vault_id` text NOT NULL,\n\t`sealed` text NOT NULL,\n\t`created_by` text NOT NULL,\n\t`created_at` integer DEFAULT (cast(unixepoch('subsecond') * 1000 as integer)) NOT NULL,\n\tCONSTRAINT `fk_proposal_rule_agent_id_agent_id_fk` FOREIGN KEY (`agent_id`) REFERENCES `agent`(`id`) ON DELETE CASCADE,\n\tCONSTRAINT `fk_proposal_rule_vault_id_vault_id_fk` FOREIGN KEY (`vault_id`) REFERENCES `vault`(`id`) ON DELETE CASCADE\n);\n--> statement-breakpoint\nCREATE INDEX `proposal_agent_idx` ON `proposal` (`agent_id`,`status`);",
+	},
 ];

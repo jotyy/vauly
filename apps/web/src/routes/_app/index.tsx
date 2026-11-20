@@ -31,12 +31,14 @@ import {
 } from "@/components/member-dialogs";
 import { notify } from "@/components/notify";
 import { Page, SectionTitle } from "@/components/page";
+import { ProposalCard } from "@/components/proposal-card";
 import { useBreached } from "@/lib/breaches";
 import { filesSeen, useFiles } from "@/lib/files";
 import { ago, plural } from "@/lib/format";
 import { useKeyring } from "@/lib/keyring";
 import { logoDomain } from "@/lib/logos";
 import { isNativeApp } from "@/lib/native";
+import { useProposals } from "@/lib/proposals";
 import { useLookup } from "@/lib/use-lookup";
 import {
 	type AccessRequest,
@@ -63,14 +65,16 @@ export const Route = createFileRoute("/_app/")({
 function Overview() {
 	const { me } = useKeyring();
 	const needs = useNeeds();
+	const { proposals, rules } = useProposals();
 	const firstName = me?.name.split(" ")[0];
+	const count = needs.rows.length + proposals.length;
 
 	return (
 		<Page
 			title="Overview"
 			description={
-				needs.rows.length
-					? `Hi ${firstName}. ${needs.rows.length} ${needs.rows.length === 1 ? "thing needs" : "things need"} you.`
+				count
+					? `Hi ${firstName}. ${count} ${count === 1 ? "thing needs" : "things need"} you.`
 					: `Hi ${firstName}. Nothing needs you right now.`
 			}
 		>
@@ -82,19 +86,30 @@ function Overview() {
 			<div className="mt-8">
 				<SectionTitle>
 					Needs you
-					{needs.rows.length > 0 && (
+					{count > 0 && (
 						<Badge variant="brand" className="ml-2">
-							{needs.rows.length}
+							{count}
 						</Badge>
 					)}
 				</SectionTitle>
-				{needs.rows.length === 0 ? (
+				{proposals.length > 0 && (
+					<div className="mb-3 flex flex-col gap-3">
+						{proposals.map((opened) => (
+							<ProposalCard
+								key={opened.id}
+								opened={opened}
+								rule={rules.find((rule) => rule.agentId === opened.agentId)}
+							/>
+						))}
+					</div>
+				)}
+				{count === 0 ? (
 					<div className="rounded-window border-line text-caption text-fg-subtle flex items-center justify-center gap-2 border border-dashed py-8">
 						<CheckCircleIcon className="text-success size-4" />
-						All clear. Access requests, new teammates and passwords to change
-						show up here.
+						All clear. Access requests, agents' proposals, new teammates and
+						passwords to change show up here.
 					</div>
-				) : (
+				) : needs.rows.length === 0 ? null : (
 					<section
 						aria-label="Needs you"
 						className="rounded-window bg-surface shadow-card divide-line-subtle flex flex-col divide-y"

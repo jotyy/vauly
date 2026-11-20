@@ -312,6 +312,53 @@ export const accessRequest = sqliteTable(
 	(table) => [index("access_request_status_idx").on(table.status)],
 );
 
+export type ProposalStatus = "pending" | "accepted" | "declined";
+
+/**
+ * Values an agent proposes for its owner to accept: a new item, or new and changed fields
+ * on one it may use. `sealed` is sealed on the agent's machine to its owner's public key
+ * (@vauly/crypto sealProposal): names and values alike. It's cleared once answered.
+ */
+export const proposal = sqliteTable(
+	"proposal",
+	{
+		/** Chosen by the agent, as it's bound into what it sealed. */
+		id: text("id").primaryKey(),
+		agentId: text("agent_id")
+			.notNull()
+			.references(() => agent.id, { onDelete: "cascade" }),
+		/** The item it changes; null for a new item. */
+		itemId: text("item_id").references(() => item.id, { onDelete: "cascade" }),
+		sealed: text("sealed"),
+		/** How many values it holds, for notifications and limits. */
+		count: integer("count").notNull(),
+		status: text("status").$type<ProposalStatus>().notNull().default("pending"),
+		/** The item it created or changed, once accepted. */
+		resultItemId: text("result_item_id"),
+		decidedBy: text("decided_by"),
+		decidedAt: integer("decided_at", { mode: "timestamp_ms" }),
+		createdAt: createdAt(),
+	},
+	(table) => [index("proposal_agent_idx").on(table.agentId, table.status)],
+);
+
+/**
+ * An agent whose proposals its owner's browser accepts into a vault without asking.
+ * `sealed` is the rule sealed with the vault's key (@vauly/crypto sealProposalRule),
+ * so the server can store and delete one, never make one.
+ */
+export const proposalRule = sqliteTable("proposal_rule", {
+	agentId: text("agent_id")
+		.primaryKey()
+		.references(() => agent.id, { onDelete: "cascade" }),
+	vaultId: text("vault_id")
+		.notNull()
+		.references(() => vault.id, { onDelete: "cascade" }),
+	sealed: text("sealed").notNull(),
+	createdBy: text("created_by").notNull(),
+	createdAt: createdAt(),
+});
+
 export type EventAction =
 	| "created"
 	| "updated"
@@ -342,7 +389,14 @@ export type EventAction =
 	// workspace's owner, without a vault).
 	| "changed"
 	// Someone deleted their own account; `detail` keeps their name.
-	| "left";
+	| "left"
+	// An agent proposed values for an item, or for a new one; `subjectId` is the proposal.
+	| "proposed"
+	// Its owner accepted or declined it; `detail` is "auto" when a rule accepted it.
+	| "accepted"
+	| "declined"
+	// An agent read the names of an item's fields, for `vauly ls` or `vauly refs`.
+	| "listed";
 
 /** Append-only audit log. `detail` is plaintext: never put a secret in it. */
 export const event = sqliteTable(

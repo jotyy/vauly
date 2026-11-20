@@ -152,7 +152,7 @@ async function callTool(
 }
 
 describe("the protocol", () => {
-	test("initialize agrees on a version and offers the three tools", async () => {
+	test("initialize agrees on a version and offers its tools", async () => {
 		const init = await handle(
 			{
 				jsonrpc: "2.0",
@@ -175,7 +175,14 @@ describe("the protocol", () => {
 			(list?.result as { tools: { name: string }[] } | undefined)?.tools.map(
 				(t) => t.name,
 			),
-		).toEqual(["list_secrets", "run_with_secrets", "request_access"]);
+		).toEqual([
+			"list_secrets",
+			"run_with_secrets",
+			"request_access",
+			"propose_secrets",
+			"list_fields",
+			"list_items",
+		]);
 	});
 
 	test("an unknown version gets the newest; notifications get no answer", async () => {

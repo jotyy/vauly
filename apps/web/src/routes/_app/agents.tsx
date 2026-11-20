@@ -1,6 +1,7 @@
 import {
 	ClockIcon,
 	DotsThreeIcon,
+	HandIcon,
 	PlusIcon,
 	ShieldCheckIcon,
 	TrashIcon,
@@ -25,7 +26,9 @@ import { ConnectAgentCard } from "@/components/connect-agent-card";
 import { ItemTile } from "@/components/item-tile";
 import { notify } from "@/components/notify";
 import { Page, SectionTitle } from "@/components/page";
+import { ProposalCard } from "@/components/proposal-card";
 import { ago } from "@/lib/format";
+import { useProposalActions, useProposals } from "@/lib/proposals";
 import { useLookup } from "@/lib/use-lookup";
 import {
 	type Agent,
@@ -48,33 +51,42 @@ function Agents() {
 	const lookup = useLookup();
 	const [creating, setCreating] = useState(false);
 	const pending = requests.data ?? [];
+	const { proposals, rules } = useProposals();
 	const list = agents.data ?? [];
+	const waiting = pending.length + proposals.length;
 
 	return (
 		<Page
 			title="Agents"
 			description="Agents run commands with your secrets without ever seeing them."
 		>
-			{agents.isPending ? null : list.length === 0 && pending.length === 0 ? (
+			{agents.isPending ? null : list.length === 0 && waiting === 0 ? (
 				<ConnectAgentCard first onNewAgent={() => setCreating(true)} />
 			) : (
 				<>
 					<SectionTitle>
 						Waiting for you
-						{pending.length > 0 && (
+						{waiting > 0 && (
 							<Badge variant="brand" className="ml-2">
-								{pending.length}
+								{waiting}
 							</Badge>
 						)}
 					</SectionTitle>
-					{pending.length === 0 ? (
+					{waiting === 0 ? (
 						<div className="rounded-window border-line text-caption text-fg-subtle mb-8 flex items-center justify-center gap-2 border border-dashed py-8">
 							<ShieldCheckIcon className="size-4" />
-							Nothing to approve. When an agent asks for a new item, it shows up
-							here.
+							Nothing to approve. When an agent asks for an item, or proposes
+							secrets, it shows up here.
 						</div>
 					) : (
 						<div className="mb-8 flex flex-col gap-3">
+							{proposals.map((opened) => (
+								<ProposalCard
+									key={opened.id}
+									opened={opened}
+									rule={rules.find((rule) => rule.agentId === opened.agentId)}
+								/>
+							))}
 							{pending.map((request) => (
 								<ApprovalCard
 									key={request.id}
@@ -121,6 +133,8 @@ function Agents() {
 
 function AgentRow({ agent }: { agent: Agent }) {
 	const actions = useActions();
+	const proposalActions = useProposalActions();
+	const rule = useProposals().rules.find((r) => r.agentId === agent.id);
 	const [deleting, setDeleting] = useState(false);
 	const expires = agent.expiresAt ? new Date(agent.expiresAt) : null;
 	const expired = expires ? expires.getTime() < Date.now() : false;
@@ -158,7 +172,10 @@ function AgentRow({ agent }: { agent: Agent }) {
 								? "access expired"
 								: `expires in ${daysLeft} ${daysLeft === 1 ? "day" : "days"}`
 							: "no expiry",
-					].join(" · ")}
+						rule?.valid && `accepts proposals into ${rule.vault.name}`,
+					]
+						.filter(Boolean)
+						.join(" · ")}
 				</span>
 			</div>
 			<div className="text-caption flex w-28 flex-col items-end gap-0.5">
@@ -209,6 +226,19 @@ function AgentRow({ agent }: { agent: Agent }) {
 							Extend {days} days
 						</DropdownMenuItem>
 					))}
+					{rule && (
+						<DropdownMenuItem
+							onClick={() =>
+								run(
+									proposalActions.removeRule(agent.id),
+									`${agent.name}'s proposals wait for you again`,
+								)
+							}
+						>
+							<HandIcon />
+							Ask before accepting proposals
+						</DropdownMenuItem>
+					)}
 					<DropdownMenuSeparator />
 					<DropdownMenuItem
 						variant="destructive"

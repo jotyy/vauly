@@ -600,6 +600,191 @@ export async function unwrapKeyFrom(
 	return unwrapKey(aes, sealed);
 }
 
+// --- Proposals (agents suggesting secrets) ----------------------------------------
+//
+// An agent proposes values for a person to accept. It seals them to its owner's public
+// key, with a key that takes two ECDH secrets: a fresh ephemeral key's, so each proposal
+// has its own key, and the agent's own key pair's, so only the holder of the agent's
+// private key can make a proposal that opens with that agent's public key. The server
+// relays it, and can neither read it nor make one up.
+
+/** What a proposal holds once opened. */
+export type Proposal = {
+	v: 1;
+	/** The proposal's ID, also bound in its additional data. */
+	id: string;
+	/** When the agent made it, as an ISO date. */
+	at: string;
+	/** For a new item: its name. */
+	name?: string;
+	/** For a new item: the vault the agent suggests, by name. The person decides. */
+	vault?: string;
+	fields: { label: string; value: string }[];
+};
+
+/** Which proposal this is, who made it and for which item; it opens for nothing else. */
+export type ProposalContext = {
+	proposalId: string;
+	agentId: string;
+	/** The item it changes, or null for a new item. */
+	itemId: string | null;
+};
+
+const proposalData = ({ proposalId, agentId, itemId }: ProposalContext) =>
+	encoder.encode(`vauly/proposal\n${proposalId}\n${agentId}\n${itemId ?? ""}`);
+
+async function proposalKey(
+	ephemeralSecret: ArrayBuffer,
+	staticSecret: ArrayBuffer,
+	ownerPublicKey: string,
+	agentPublicKey: string,
+) {
+	const both = new Uint8Array(64);
+	both.set(new Uint8Array(ephemeralSecret), 0);
+	both.set(new Uint8Array(staticSecret), 32);
+	const hkdfKey = await crypto.subtle.importKey("raw", both, "HKDF", false, [
+		"deriveKey",
+	]);
+	return crypto.subtle.deriveKey(
+		{
+			name: "HKDF",
+			hash: "SHA-256",
+			salt: new Uint8Array(32),
+			info: encoder.encode(
+				`vauly/proposal:${ownerPublicKey}:${agentPublicKey}`,
+			),
+		},
+		hkdfKey,
+		AES,
+		false,
+		["encrypt", "decrypt"],
+	);
+}
+
+const ecdh = (privateKey: CryptoKey, publicKey: CryptoKey) =>
+	crypto.subtle.deriveBits(
+		{ name: "ECDH", public: publicKey },
+		privateKey,
+		256,
+	);
+
+/**
+ * Seals a proposal on the agent's machine: `base64(ephemeral public key) + ":" + ` the
+ * proposal's JSON, sealed with additional data that names it.
+ */
+export async function sealProposal({
+	agentPrivateKey,
+	agentPublicKey,
+	ownerPublicKey,
+	context,
+	proposal,
+}: {
+	agentPrivateKey: CryptoKey;
+	agentPublicKey: string;
+	ownerPublicKey: string;
+	context: ProposalContext;
+	proposal: Proposal;
+}): Promise<string> {
+	if (proposal.id !== context.proposalId) {
+		throw new Error("The proposal's ID doesn't match");
+	}
+	const owner = await importPublicKey(ownerPublicKey);
+	const ephemeral = await random.ecdhKeyPair();
+	const key = await proposalKey(
+		await ecdh(ephemeral.privateKey, owner),
+		await ecdh(agentPrivateKey, owner),
+		ownerPublicKey,
+		agentPublicKey,
+	);
+	const ephemeralPublic = new Uint8Array(
+		await crypto.subtle.exportKey("spki", ephemeral.publicKey),
+	);
+	const sealed = await sealWith(
+		key,
+		encoder.encode(JSON.stringify(proposal)),
+		proposalData(context),
+	);
+	return `${toBase64(ephemeralPublic)}:${sealed}`;
+}
+
+/**
+ * Opens a proposal in the owner's browser. It fails unless the agent whose public key is
+ * given made it, for this very proposal, agent and item.
+ */
+export async function openProposal({
+	ownerPrivateKey,
+	ownerPublicKey,
+	agentPublicKey,
+	context,
+	sealed,
+}: {
+	ownerPrivateKey: CryptoKey;
+	ownerPublicKey: string;
+	agentPublicKey: string;
+	context: ProposalContext;
+	sealed: string;
+}): Promise<Proposal> {
+	const [ephemeralPublic, body] = sealed.split(":");
+	if (!ephemeralPublic || !body) throw new Error("Malformed proposal");
+	const key = await proposalKey(
+		await ecdh(ownerPrivateKey, await importPublicKey(ephemeralPublic)),
+		await ecdh(ownerPrivateKey, await importPublicKey(agentPublicKey)),
+		ownerPublicKey,
+		agentPublicKey,
+	);
+	const proposal = JSON.parse(
+		decoder.decode(await openWith(key, body, proposalData(context))),
+	) as Proposal;
+	if (
+		proposal.v !== 1 ||
+		proposal.id !== context.proposalId ||
+		!Array.isArray(proposal.fields)
+	) {
+		throw new Error("Unknown proposal format");
+	}
+	return proposal;
+}
+
+/**
+ * A person's word that an agent's proposals go into a vault without asking: sealed with
+ * that vault's key, so only someone who can open the vault can make one, and naming the
+ * agent's public key, so it stops applying if the agent's key is ever swapped.
+ */
+export type ProposalRule = {
+	v: 1;
+	agentId: string;
+	agentPublicKey: string;
+	vaultId: string;
+};
+
+const ruleData = (agentId: string, vaultId: string) =>
+	encoder.encode(`vauly/proposal-rule\n${agentId}\n${vaultId}`);
+
+export const sealProposalRule = (vaultKey: CryptoKey, rule: ProposalRule) =>
+	sealWith(
+		vaultKey,
+		encoder.encode(JSON.stringify(rule)),
+		ruleData(rule.agentId, rule.vaultId),
+	);
+
+/** Opens a rule, refused unless it's for this agent and vault. */
+export async function openProposalRule(
+	vaultKey: CryptoKey,
+	sealed: Sealed,
+	agentId: string,
+	vaultId: string,
+): Promise<ProposalRule> {
+	const rule = JSON.parse(
+		decoder.decode(
+			await openWith(vaultKey, sealed, ruleData(agentId, vaultId)),
+		),
+	) as ProposalRule;
+	if (rule.v !== 1 || rule.agentId !== agentId || rule.vaultId !== vaultId) {
+		throw new Error("Unknown rule format");
+	}
+	return rule;
+}
+
 // --- Account bundle --------------------------------------------------------------
 
 /**

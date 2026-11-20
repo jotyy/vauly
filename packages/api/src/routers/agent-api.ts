@@ -7,18 +7,31 @@ import {
 	attachment,
 	item,
 	member,
+	proposal,
 	vaultAccess,
 } from "@vauly/db/schema/vault";
-import { and, eq, gt, inArray, isNotNull, isNull, lte } from "drizzle-orm";
+import {
+	and,
+	count,
+	eq,
+	gt,
+	inArray,
+	isNotNull,
+	isNull,
+	lte,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import { getChunk } from "../file-chunks";
 import { readPass, signPass } from "../file-pass";
 import { publicProcedure } from "../index";
 import { hashToken, logEvent, newId } from "../lib";
-import { approvalDeliveries } from "../push/notify";
+import { approvalDeliveries, proposalDeliveries } from "../push/notify";
 
 const DENIAL_COOLDOWN = 10 * 60 * 1000;
+/** Proposals an agent may have waiting at once, so it can't bury its owner in them. */
+const MAX_PENDING_PROPOSALS = 20;
+const proposalId = z.string().regex(/^prp_[0-9a-z]{16,40}$/);
 
 function sameHash(a: string, b: string) {
 	if (a.length !== b.length) return false;
@@ -37,7 +50,11 @@ const agentProcedure = publicProcedure.use(async ({ context, next }) => {
 	if (!match?.[1] || !match[2])
 		throw new ORPCError("UNAUTHORIZED", { message: "Missing agent token" });
 	const [found] = await context.db
-		.select({ agent, owner: member.userId })
+		.select({
+			agent,
+			owner: member.userId,
+			ownerPublicKey: member.publicKey,
+		})
 		.from(agent)
 		.leftJoin(member, eq(member.userId, agent.ownerId))
 		.where(eq(agent.id, match[1]));
@@ -65,7 +82,9 @@ const agentProcedure = publicProcedure.use(async ({ context, next }) => {
 		.update(agent)
 		.set({ lastSeenAt: new Date(), host })
 		.where(eq(agent.id, row.id));
-	return next({ context: { agent: row } });
+	return next({
+		context: { agent: row, ownerPublicKey: found.ownerPublicKey ?? "" },
+	});
 });
 
 const itemIds = z.array(z.string().max(40)).min(1).max(20);
@@ -276,7 +295,158 @@ export const agentApiRouter = {
 		id: context.agent.id,
 		name: context.agent.name,
 		publicKey: context.agent.publicKey,
+		/** Its owner's, whom its proposals are sealed to. */
+		ownerPublicKey: context.ownerPublicKey,
 	})),
+
+	/**
+	 * The items this agent may use without asking, sealed, for `vauly ls` and `vauly refs`
+	 * to read their names and their fields' names on its machine. A one-time grant is
+	 * listed without the item, so listing doesn't use it up. Each item handed over is
+	 * logged.
+	 */
+	items: agentProcedure
+		.input(z.object({ command: reason }))
+		.handler(async ({ context, input }) => {
+			const { db, agent: me } = context;
+			const now = new Date();
+			const rows = await db
+				.select({ grant: agentGrant, item })
+				.from(agentGrant)
+				.innerJoin(item, eq(item.id, agentGrant.itemId))
+				.where(
+					and(
+						eq(agentGrant.agentId, me.id),
+						isNull(item.deletedAt),
+						inArray(
+							item.vaultId,
+							db
+								.select({ vaultId: vaultAccess.vaultId })
+								.from(vaultAccess)
+								.where(eq(vaultAccess.userId, me.ownerId)),
+						),
+					),
+				)
+				.limit(200);
+			const live = rows.filter((row) => isLive(row.grant, now));
+			const handed = live.filter((row) => !row.grant.once);
+			if (handed.length > 0) {
+				const [first, ...rest] = handed.map((row) =>
+					logEvent(db, {
+						actorType: "agent",
+						actorId: me.id,
+						action: "listed",
+						itemId: row.item.id,
+						vaultId: row.item.vaultId,
+						detail: input.command,
+					}),
+				);
+				if (first) await db.batch([first, ...rest]);
+			}
+			return live.map((row) =>
+				row.grant.once
+					? { itemId: row.item.id, status: "once" as const }
+					: {
+							itemId: row.item.id,
+							status: "granted" as const,
+							data: row.item.data,
+							wrappedKey: row.grant.wrappedKey,
+						},
+			);
+		}),
+
+	/**
+	 * Hands its owner values to accept: a new item, or fields for one this agent may use.
+	 * Sealed on its machine to its owner's public key, names and values alike, so the
+	 * server stores what it can't read. Only the owner's browser opens it.
+	 */
+	propose: agentProcedure
+		.input(
+			z.object({
+				id: proposalId,
+				itemId: z.string().max(40).nullable(),
+				sealed: z.string().min(40).max(60_000),
+				count: z.number().int().min(1).max(200),
+			}),
+		)
+		.handler(async ({ context, input }) => {
+			const { db, agent: me } = context;
+			let vaultId: string | null = null;
+			if (input.itemId) {
+				const [entry] = await lookup(db, me, [input.itemId]);
+				if (!entry?.target) {
+					throw new ORPCError("NOT_FOUND", {
+						message: `${input.itemId} doesn't exist or was deleted.`,
+					});
+				}
+				// An agent changes only what it may use: it can't learn of other items this way.
+				if (!entry.grant) {
+					throw new ORPCError("FORBIDDEN", {
+						message: `This agent may not use ${input.itemId} yet. Run vauly refs ${input.itemId} to ask for it first.`,
+					});
+				}
+				vaultId = entry.target.vaultId;
+			}
+			const [waiting] = await db
+				.select({ n: count() })
+				.from(proposal)
+				.where(
+					and(eq(proposal.agentId, me.id), eq(proposal.status, "pending")),
+				);
+			if ((waiting?.n ?? 0) >= MAX_PENDING_PROPOSALS) {
+				throw new ORPCError("CONFLICT", {
+					message: `This agent has ${MAX_PENDING_PROPOSALS} proposals waiting. Ask your person to answer them first.`,
+				});
+			}
+			const [taken] = await db
+				.select({ id: proposal.id })
+				.from(proposal)
+				.where(eq(proposal.id, input.id));
+			if (taken) {
+				throw new ORPCError("CONFLICT", {
+					message: "That proposal ID is taken.",
+				});
+			}
+			await db.batch([
+				db.insert(proposal).values({
+					id: input.id,
+					agentId: me.id,
+					itemId: input.itemId,
+					sealed: input.sealed,
+					count: input.count,
+				}),
+				logEvent(db, {
+					actorType: "agent",
+					actorId: me.id,
+					action: "proposed",
+					itemId: input.itemId,
+					vaultId,
+					subjectId: input.id,
+					detail: String(input.count),
+				}),
+			]);
+			context.notify(proposalDeliveries(db, me, input.count));
+			return { id: input.id, status: "pending" as const };
+		}),
+
+	/** Whether its owner answered its proposals, and with which item. */
+	proposals: agentProcedure
+		.input(z.object({ ids: z.array(proposalId).min(1).max(20) }))
+		.handler(({ context, input }) =>
+			context.db
+				.select({
+					id: proposal.id,
+					status: proposal.status,
+					itemId: proposal.resultItemId,
+				})
+				.from(proposal)
+				.where(
+					and(
+						eq(proposal.agentId, context.agent.id),
+						inArray(proposal.id, input.ids),
+					),
+				),
+		),
 
 	/**
 	 * For each item: the sealed item and its key wrapped to this agent, or a pending
