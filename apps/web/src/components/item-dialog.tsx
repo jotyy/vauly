@@ -59,6 +59,7 @@ const kinds: { value: ItemKind; label: string }[] = [
 	{ value: "ssh-key", label: "SSH key" },
 	{ value: "card", label: "Card" },
 	{ value: "identity", label: "Identity" },
+	{ value: "environment", label: "Environment" },
 ];
 
 const secretLabel: Record<ItemKind, string> = {
@@ -68,6 +69,7 @@ const secretLabel: Record<ItemKind, string> = {
 	"ssh-key": "Private key",
 	card: "",
 	identity: "",
+	environment: "",
 };
 
 /** The kinds that keep a username and a secret; cards and identities have their own. */
@@ -78,6 +80,7 @@ const namePlaceholder: Partial<Record<ItemKind, string>> = {
 	login: "GitHub",
 	card: "Company Visa",
 	identity: "Acme Ltd",
+	environment: "acme/production",
 };
 
 // A card's and an identity's fields as the form edits them: every one a string.
@@ -136,6 +139,14 @@ type Form = {
 };
 
 const rowId = () => crypto.randomUUID();
+
+/** A variable in an environment: a secret, so hidden from the start. */
+const newVariable = (): FieldRow => ({
+	id: newFieldId(),
+	label: "",
+	value: "",
+	hidden: true,
+});
 
 function fromItem(item?: Item, vaultId?: string): Form {
 	return {
@@ -312,7 +323,18 @@ export function ItemDialog({
 						<Tabs
 							className="max-w-full overflow-x-auto"
 							value={form.kind}
-							onValueChange={(value) => set("kind", value as ItemKind)}
+							onValueChange={(value) => {
+								const kind = value as ItemKind;
+								setForm((current) => ({
+									...current,
+									kind,
+									// An environment is its variables: start with a row for the first.
+									fields:
+										kind === "environment" && current.fields.length === 0
+											? [newVariable()]
+											: current.fields,
+								}));
+							}}
 						>
 							<TabsList>
 								{kinds.map((kind) => (
@@ -446,13 +468,16 @@ export function ItemDialog({
 						{form.fields.length > 0 && (
 							<fieldset className="flex min-w-0 flex-col gap-1.5">
 								<legend className="text-caption text-fg-muted mb-1.5">
-									Fields
+									{form.kind === "environment" ? "Variables" : "Fields"}
 								</legend>
 								{form.fields.map((field, index) => (
 									<FieldInput
 										key={field.id}
 										number={index + 1}
 										field={field}
+										placeholder={
+											form.kind === "environment" ? "DATABASE_URL" : "PIN"
+										}
 										onChange={(next) =>
 											set(
 												"fields",
@@ -495,12 +520,14 @@ export function ItemDialog({
 								onClick={() =>
 									set("fields", [
 										...form.fields,
-										{ id: newFieldId(), label: "", value: "" },
+										form.kind === "environment"
+											? newVariable()
+											: { id: newFieldId(), label: "", value: "" },
 									])
 								}
 							>
 								<PlusIcon data-icon="inline-start" />
-								Add a field
+								{form.kind === "environment" ? "Add a variable" : "Add a field"}
 							</Button>
 						</div>
 						<Row label="Notes" optional={form.kind !== "note"}>
@@ -706,11 +733,13 @@ function HiddenInput({
 function FieldInput({
 	number,
 	field,
+	placeholder,
 	onChange,
 	onRemove,
 }: {
 	number: number;
 	field: FieldRow;
+	placeholder: string;
 	onChange: (field: Partial<CustomField>) => void;
 	onRemove: () => void;
 }) {
@@ -719,7 +748,7 @@ function FieldInput({
 			<Input
 				aria-label={`Field ${number} name`}
 				value={field.label}
-				placeholder="PIN"
+				placeholder={placeholder}
 				className="w-40 shrink-0"
 				onChange={(event) => onChange({ label: event.target.value })}
 			/>

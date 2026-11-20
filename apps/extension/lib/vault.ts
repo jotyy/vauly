@@ -38,7 +38,8 @@ export type ItemKind =
 	| "note"
 	| "ssh-key"
 	| "card"
-	| "identity";
+	| "identity"
+	| "environment";
 
 export type Entry = {
 	id: string;

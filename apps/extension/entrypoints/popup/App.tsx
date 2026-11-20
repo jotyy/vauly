@@ -11,6 +11,7 @@ import {
 	LockSimpleIcon,
 	MagnifyingGlassIcon,
 	NoteIcon,
+	StackIcon,
 	TerminalWindowIcon,
 	UserIcon,
 } from "@phosphor-icons/react";
@@ -814,6 +815,7 @@ const kindIcon: Record<string, typeof GlobeIcon> = {
 	"ssh-key": TerminalWindowIcon,
 	card: CreditCardIcon,
 	identity: IdentificationCardIcon,
+	environment: StackIcon,
 };
 
 /** The line under an entry's name: who or what it is, never a card's number. */

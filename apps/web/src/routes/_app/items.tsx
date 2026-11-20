@@ -67,6 +67,7 @@ const kinds = [
 	{ value: "ssh-key", label: "SSH keys" },
 	{ value: "card", label: "Cards" },
 	{ value: "identity", label: "Identities" },
+	{ value: "environment", label: "Environments" },
 ];
 
 const healthLabel = {

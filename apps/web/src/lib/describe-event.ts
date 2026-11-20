@@ -114,16 +114,51 @@ export function describeEvent(
 		case "denied":
 			return parts(`denied ${subject ?? "an agent"} access to`, itemName);
 		case "granted":
+			if (event.detail === "proposals")
+				return parts(
+					`let ${subject ?? "an agent"}'s proposals into`,
+					vault?.name ?? "a vault",
+					"without asking",
+				);
 			return parts(
 				`let ${subject ?? "an agent"} use`,
 				itemName,
 				durations[event.detail ?? ""],
+			);
+		case "proposed": {
+			const count = Number(event.detail ?? 0);
+			const values = `${count} ${count === 1 ? "value" : "values"}`;
+			return event.itemId
+				? parts(`proposed ${values} for`, itemName)
+				: parts(`proposed a new item with ${values}`);
+		}
+		case "accepted":
+			return parts(
+				`accepted ${subject ?? "an agent"}'s proposal for`,
+				itemName,
+				event.detail === "auto" ? "by their rule" : undefined,
+			);
+		case "declined":
+			return event.itemId
+				? parts(`declined ${subject ?? "an agent"}'s proposal for`, itemName)
+				: parts(`declined ${subject ?? "an agent"}'s proposal`);
+		case "listed":
+			return parts(
+				"read the field names of",
+				itemName,
+				event.detail ? `for ${event.detail}` : undefined,
 			);
 		case "linked":
 			return parts("shared a link to", itemName, linkDetail(event.detail));
 		case "opened":
 			return parts("opened", itemName, "from a share link");
 		case "revoked":
+			if (event.detail === "proposals")
+				return parts(
+					`stopped accepting ${subject ?? "an agent"}'s proposals into`,
+					vault?.name ?? "a vault",
+					"without asking",
+				);
 			if (event.itemId && event.detail === "link")
 				return parts("turned off a link to", itemName);
 			if (event.itemId)

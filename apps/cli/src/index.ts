@@ -15,6 +15,17 @@ import { serve } from "./mcp";
 import { createMasker, findReferences, parseEnvFile } from "./references";
 import { exitCode, formatReport, VerifyError, verify } from "./verify";
 import { versionLine } from "./version";
+import {
+	collectValues,
+	itemFields,
+	listItems,
+	listLines,
+	nameList,
+	ProposalPending,
+	propose,
+	referenceLines,
+	waitForAnswer,
+} from "./write";
 
 // vauly run -- <command>: resolves vauly:// references in the environment, waits for a
 // person to approve new items, and starts the command with the values injected. The
@@ -24,6 +35,12 @@ const HELP = `vauly — use secrets without seeing them
 
 Usage:
   vauly run [--env-file <path>] -- <command> [args...]
+  vauly put <item> (--env-file <path> | --from-env A,B | < file)
+            [--keys A,B] [--vault <name>] [--no-wait]
+                   propose values for a person to accept into an item: the
+                   values are read here and sealed; only names are printed
+  vauly refs <item>   print KEY=vauly://… for each of an item's fields
+  vauly ls         list the items this agent may use, with their fields' names
   vauly mcp        an MCP server for coding agents, on stdin and stdout
   vauly whoami
   vauly verify <url> [--against <manifest>] [--source <checkout>]
@@ -38,6 +55,10 @@ Environment:
 
 Values like vauly://itm_7k2m9qx4hc3r (or …/username) in the environment or the
 env file are replaced by the item's value inside <command> only.
+
+<item> is an item's ID (itm_…) or its name. vauly put changes an item this agent
+may use; any other name makes a new item once a person accepts it. No command
+ever prints a value.
 
 vauly verify rebuilds the commit the instance names, which needs git and bun, and
 compares every file and security header. --against compares with a manifest you
@@ -110,6 +131,120 @@ async function run(args: string[]) {
 	child.on("close", (code) => process.exit(code ?? 1));
 }
 
+const approvalTimeout = () =>
+	Number(process.env.VAULY_APPROVAL_TIMEOUT ?? 300) * 1000;
+
+/** Splits `<target> --flag value --switch` into the target and its options. */
+function options(args: string[], switches: string[], valued: string[]) {
+	let target: string | undefined;
+	const values: Record<string, string> = {};
+	const on = new Set<string>();
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i] as string;
+		if (valued.includes(arg)) {
+			const value = args[++i];
+			if (value === undefined) throw new CliError(`${arg} needs a value.`);
+			values[arg] = value;
+		} else if (switches.includes(arg)) on.add(arg);
+		else if (arg.startsWith("--"))
+			throw new CliError(`Unknown option "${arg}". Run vauly help.`);
+		else if (target === undefined) target = arg;
+		else throw new CliError(`Unexpected "${arg}". Run vauly help.`);
+	}
+	return { target, values, on };
+}
+
+async function readStdin() {
+	const chunks: Buffer[] = [];
+	for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+	return Buffer.concat(chunks).toString("utf8");
+}
+
+async function putCommand(args: string[]) {
+	const { target, values, on } = options(
+		args,
+		["--no-wait"],
+		["--env-file", "--from-env", "--keys", "--vault"],
+	);
+	if (!target) {
+		throw new CliError(
+			"Usage: vauly put <item> (--env-file <path> | --from-env A,B) [--keys A,B]",
+		);
+	}
+	const fromEnv = values["--from-env"];
+	const envFile = values["--env-file"];
+	const text =
+		!envFile && !fromEnv && !process.stdin.isTTY
+			? await readStdin()
+			: undefined;
+	if (!envFile && !fromEnv && text === undefined) {
+		throw new CliError(
+			"Say where the values are: --env-file <path>, --from-env A,B, or pipe them in.",
+		);
+	}
+	const found = collectValues({
+		envFile,
+		fromEnv: fromEnv === undefined ? undefined : nameList(fromEnv),
+		text,
+		keys:
+			values["--keys"] === undefined ? undefined : nameList(values["--keys"]),
+	});
+	const cfg = config();
+	const sent = await propose(cfg, target, found, { vault: values["--vault"] });
+	const into = sent.itemId ? sent.itemId : `a new item, ${sent.name}`;
+	process.stderr.write(
+		`vauly: proposed ${found.length} ${found.length === 1 ? "value" : "values"} for ${into}: ${found.map((entry) => entry.label).join(", ")}\n`,
+	);
+	if (on.has("--no-wait")) {
+		console.log(sent.id);
+		return;
+	}
+	process.stderr.write(
+		`vauly: waiting for a person to accept ${sent.id} in vauly under Needs you…\n`,
+	);
+	const itemId = await waitForAnswer(cfg, sent.id, approvalTimeout()).catch(
+		(error) => {
+			if (error instanceof ProposalPending) {
+				process.stderr.write(`vauly: ${error.message}\n`);
+				process.exit(3);
+			}
+			throw error;
+		},
+	);
+	process.stderr.write(
+		`vauly: accepted. vauly refs ${itemId} prints its references.\n`,
+	);
+	console.log(itemId);
+}
+
+async function refsCommand(args: string[]) {
+	const { target } = options(args, [], []);
+	if (!target) throw new CliError("Usage: vauly refs <item>");
+	const cfg = config();
+	const item = await itemFields(cfg, target, {
+		timeoutMs: approvalTimeout(),
+		onWaiting: (_count, agent) =>
+			process.stderr.write(
+				`vauly: ${agent} needs approval to use ${target}. Approve it in vauly under Needs you…\n`,
+			),
+	}).catch((error) => {
+		throw error instanceof ApprovalPending
+			? new CliError("Nobody approved the request in time.")
+			: error;
+	});
+	const lines = referenceLines(item);
+	if (lines.length === 0) {
+		process.stderr.write(`vauly: ${item.name} has no fields.\n`);
+		return;
+	}
+	console.log(lines.join("\n"));
+}
+
+async function lsCommand(args: string[]) {
+	options(args, [], []);
+	console.log(listLines(await listItems(config())).join("\n"));
+}
+
 async function verifyCommand(args: string[]) {
 	let url: string | undefined;
 	const options: { against?: string; source?: string } = {};
@@ -161,6 +296,9 @@ async function main() {
 		return;
 	}
 	if (command === "run") return run(args);
+	if (command === "put") return putCommand(args);
+	if (command === "refs") return refsCommand(args);
+	if (command === "ls") return lsCommand(args);
 	if (command === "verify") return verifyCommand(args);
 	if (command === "mcp") return serve();
 	throw new CliError(`Unknown command "${command}". Run vauly help.`);

@@ -37,7 +37,9 @@ export type ItemKind =
 	| "note"
 	| "ssh-key"
 	| "card"
-	| "identity";
+	| "identity"
+	/** One app's secrets in one place, such as acme/production: a hidden field each. */
+	| "environment";
 export type { Card, Identity };
 export type Tone = "blue" | "teal" | "amber" | "violet";
 

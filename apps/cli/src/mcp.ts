@@ -21,6 +21,15 @@ import {
 	type Reference,
 } from "./references";
 import { version } from "./version";
+import {
+	collectValues,
+	itemFields,
+	listItems,
+	ProposalPending,
+	propose,
+	referenceLines,
+	waitForAnswer,
+} from "./write";
 
 // vauly mcp: a Model Context Protocol server on stdin and stdout, for coding agents. It is
 // the same agent as `vauly run`, with the same token, grants and approvals. No tool hands
@@ -141,6 +150,77 @@ export const tools = [
 			additionalProperties: false,
 		},
 		annotations: { readOnlyHint: false, openWorldHint: true },
+	},
+	{
+		name: "propose_secrets",
+		title: "Propose secrets",
+		description:
+			"Put secrets into vauly without seeing them. Reads the values on this machine, from an env file or from variables in this server's environment, seals them so only your person can open them, and proposes them: as a new item with this name, or as new and changed fields on an item this agent may use. Your person accepts or declines in vauly. You get the key names and the proposal back, never a value. Then use list_fields for the references to commit instead of the values.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				item: {
+					type: "string",
+					description:
+						"An item's ID (itm_…) or name, such as `acme/production`. A name this agent can't use yet makes a new item.",
+				},
+				envFile: {
+					type: "string",
+					description:
+						"The env file that holds the values, relative to the project, such as `.env.production`. vauly:// references in it are skipped.",
+				},
+				variables: {
+					type: "array",
+					items: { type: "string" },
+					description:
+						"Names of variables in this server's own environment to propose instead.",
+				},
+				keys: {
+					type: "array",
+					items: { type: "string" },
+					description: "Only these keys of the env file.",
+				},
+				vault: {
+					type: "string",
+					description:
+						"For a new item: the vault to suggest, by name. Your person decides.",
+				},
+				cwd: envInput.cwd,
+			},
+			required: ["item"],
+			additionalProperties: false,
+		},
+		annotations: { readOnlyHint: false, openWorldHint: true },
+	},
+	{
+		name: "list_fields",
+		title: "List an item's fields",
+		description:
+			"The names of an item's fields and a vauly:// reference for each, as KEY=vauly://itm_…/fields/KEY lines to put in .env instead of values. Never returns a value. An item this agent may not use yet is asked for, and a person approves it in vauly.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				item: {
+					type: "string",
+					description: "The item's ID (itm_…) or its name.",
+				},
+			},
+			required: ["item"],
+			additionalProperties: false,
+		},
+		annotations: { readOnlyHint: true, openWorldHint: false },
+	},
+	{
+		name: "list_items",
+		title: "List items",
+		description:
+			"The items this agent may use without asking: each one's ID, name and field names. Never returns a value.",
+		inputSchema: {
+			type: "object",
+			properties: {},
+			additionalProperties: false,
+		},
+		annotations: { readOnlyHint: true, openWorldHint: false },
 	},
 ] as const;
 
@@ -370,6 +450,109 @@ async function requestAccess(context: Context, args: Record<string, unknown>) {
 	});
 }
 
+async function proposeSecrets(context: Context, args: Record<string, unknown>) {
+	const target = typeof args.item === "string" ? args.item.trim() : "";
+	if (!target) throw new CliError("Say which item, by its ID or name.");
+	const cwd =
+		typeof args.cwd === "string"
+			? resolvePath(context.cwd, args.cwd)
+			: context.cwd;
+	const strings = (value: unknown) =>
+		Array.isArray(value) ? value.map(String) : undefined;
+	const variables = strings(args.variables);
+	const envFile =
+		typeof args.envFile === "string"
+			? resolvePath(cwd, args.envFile)
+			: undefined;
+	if (!envFile && !variables) {
+		throw new CliError(
+			"Say where the values are: envFile, or variables in this server's environment.",
+		);
+	}
+	const values = collectValues({
+		envFile,
+		fromEnv: variables,
+		keys: strings(args.keys),
+		env: context.env,
+	});
+	const cfg = config(context.env);
+	const sent = await propose(cfg, target, values, {
+		vault: typeof args.vault === "string" ? args.vault : undefined,
+	});
+	const keys = values.map((value) => value.label);
+	const into = sent.itemId ?? `a new item called ${sent.name}`;
+	const summary = `Proposed ${keys.length} ${keys.length === 1 ? "key" : "keys"} for ${into}: ${keys.join(", ")}.`;
+	context.progress?.(`Waiting for a person to accept ${sent.id} in vauly`, 0);
+	try {
+		const itemId = await waitForAnswer(cfg, sent.id, context.approvalWaitMs);
+		return text(
+			`${summary}\nAccepted into ${itemId}. Call list_fields with it for the references to use instead of the values.`,
+			{ proposal: sent.id, status: "accepted", itemId, keys },
+		);
+	} catch (error) {
+		if (error instanceof ProposalPending) {
+			return text(
+				`${summary}\nProposal ${sent.id} is waiting for your person under Needs you in vauly. Ask them to accept it.`,
+				{ proposal: sent.id, status: "waiting", keys },
+			);
+		}
+		throw error;
+	}
+}
+
+async function listFields(context: Context, args: Record<string, unknown>) {
+	const target = typeof args.item === "string" ? args.item.trim() : "";
+	if (!target) throw new CliError("Say which item, by its ID or name.");
+	try {
+		const item = await itemFields(config(context.env), target, {
+			timeoutMs: context.approvalWaitMs,
+			onWaiting: (_count, agent) =>
+				context.progress?.(
+					`${agent} is waiting for a person to approve ${target} in vauly`,
+					0,
+				),
+		});
+		const lines = referenceLines(item);
+		return text(
+			lines.length
+				? `${item.name} (${item.id}):\n${lines.join("\n")}`
+				: `${item.name} (${item.id}) has no fields.`,
+			{
+				item: item.id,
+				name: item.name,
+				fields: item.fields.map((label, index) => ({
+					name: label,
+					reference: lines[index]?.split("=").slice(1).join("="),
+				})),
+			},
+		);
+	} catch (error) {
+		if (error instanceof ApprovalPending) {
+			return text(
+				`${target} needs a person's approval in vauly first. Ask them to approve it under Needs you, then call list_fields again.`,
+				{ status: "waiting_for_approval" },
+				true,
+			);
+		}
+		throw error;
+	}
+}
+
+async function listItemsTool(context: Context) {
+	const items = await listItems(config(context.env), "list_items");
+	const lines = items.map((item) =>
+		"once" in item
+			? `${item.id}: allowed for one run`
+			: `${item.id}: ${item.name}${item.fields.length ? ` (${item.fields.join(", ")})` : ""}`,
+	);
+	return text(
+		lines.length
+			? lines.join("\n")
+			: "This agent may not use any item without asking yet.",
+		{ items },
+	);
+}
+
 const handlers: Record<
 	(typeof tools)[number]["name"],
 	(context: Context, args: Record<string, unknown>) => Promise<ToolResult>
@@ -377,6 +560,9 @@ const handlers: Record<
 	list_secrets: listSecrets,
 	run_with_secrets: runWithSecrets,
 	request_access: requestAccess,
+	propose_secrets: proposeSecrets,
+	list_fields: listFields,
+	list_items: listItemsTool,
 };
 
 /** Answers one JSON-RPC message; null for notifications, which get no answer. */
@@ -403,7 +589,7 @@ export async function handle(
 				capabilities: { tools: { listChanged: false } },
 				serverInfo: { name: "vauly", title: "vauly", version },
 				instructions:
-					"Secrets from vauly, a team password manager. You never see their values: use list_secrets to see what this project can use, and run_with_secrets to run a command with them. A person approves each item the first time.",
+					"Secrets from vauly, a team password manager. You never see their values: use list_secrets to see what this project can use, and run_with_secrets to run a command with them. A person approves each item the first time. To move secrets into vauly, use propose_secrets, then list_fields for the references to commit instead.",
 			});
 		}
 		case "ping":
